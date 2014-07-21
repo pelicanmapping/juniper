@@ -1,0 +1,100 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2011 Pelican Ventures, Inc.
+* http://wush.net/trac/juniper
+*
+* osgJuniper is free software; you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>
+*/
+#ifndef OSGJUNIPER_IBR
+#define OSGJUNIPER_IBR 1
+
+#include "Common"
+#include <osg/Shape>
+#include <osg/Geometry>
+#include <map>
+
+namespace osgJuniper
+{
+
+	struct OSGJUNIPER_EXPORT IBRCamera
+	{
+		IBRCamera():
+	      _selected(false)
+		{
+		}
+
+		int           _id;
+		double        _focalLength;  // camera's focal length, in pixels.
+		double        _k1, _k2;      // two radial distortion correction coefficients
+		osg::Matrixd  _rot;
+		osg::Vec3d    _trans;        // translation
+
+		std::string _imageUri;
+		std::string _depthModelUri;
+		osg::ref_ptr<osg::Image> _image;
+		bool _selected;
+
+		osg::Vec3d worldToCamera( const osg::Vec3d& X ) const
+		{
+			// untested
+			osg::Vec3d P = _rot * X + _trans;
+			osg::Vec3d p = -P / P.z();
+			return p * r(p) * _focalLength;
+		}
+
+		osg::Matrixd getWorldMatrix() const
+		{
+			// tested, working
+			osg::Matrixd rot_i;
+			rot_i.invert( _rot );
+			osg::Matrixd result = _rot *
+				osg::Matrixd::translate( rot_i * -_trans );
+			return result;
+		}
+
+    const std::string& getDepthModelUri() const { return _depthModelUri; }
+    const std::string& getImageUri() const { return _imageUri; }
+
+	private:
+		double r(const osg::Vec3d& p) const
+		{
+			double plen2 = p.length2();
+			return 1.0 + _k1 * plen2 + _k2 * plen2 * plen2;
+		}
+	};
+	typedef std::vector<IBRCamera> IBRCameraList;
+
+	struct OSGJUNIPER_EXPORT IBRPointView
+	{
+		int _cameraIndex;   // index into camera list
+		int _key;           // index of SIFT keypoint where point was detected
+		float _x, _y;       // pixel position in image (0,0 is the center)
+	};
+
+	struct OSGJUNIPER_EXPORT IBRPoint
+	{
+		osg::Vec3d  _position;
+		osg::Vec4ub _color;
+		std::vector<IBRPointView> _views;
+	};
+	typedef std::vector<IBRPoint> IBRPointList;
+
+	struct OSGJUNIPER_EXPORT IBRModel : public osg::Referenced
+	{
+		IBRCameraList _cameras;
+		IBRPointList _points;
+	};
+}
+
+#endif

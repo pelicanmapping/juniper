@@ -1,0 +1,185 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2011 Pelican Ventures, Inc.
+* http://wush.net/trac/juniper
+*
+* osgJuniper is free software; you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>
+*/
+#ifndef OSGJUNIPER_IBR_CAMERANODE
+#define OSGJUNIPER_IBR_CAMERANODE 1
+
+#include "Common"
+#include <osg/MatrixTransform>
+#include <osg/Geometry>
+#include <osg/Geode>
+#include <osg/Material>
+#include <osgJuniper/IBR>
+
+#include <osgEarth/TaskService>
+
+
+
+namespace osgJuniper
+{
+    /**
+     * A decorator that organizes the IBR scene.  You can add IBRCameraNodes to it.
+     */
+    class OSGJUNIPER_EXPORT IBRScene : public osg::Group
+    {
+    public:
+        IBRScene();
+
+        osgEarth::TaskService* getTaskService() { return _taskService.get(); }
+
+    private:
+        osg::ref_ptr< osgEarth::TaskService > _taskService;
+    };
+
+
+    //class LoadImageOperation : public osg::Operation
+    struct LoadImageOperation : public osgEarth::TaskRequest
+    {
+    public:
+        LoadImageOperation(const std::string& filename);
+        virtual void operator() (osgEarth::ProgressCallback* progress);
+        osg::ref_ptr< osg::Image > _image;
+        std::string _filename;
+    };
+
+    /**
+     *IBRCamera is used to render an IBR Camera with a frustum
+     */
+    class OSGJUNIPER_EXPORT IBRCameraNode : public osg::MatrixTransform
+    {		
+    public:
+        IBRCameraNode();
+
+        /**
+         *Gets the opacity
+         */
+        float getOpacity() const;
+
+        /**
+         *Sets the opacity (0-1)
+         */
+        void setOpacity(float opacity);
+
+        /**
+         *Gets whether or not to show the frustum
+         */
+        bool getShowFrustum() const;
+
+        /**
+         *Sets whether or not to show the frustum
+         */
+        void setShowFrustum( bool showFrustum );
+
+        /**
+         *Gets the frustum color
+         */
+        const osg::Vec4f& getFrustumColor() const;
+
+        /**
+         *Sets the frustum color
+         */
+        void setFrustumColor( const osg::Vec4f& frustumColor);
+
+        /**
+         *Gets the scale of the frustum
+         */
+        float getScale() const;
+
+        /**
+         *Sets the scale of the frustum
+         */
+        void setScale(float scale);
+
+
+        /**
+         *Sets the camera to render
+         */
+        void setCamera(const IBRCamera& camera);
+
+        /**
+         *Gets the camera to render
+         */
+        const IBRCamera& getCamera() const;
+
+        /**
+         *Gets transform of depth model
+         */
+        osg::MatrixTransform* getTransform() { return _transform.get(); }
+
+        /**
+         *Create a geometry with the image of camera
+         */
+        osg::Geometry* createCameraGeom( const IBRCamera& camera, int imgWidth=0, int imgHeight=0, float scale=1.0f );
+
+        virtual void traverse(osg::NodeVisitor &nv);
+
+    private:
+        float _opacity;
+        bool  _showFrustum;
+        osg::Vec4f _frustumColor;		
+        float _scale;
+
+        IBRCamera _camera;
+
+        osg::ref_ptr<osg::Material> _material;
+
+        osg::ref_ptr< osg::Geometry > _frustumGeometry;
+        osg::ref_ptr< osg::Geode > _frustumGeode;
+
+        osg::ref_ptr< osg::Geometry > _faceGeometry;
+        osg::ref_ptr< osg::Geode > _faceGeode;
+        osg::ref_ptr< osg::Node > _depthModel;
+        osg::ref_ptr< osg::MatrixTransform > _transform;
+
+        osg::Geometry* createFrustumGeometry( const IBRCamera& camera, int imgWidth=0, int imgHeight=0, float scale=1.0f );
+        osg::Node* createCameraNode( const IBRCamera& camera );
+        osg::Node* createCameraDepthGeom( const IBRCamera& camera, int imgWidth, int imgHeight);
+        void redraw();
+
+        osg::ref_ptr< LoadImageOperation > _loadImageOperation;
+
+        bool _fullRes;
+
+        osg::ref_ptr< osg::Image > _image;
+        osg::ref_ptr< osg::Image > _thumbnail;
+
+        osg::observer_ptr< IBRScene > _ibrScene;
+    };
+
+    typedef std::vector<osg::ref_ptr< osgJuniper::IBRCameraNode > > CameraList;
+
+    /**
+     * Finds cameras in a scene graph
+     */
+    struct OSGJUNIPER_EXPORT IBRCameraFinder : public osg::NodeVisitor
+    {
+        CameraList _cameraList;
+
+        IBRCameraFinder() : osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN) {}
+        void apply(osg::MatrixTransform& node) {
+            IBRCameraNode* camNode = dynamic_cast<IBRCameraNode*>(&node);
+            if (camNode)
+            {
+                _cameraList.push_back(camNode);
+            }
+            traverse(node);
+        }
+    };
+}
+
+#endif

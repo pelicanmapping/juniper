@@ -1,0 +1,189 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2011 Pelican Ventures, Inc.
+* http://wush.net/trac/juniper
+*
+* osgEarth is free software; you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>
+*/
+#ifndef OSGJUNIPER_STREAMINGNODE
+#define OSGJUNIPER_STREAMINGNODE 1
+
+#include "Common"
+#include <osg/Geode>
+#include <osg/Geometry>
+
+namespace osgJuniper
+{
+    /**
+    * A callback that is called when a node is ready from a StreamingNodeSource
+    */
+    class OSGJUNIPER_EXPORT StreamingNodeSourceCallback : public osg::Referenced
+    {
+    public:
+        /**
+        * Called when a frame is ready
+        */
+        virtual void onFrame(osg::Node* node) {}
+    };
+
+    typedef std::list< osg::ref_ptr< StreamingNodeSourceCallback > > StreamingNodeCallbackList;
+
+    /**
+     * A streaming source of Nodes
+     */
+    class OSGJUNIPER_EXPORT StreamingNodeSource : public osg::Referenced
+    {
+    public:
+        StreamingNodeSource();
+
+        /**
+         *Starts streaming data.
+         */
+        void startStreaming();
+
+        /**
+         *Stops streaming data
+         */
+        void stopStreaming();
+
+        /**
+         *Gets whether or not data is streaming from this source.
+         */
+        bool isStarted() const { return _isStarted;}
+
+        /**
+         * Gets the list of StreamingNodeCallbacks for this source
+         */
+        StreamingNodeCallbackList& getCallbacks() { return _callbacks; }
+
+    protected:
+        /**
+         *Starts the streaming logic, usually in a different thread.  Overriden in subclasses.
+         */
+        virtual void startImplementation()  = 0;
+
+        /**
+         *Stops the streaming logic, usually by stopping the thread.  Overriden in subclasses.
+         */
+        virtual void stopImplementation() = 0;
+
+        /**
+         * Helper method that notifies any callbacks of a new frame.
+         */
+        void frame(osg::Node* node);
+    private:
+        StreamingNodeCallbackList _callbacks;
+        bool _isStarted;
+    };
+
+
+    /**
+     * Simple source of streaming nodes.  Mostly for demo and testing purposes.
+     * Loops through a list of filenames in a background thread and publishes them to any callbacks.
+     */
+    class OSGJUNIPER_EXPORT SimpleStreamingNodeSource : public StreamingNodeSource, public OpenThreads::Thread
+    {
+    public:
+        SimpleStreamingNodeSource();
+
+        /**
+         *Adds a filename to the list.
+         */
+        void addFilename(const std::string& filename);
+
+        virtual void startImplementation();
+        virtual void stopImplementation();
+
+        virtual void run();
+        virtual int cancel();
+
+    protected:
+        ~SimpleStreamingNodeSource();
+
+        typedef std::vector< std::string > FileNameList;
+        FileNameList _filenames;
+        unsigned int _filenameIndex;
+        bool _done;
+    };
+
+    /**
+     * A NodeSource that streams a fixed number of random points.
+     */
+    class OSGJUNIPER_EXPORT RandomStreamingNodeSource : public StreamingNodeSource, public OpenThreads::Thread
+    {
+    public:
+        RandomStreamingNodeSource();
+
+        virtual void startImplementation();
+        virtual void stopImplementation();
+
+        virtual void run();
+        virtual int cancel();
+
+        /**
+         * Gets the number of points that this source will stream
+         */
+        unsigned int getNumPoints() const { return _numPoints; }
+
+        /**
+         * Sets the number of points that this source will stream.
+         */
+        void setNumPoints( unsigned int numPoints ) { _numPoints = numPoints; }
+
+        /**
+         * Utility method for creating a node with the given points and colors.
+         */
+        osg::Node* makePoints(osg::Vec3Array* points, osg::Vec4Array* colors, unsigned int numPoints);
+
+    protected:
+        ~RandomStreamingNodeSource();
+        bool _done;
+        unsigned int _numPoints;
+    };
+
+    /**
+     * StreamingNode is an osg Node that can render data coming from a StreamingNodeSource.
+     */
+    class OSGJUNIPER_EXPORT StreamingNode : public osg::Group
+    {
+    public:
+        class Callback : public StreamingNodeSourceCallback
+        {
+        public:
+            virtual void onFrame(osg::Node* node);
+            osg::ref_ptr< osg::Node > _pendingNode;
+        };
+
+        /**
+         *Create a new StreamingNode that will monitor the given StreamingNodeSource.
+         */
+        StreamingNode( StreamingNodeSource* source );
+
+        StreamingNodeSource* getSource() { return _source.get(); }
+
+        unsigned int getHistory() const;
+        void setHistory(unsigned int history);
+
+        virtual void traverse(osg::NodeVisitor& nv);        
+    protected:
+        osg::ref_ptr< StreamingNodeSource > _source;
+        osg::ref_ptr< Callback > _callback;
+        unsigned int _history;
+    };
+
+} // namespace osgJuniper
+
+#endif // OSGJUNIPER_STREAMINGNODE
+
+

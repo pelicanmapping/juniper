@@ -1,0 +1,106 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2011 Pelican Ventures, Inc.
+* http://wush.net/trac/juniper
+*
+* osgJuniper is free software; you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>
+*/
+
+#ifndef OSGJUNIPERMAP_DECLUTTERTEXTPRIMITIVE_H
+#define OSGJUNIPERMAP_DECLUTTERTEXTPRIMITIVE_H 1
+
+#include <osgJuniperMap/Common>
+#include <osgJuniperMap/Primitive>
+#include <osg/AutoTransform>
+#include <osgEarthAnnotation/LabelNode>
+#include <osgText/Text>
+
+namespace osgJuniper { namespace Map {
+
+    using namespace osgEarth;
+
+    class OSGJUNIPERMAP_EXPORT DeclutterTextPrimitive : public Primitive
+    {
+    public:
+        DeclutterTextPrimitive(PrimitiveId id);
+
+        virtual const char* className() const { return "DeclutterTextPrimitive"; } 
+
+        const Location& getLocation() const;
+        void setLocation(const Location& location);
+
+        AltitudeModeEnum getAltitudeMode() const;
+        void setAltitudeMode(AltitudeModeEnum altitudeMode);
+
+        virtual void setMapContext(MapContext* context);
+
+        const std::string& getText() const;
+        void setText( const std::string& text );
+
+        const std::string& getFont() const;
+        void setFont( const std::string& font);
+
+        void setForegroundColor( const osg::Vec4& color );
+        const osg::Vec4& getForegroundColor() const;
+
+        void setOutlineColor( const osg::Vec4& color );
+        const osg::Vec4& getOutlineColor() const;
+
+        float getRotation() const;
+        void setRotation(float rotation);
+
+        float getSize() const;
+        void setSize( float size);
+
+        void setDeclutter( bool declutter );
+        bool getDeclutter() const;
+
+        short getOffsetX() const;
+        short getOffsetY() const;
+        void setOffset( short x, short y );
+
+        virtual void setProperty(const std::string& name, bool   value);
+        virtual void setProperty(const std::string& name, const osg::Vec3d& value);
+        virtual void setProperty(const std::string& name, int    value);
+        virtual void setProperty(const std::string& name, const std::string& value);
+        virtual void setProperty(const std::string& name, double value);
+		virtual void setProperty(const std::string& name, const LocationList& locations);
+
+        virtual void setProperty(const std::string& name, const std::vector< osg::Vec3 > value) {}
+        virtual void setProperty(const std::string& name, const std::vector< int > value) {}
+
+    protected:
+
+        void init();
+
+        osgEarth::Annotation::LabelNode* getLabel();
+
+        ~DeclutterTextPrimitive();
+        Location _location;
+        AltitudeModeEnum _altitudeMode;
+
+        osg::Vec4 _fgColor;
+        osg::Vec4 _outlineColor;        
+        std::string _text;
+        std::string _font;
+        float _rotation;
+        float _size;
+        osg::ref_ptr< osgEarth::Annotation::LabelNode > _label;
+        bool _declutter;
+        osg::Vec2s _offset;
+    };
+
+
+}}
+#endif

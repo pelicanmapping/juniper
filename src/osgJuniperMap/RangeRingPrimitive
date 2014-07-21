@@ -1,0 +1,75 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2011 Pelican Ventures, Inc.
+* http://wush.net/trac/juniper
+*
+* osgJuniper is free software; you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>
+*/
+
+#ifndef OSGJUNIPERMAP_RANGERINGPRIMITIVE_H
+#define OSGJUNIPERMAP_RANGERINGPRIMITIVE_H 1
+
+#include <osgJuniperMap/Common>
+#include <osgJuniperMap/Primitive>
+#include <osg/MatrixTransform>
+#include <osg/Geometry>
+#include <osg/Geode>
+
+namespace osgJuniper { namespace Map {
+
+
+    class OSGJUNIPERMAP_EXPORT RangeRingPrimitive : public Primitive
+    {
+    public:
+        RangeRingPrimitive(PrimitiveId id);
+
+        virtual const char* className() const { return "RangeRingPrimitive"; } 
+
+        const Location& getLocation() const;
+        void setLocation(const Location& location);
+        
+        virtual void setMapContext(MapContext* context);        
+
+        void setColor( const osg::Vec4& color);                        
+        const osg::Vec4& getColor() const;
+
+        void setRange(double size);
+        double getRange() const;
+
+        void setLineWidth(float lineWidth);
+        float getLineWidth() const;
+
+        virtual void setProperty(const std::string& name, int value);
+        virtual void setProperty(const std::string& name, double value);
+        virtual void setProperty(const std::string& name, const osg::Vec3d& value);
+        
+        
+    protected:
+
+        void init();
+
+        ~RangeRingPrimitive();
+        Location _location;                
+        osg::Vec4 _color;
+        double _range;
+        float _lineWidth;
+
+        osg::ref_ptr< osg::MatrixTransform > _transform;
+        osg::ref_ptr< osg::Geometry > _drawable;
+        osg::ref_ptr< osg::Geode > _geode;
+    };
+
+
+}}
+#endif

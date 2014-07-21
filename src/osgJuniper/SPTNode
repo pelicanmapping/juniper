@@ -1,0 +1,68 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2011 Pelican Ventures, Inc.
+* http://wush.net/trac/juniper
+*
+* osgEarth is free software; you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>
+*/
+#ifndef OSGJUNIPER_SPTNODE
+#define OSGJUNIPER_SPTNODE 1
+
+#include <osgJuniper/Common>
+#include <osg/Geode>
+#include <osg/Geometry>
+#include <osgJuniper/Point>
+
+namespace osgJuniper
+{
+    /**
+     * Experimental class that implements the Sequential Point Tree algorithm as described in 
+     * http://www.vis.uni-stuttgart.de/~dachsbcn/download/spt.pdf
+     */
+    class OSGJUNIPER_EXPORT SPTNode : public osg::Geode
+    {
+    public:
+        SPTNode();
+        void setPoints( PointList &points );
+
+        void setRadiusFactor( float radiusFactor );
+        float getRadiusFactor() const;
+
+        void setEnabled( bool enabled);
+        bool getEnabled() const;
+
+        unsigned int getMaxVerts() const;
+        void setMaxVerts(unsigned int maxVerts);
+
+
+        virtual void traverse(osg::NodeVisitor &nv);
+
+    protected:
+        float _radiusFactor;
+        osg::Geometry *_geometry;
+        osg::Vec3Array* _verts;
+        osg::Vec4Array* _colors;
+        osg::Vec3Array* _normals;
+        typedef std::map< float, int> RangeMap;
+        RangeMap _rangeMap;
+        osg::DrawArrays* _drawArrays;
+        bool _enabled;
+        unsigned int _maxVerts;
+    };
+
+} // namespace osgJuniper
+
+#endif // OSGJUNIPER_SPTNODE
+
+

@@ -1,0 +1,89 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2011 Pelican Ventures, Inc.
+* http://wush.net/trac/juniper
+*
+* osgJuniper is free software; you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>
+*/
+
+#ifndef OSGJUNIPERMAP_ARTICULATION_H
+#define OSGJUNIPERMAP_BITMAPPRIMITIVE_H 1
+
+#include <osgJuniperMap/Common>
+#include <osg/MatrixTransform>
+#include <osgSim/DOFTransform>
+
+namespace osgJuniper { namespace Map {
+
+    /**
+    * Attaches to a specific node and controls it's articulation.
+    */
+    class OSGJUNIPERMAP_EXPORT ArticulationController : public osg::Referenced
+    {
+    public:
+        ArticulationController(osg::Node* node);
+
+        /**
+         *Gets the Node that is being controlled
+         */
+        osg::Node* getNode() const;
+
+        /**
+         *Gets the translation of the articulated part
+         */
+        const osg::Vec3d& getTranslation() const;
+
+
+        /**
+         *Sets the translation of the articulated part
+         */
+        void setTranslation( const osg::Vec3d& translation);
+
+        /**
+         * Gets the rotation of the articulated part.
+         */
+        const osg::Vec3d& getRotation() const;
+
+
+        /**
+         * Sets the rotation of the articulated part.
+         *  This is specified as rotation in degrees around each axis (x-axis rotation, y-axis rotation, z-axis rotation)
+         */
+        void setRotation(const osg::Vec3d& rotation);
+
+        /**
+         *Gets the rotation offset of the articulated part
+         */
+        const osg::Vec3d& getRotationOffset() const;
+
+        /**
+         *Sets the rotation offset of the articulated part
+         */
+        void setRotationOffset(const osg::Vec3d& rotationOffset);
+
+    protected:
+        void update();
+
+        osg::Vec3d _rotationOffset;
+        osg::Vec3d _rotation;
+        osg::Vec3d _translation;
+        osg::Vec3d _baseTrans;
+
+        osg::ref_ptr< osg::MatrixTransform > _matrixTransform;
+        osg::ref_ptr< osgSim::DOFTransform > _dof;
+    };
+
+
+}}
+#endif

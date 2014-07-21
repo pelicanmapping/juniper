@@ -1,0 +1,166 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2011 Pelican Ventures, Inc.
+* http://wush.net/trac/juniper
+*
+* osgEarth is free software; you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>
+*/
+
+#ifndef JUNIPER_CAMERA_MANIPULATOR
+#define JUNIPER_CAMERA_MANIPULATOR
+
+#include <osgJuniper/Common>
+#include <osgJuniper/IBRCameraNode>
+#include <osg/MatrixTransform>
+#include <osg/Version>
+#include <osg/Timer>
+#include <osgAnimation/EaseMotion>
+
+#if OSG_MIN_VERSION_REQUIRED(2,9,7)
+#include <osgGA/CameraManipulator>
+namespace osgGA {
+    typedef CameraManipulator MatrixManipulator;
+};
+#else
+#include <osgGA/MatrixManipulator>
+#endif
+
+
+namespace osgJuniper
+{
+
+    class OSGJUNIPER_EXPORT IBRManipulator : public osgGA::MatrixManipulator
+    {
+    public:
+        IBRManipulator();
+        void setCameraList( const CameraList& cameraList);
+
+        osg::Matrixd getLocalToWorld(osg::Transform* transform)
+        {
+            osg::Matrixd mat = osg::computeLocalToWorld(transform->getParentalNodePaths()[0]);
+            return mat;
+        }
+
+        void removeScale(osg::Matrixd& localToWorld)
+        {
+            double sx = 1.0/sqrt(localToWorld(0,0)*localToWorld(0,0) + localToWorld(1,0)*localToWorld(1,0) + localToWorld(2,0)*localToWorld(2,0));
+            double sy = 1.0/sqrt(localToWorld(0,1)*localToWorld(0,1) + localToWorld(1,1)*localToWorld(1,1) + localToWorld(2,1)*localToWorld(2,1));
+            double sz = 1.0/sqrt(localToWorld(0,2)*localToWorld(0,2) + localToWorld(1,2)*localToWorld(1,2) + localToWorld(2,2)*localToWorld(2,2));
+            localToWorld = localToWorld*osg::Matrixd::scale(sx,sy,sz);
+        }
+
+        virtual const char* className() const { return "CameraManipulator"; }
+        /** set the position of the matrix manipulator using a 4x4 Matrix.*/
+        virtual void setByMatrix(const osg::Matrixd& matrix) 
+        {
+            if (_cameraList.empty())
+                _matrix = matrix; 
+        }
+
+        /** set the position of the matrix manipulator using a 4x4 Matrix.*/
+        virtual void setByInverseMatrix(const osg::Matrixd& matrix) 
+        {
+            if (_cameraList.empty())
+                _matrix.invert(matrix);
+        }
+
+        /** get the position of the manipulator as 4x4 Matrix.*/
+        //virtual osg::Matrixd getMatrix() const { return _matrix; }
+        virtual osg::Matrixd getMatrix() const
+        {
+            return osg::Matrixd::translate(0.0,0.0,_offset) * _matrix;
+        }
+
+        /** get the position of the manipulator as a inverse matrix of the manipulator, typically used as a model view matrix.*/
+        virtual osg::Matrixd getInverseMatrix() const { return osg::Matrixd::inverse(getMatrix()); }
+
+        /** handle events, return true if handled, false otherwise.*/
+        virtual bool handle(const osgGA::GUIEventAdapter& ea,osgGA::GUIActionAdapter& us);
+
+        /** Attach a node to the manipulator.
+        Automatically detaches previously attached node.
+        setNode(NULL) detaches previously nodes.
+        Is ignored by manipulators which do not require a reference model.*/
+        virtual void setNode(osg::Node* node);
+
+        /** Return node if attached.*/
+        virtual const osg::Node* getNode() const;
+
+        /** Return node if attached.*/
+        virtual osg::Node* getNode();
+
+
+        bool handleFrame();
+
+        void flushMouseEventStack();
+        void addMouseEvent(const osgGA::GUIEventAdapter& ea);
+        osg::Matrixd computeMatrix(int in, int out, double ratio);
+        void calcCamera();
+        int getCameraIndex();
+        void setCameraIndex(int value);
+        void setNextCamera();
+        void setPrevCamera();
+        void zoomCamera();
+
+
+        void createHUD();
+        osg::Camera* getGraph() { return _camera.get();}
+
+        void updateZoomMode(osgGA::GUIActionAdapter& us);
+        void enterZoomMode();
+        void leaveZoomMode();
+
+
+    protected:
+
+        CameraList _cameraList;
+        osg::Matrixd _matrix;
+
+        float _offset;
+        float _scrollDelta;
+        float _minOpacity;
+        float _maxOpacity;
+
+        // Internal event stack comprising last two mouse events.
+        osg::ref_ptr<const osgGA::GUIEventAdapter> _ga_t1;
+        osg::ref_ptr<const osgGA::GUIEventAdapter> _ga_t0;
+
+        double _currentPosition;
+
+        enum ZoomMode {
+            ZOOM_IN,
+            ZOOM_OUT,
+            ZOOM_UNACTIVE,
+        };
+
+        osgAnimation::InCubicMotion _zoomMotionIn;
+        osgAnimation::InCubicMotion _zoomMotionOut;
+
+        ZoomMode _zoomState;
+        osg::Timer_t _startTimeZoom;
+
+        osg::ref_ptr<osg::Camera> _camera;
+        osg::ref_ptr<osg::Geode> _geode;
+        osg::ref_ptr<osg::Geometry> _geometry;
+        std::vector<float> _restoreAlpha;
+
+
+        bool _automaticMode;
+        double _previousTime;
+
+        osg::observer_ptr<osg::Node> _node;
+    };
+}
+
+#endif

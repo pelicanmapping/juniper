@@ -1,0 +1,152 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2011 Pelican Ventures, Inc.
+* http://wush.net/trac/juniper
+*
+* osgJuniper is free software; you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>
+*/
+
+#ifndef OSGJUNIPERMAP_REGISTRY_H
+#define OSGJUNIPERMAP_REGISTRY_H 1
+
+#include <osgJuniperMap/Common>
+#include <osgJuniperMap/Primitive>
+#include <osgJuniper/Utils>
+
+namespace osgJuniper { namespace Map {
+
+
+    class OSGJUNIPERMAP_EXPORT PrimitiveFactory : public osg::Referenced
+    {
+    public:
+        virtual Primitive* create(const std::string& type, PrimitiveId id) = 0;
+    };
+
+    class OSGJUNIPERMAP_EXPORT Registry : public osg::Referenced
+    {
+    public:
+        static Registry* instance();
+
+        /**
+         * Adds the given PrimitiveFactory to the list of factories
+         * @param factory
+         *        The factory to add
+         * @param first
+         *        If true, insert this factory at the beginning of the list.  If false, insert it at the end.
+         *        By setting first to true, you can override the default primitives of Juniper by providing
+         *        your own factories that will get the first try to create a primitive.
+         */
+        void addPrimitiveFactory(PrimitiveFactory* factory, bool first=false);
+
+        /**
+         * Removes the given primitive factory from the list of factories
+         * @param factory
+         *        The factory to remove
+         */
+        void removePrimitiveFactory(PrimitiveFactory* factory);
+
+        /**
+         * Creates a Primitive
+         * @param type
+         *        The type of primitive to create
+         * @param id
+         *        The id of the newly created primitive.
+         * @returns
+         *        The newly created Primitive or NULL if there was an error.
+         */
+        Primitive* createPrimitive(const std::string& type, PrimitiveId id);
+
+        osg::Image* getImageForObject( __int64 id, bool cache=true, const std::string& plugin="" );
+        const std::string& getDefaultImagePlugin() const;
+        void setDefaultImagePlugin( const std::string &defaultImagePlugin );
+
+    protected:
+        //Protected constructor to enforce singleton instance
+        Registry();
+        ~Registry();
+
+        typedef std::vector< osg::ref_ptr< PrimitiveFactory > > PrimitiveFactoryList;
+        PrimitiveFactoryList _primitiveFactories;
+        OpenThreads::Mutex _primitiveFactoriesMutex;
+
+        std::string _defaultImagePlugin;
+    };
+
+    template<class T>
+    class RegisterPrimitiveFactoryProxy
+    {
+    public:
+        RegisterPrimitiveFactoryProxy(bool first = false)
+        {
+            _factory = new T;
+            if (Registry::instance())
+            {
+                Registry::instance()->addPrimitiveFactory( _factory.get());
+            }
+
+        }
+
+        RegisterPrimitiveFactoryProxy(T* factory, bool first = false)
+        {
+            _factory = factory;
+            if (Registry::instance())
+            {
+                Registry::instance()->addPrimitiveFactory( _factory.get(), first);
+            }
+
+        }
+
+        ~RegisterPrimitiveFactoryProxy()
+        {
+            if (Registry::instance())
+            {
+                Registry::instance()->removePrimitiveFactory( _factory.get());
+            }
+        }
+
+    protected:
+        osg::ref_ptr< T > _factory;
+    };
+
+    template<class T>
+    class SimplePrimitiveFactory : public PrimitiveFactory
+    {
+    public:
+        SimplePrimitiveFactory(const std::string& type):
+          _type(type)
+        {
+        }
+    protected:
+        virtual Primitive* create(const std::string& type, PrimitiveId id)
+        {        
+            if (Utils::toLower(_type).compare( Utils::toLower( type ) ) == 0) return new T(id);
+            return 0;
+        }
+        std::string _type;
+    };
+
+#define REGISTER_PRIMITIVE_FACTORY(classname) \
+    static osgJuniper::Map::RegisterPrimitiveFactoryProxy<classname> g_primitiveFactory_proxy_##classname;
+
+#define REGISTER_SIMPLE_PRIMITIVE_FACTORY(classname) \
+    static osgJuniper::Map::RegisterPrimitiveFactoryProxy<SimplePrimitiveFactory<classname>> g_simplePrimitiveFactory_proxy_##classname(new SimplePrimitiveFactory<classname>(#classname));
+
+#define REGISTER_SIMPLE_PRIMITIVE_FACTORY_TYPE(classname, typeName) \
+    static osgJuniper::Map::RegisterPrimitiveFactoryProxy<SimplePrimitiveFactory<classname>> g_simplePrimitiveFactory_proxy_##classname_##typeName(new SimplePrimitiveFactory<classname>(#typeName));
+
+#define REGISTER_SIMPLE_PRIMITIVE_FACTORY_OVERRIDE(classname) \
+    static osgJuniper::Map::RegisterPrimitiveFactoryProxy<SimplePrimitiveFactory<classname>> g_simplePrimitiveFactory_proxy_##classname(new SimplePrimitiveFactory<classname>(#classname), true);
+
+}}
+#endif

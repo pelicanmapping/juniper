@@ -1,0 +1,347 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2011 Pelican Ventures, Inc.
+* http://wush.net/trac/juniper
+*
+* osgEarth is free software; you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>
+*/
+#ifndef OSGJUNIPER_VELODYNE
+#define OSGJUNIPER_VELODYNE 1
+
+#include "Common"
+#include <osg/Geode>
+#include <osg/Geometry>
+#include <osgJuniper/Point>
+#include <osgJuniper/Pcap>
+#include <osgJuniper/StreamingNode>
+
+namespace osgJuniper
+{
+    const guint VLS_PORT = 2368;             // UDP port for broadcast of packets from scanner
+    const guint VLS_PKT_LEN = 1248;          // Total length of a lidar packet
+    const guint VLS_DATA_LEN_V1 = 1216;      // Payload size of old lidar packet (not used anymore)
+    const guint VLS_DATA_LEN_V2 = 1214;      // Payload size of new lidar packet
+    const guint VLS_TRAILER_LEN = 6;         // Length of trailer data
+    const guint VLS_LINK_HDR_LEN = 14;       // Length of ethernet header
+    const guint VLS_IP_VERSION = 4;          // IPv4
+    const guint VLS_IP_PROTO = 17;           // UDP
+    const guint VLS_HDR_LEN = 42;            // Length of lidar packet headers (before payload)
+    const guint VLS_FIRING_PER_PKT = 12;     // Number of firings per packet
+    const guint VLS_LASER_PER_FIRING = 32;   // Number of lasers in a firing
+    const guint VLS_MAX_NUM_LASERS = 64;     // Total number of lasers
+    const guint VLS_NUM_ROT_ANGLES = 36000;  // Number of rotation values (0 through 35999)
+    const guint VLS_NUM_BLOCKS = 2;          // Number of "firing blocks" (lasers 0-31 and 32-63)
+#define VLS_DIM_SCALE 1.0f;
+
+    // Enum for the "select" value used to descriminate between firing blocks
+    enum LaserBlockSelect {
+        BLOCK_0_TO_31  = 0xeeff,
+        BLOCK_32_TO_63 = 0xddff
+    };
+
+    //
+    // Data structures for data within a packet's payload.  The payload for a packet
+    // consists of VLS_FIRING_PER_PKT number of vls_firing structs which contain
+    // the firing data.
+    //
+    /** Laser data point. */
+#pragma pack(push, 1)
+    typedef struct vls_point {
+        guint16 distance;
+        guint8 intensity;
+    } vls_point_t;
+#pragma pack(pop)
+
+    /** Firing data from a set of lasers. */
+#pragma pack(push,1)
+    typedef struct vls_firing {
+        guint16 select; // which firing block this is from, block 0 (lasers 0-31) has a value of 0xeeff while block 1 (lasers 32-63) has a value of 0xddff
+        guint16 position;
+        vls_point_t points[VLS_LASER_PER_FIRING];
+    } vls_firing_t;
+#pragma pack(pop)
+
+    class OSGJUNIPER_EXPORT CorrectionData : public osg::Referenced
+    {
+    public:
+        CorrectionData();
+    protected:
+        double _rotCosTable[36001];
+        double _rotSinTable[36001];
+    };
+
+    /** This structure is the C-equivalent of the XML correction file "db.xml" that
+    * comes with every velodyne laser (it is used by their DSR application).
+    * Note that the angles are in degrees and the distances in centimeters.
+    */
+    typedef struct __RAW_CORRECTION_DATA__ {
+        // This parameter is the rotational correction angle for each laser, as
+        // viewed from the back of the unit. Positive factors rotate to the left, and negative
+        // values rotate to the right.
+        double	m_dRotCorrectionDeg;
+        // This parameter is the vertical correction angle for each laser, as
+        // viewed from the back of the unit. Positive values have the laser pointing up, and
+        // negative values have the laser pointing down.
+        double	m_dVertCorrectionDeg;
+        // Each laser has its own unique distance due to minor variations in the
+        // parts used to construct the laser. This correction factor, in centimeters, accounts
+        // for this variance. This number should be directly added to the distance value read in
+        // the packet.
+        double	m_dDistCorrectionCm;
+        // This value represents the height of each laser as measured
+        // from the bottom of the base. It is a fixed value for all upper block lasers and a
+        // different fixed value for all lower block lasers.
+        double	m_dVertOffsetCorrectionCm;
+        // This value represents the horizontal offset of each laser as
+        // viewed from the back of the laser. It is a constant positive or negative value for
+        // all lasers.
+        double	m_dHorizOffsetCorrectionCm;
+    } RAW_CORRECTION_DATA;
+
+
+    struct OSGJUNIPER_EXPORT CalibrationPoint
+    {
+        CalibrationPoint();
+        CalibrationPoint(double rotCorrectionDeg, double vertCorrectionDeg, double distCorrectionCm, double vertOffsetCorrectionCm, double horizOffsetCorrectionCm);
+
+        double _cosRotationCorrection;
+        double _sinRotationCorrection;
+        double _cosVertCorrection;
+        double _sinVertCorrection;
+        double _distCorrectionCm;
+        double _vertOffsetCorrectionCm;
+        double _horizOffsetCorrectionCm;
+    };
+
+    typedef std::vector< CalibrationPoint > CalibrationList;
+
+    class OSGJUNIPER_EXPORT CalibrationDB : public osg::Referenced
+    {
+    public:
+        CalibrationDB();
+
+        static CalibrationDB* buildDefaultCalibrationDatabase();
+        const CalibrationPoint& getCalibration(unsigned int laserNum);
+        void setCalibrationPoint(unsigned int laserNum, const CalibrationPoint& point);
+        unsigned int getNumCalibrations() const { return _calibrations.size(); }
+
+    private:
+        CalibrationList _calibrations;
+    };  
+
+    // Define the default correction factors
+    // These are the corrections for Spawar's first velodyne, it will have to
+    // be modified for others.
+    RAW_CORRECTION_DATA	RawCorrections[VLS_MAX_NUM_LASERS] = {
+        /* 0 */		{-4.5, -7.1581192, 20, 21.560343, -2.5999999},
+        /* 1 */		{-3, -6.8178215, 20, 21.516994, 2.5999999},
+        /* 2 */		{3.5, 0.31782165, 20, 20.617426, -2.5999999},
+        /* 3 */		{5, 0.65811908, 20, 20.574717, 2.5999999},
+        /* 4 */		{-0.2, -6.4776502, 2, 21.473722, -2.5999999},
+        /* 5 */		{1.5, -6.1375928, 7, 21.430525, 2.5999999},
+        /* 6 */		{-1, -8.520812, 12, 21.734608, -2.5999999},
+        /* 7 */		{0.5, -8.1798887, 13, 21.690901, 2.5999999},
+        /* 8 */		{4, -5.797637, 16, 21.387396, -2.5999999},
+        /* 9 */		{5.8000002, -5.4577708, 13, 21.34433, 2.5999999},
+        /* 10 */	{3, -7.8391404, 11, 21.647291, -2.5999999},
+        /* 11 */	{5, -7.4985547, 22, 21.603773, 2.5999999},
+        /* 12 */	{-4.5, -3.0802133, 10, 21.044245, -2.5999999},
+        /* 13 */	{-2.5, -2.7406337, 17, 21.001518, 2.5999999},
+        /* 14 */	{-5.5, -5.1179824, 8, 21.301321, -2.5999999},
+        /* 15 */	{-3.5, -4.7782598, 22, 21.258366, 2.5999999},
+        /* 16 */	{-0.2, -2.4010365, 8, 20.958813, -2.5999999},
+        /* 17 */	{2, -2.0614092, 9, 20.916126, 2.5999999},
+        /* 18 */	{-1.3, -4.4385905, 7, 21.215462, -2.5999999},
+        /* 19 */	{1, -4.0989642, 9, 21.172602, 2.5999999},
+        /* 20 */	{4, -1.7217404, 10, 20.873451, -2.5999999},
+        /* 21 */	{5.5, -1.3820176, -14, 20.830786, 2.5999999},
+        /* 22 */	{3.2, -3.7593663, 13, 21.129782, -2.5999999},
+        /* 23 */	{5, -3.4197867, 12, 21.086998, 2.5999999},
+        /* 24 */	{-4.5, 0.998555, 16, 20.531982, -2.5999999},
+        /* 25 */	{-3, 1.339141, 16, 20.489222, 2.5999999},
+        /* 26 */	{-5.3000002, -1.0422293, 12, 20.788124, -2.5999999},
+        /* 27 */	{-3.8, -0.70236301, 27, 20.745461, 2.5999999},
+        /* 28 */	{-0.30000001, 1.679889, 16, 20.446428, -2.5999999},
+        /* 29 */	{1.2, 2.0208123, 26, 20.403601, 2.5999999},
+        /* 30 */	{-0.89999998, -0.36240739, 14, 20.702793, -2.5999999},
+        /* 31 */	{0.5, -0.022349782, 20, 20.660116, 2.5999999},
+        /* 32 */	{-7.5, -22.737886, 5, 16.019152, -2.5999999},
+        /* 33 */	{-4.5999999, -22.226072, 18, 15.954137, 2.5999999},
+        /* 34 */	{5, -11.513928, 8, 14.680806, -2.5999999},
+        /* 35 */	{7.5, -11.002114, 13, 14.623099, 2.5999999},
+        /* 36 */	{-0.5, -21.714685, 6, 15.889649, -2.5999999},
+        /* 37 */	{2, -21.203688, 22, 15.82566, 2.5999999},
+        /* 38 */	{-2, -24.790272, 15, 16.284933, -2.5999999},
+        /* 39 */	{0.5, -24.276321, 24, 16.217583, 2.5999999},
+        /* 40 */	{6, -20.693031, 6, 15.762167, -2.5999999},
+        /* 41 */	{8.8000002, -20.182682, 10, 15.699132, 2.5999999},
+        /* 42 */	{5, -23.762968, 8, 16.15085, -2.5999999},
+        /* 43 */	{8.5, -23.250172, 15, 16.084715, 2.5999999},
+        /* 44 */	{-7.5, -16.615318, 8, 15.26925, -2.5999999},
+        /* 45 */	{-4.3000002, -16.105938, 20, 15.209245, 2.5999999},
+        /* 46 */	{-9, -19.672594, 11, 15.63654, -2.5999999},
+        /* 47 */	{-6, -19.162729, 16, 15.574372, 2.5999999},
+        /* 48 */	{-0.5, -15.596496, 6, 15.14954, -2.5999999},
+        /* 49 */	{2.2, -15.086954, 14, 15.090119, 2.5999999},
+        /* 50 */	{-2, -18.653046, 0, 15.51261, -2.5999999},
+        /* 51 */	{1, -18.143503, -8, 15.451235, 2.5999999},
+        /* 52 */	{6, -14.577271, 7, 15.030966, -2.5999999},
+        /* 53 */	{8.5, -14.067405, 18, 14.972065, 2.5999999},
+        /* 54 */	{5, -17.634062, 10, 15.390228, -6.1999998},
+        /* 55 */	{8, -17.124681, 21, 15.329572, 2.5999999},
+        /* 56 */	{-7, -10.489829, 12, 14.565539, -2.5999999},
+        /* 57 */	{-4, -9.9770317, 13, 14.508112, 2.5999999},
+        /* 58 */	{-8.5, -13.557318, 12, 14.913401, -2.5999999},
+        /* 59 */	{-5.5, -13.046968, 22, 14.854958, 2.5999999},
+        /* 60 */	{-0.5, -9.4636793, 18, 14.450804, -2.5999999},
+        /* 61 */	{2, -8.949728, 6, 14.3936, 2.5999999},
+        /* 62 */	{-2, -12.536313, 10, 14.796721, -2.5999999},
+        /* 63 */	{1, -12.025314, 25, 14.738676, 2.5999999},
+    };
+
+
+    osg::Vec4f DefaultLaserColors[VLS_MAX_NUM_LASERS] = {
+        /* 0 */		osg::Vec4f(0.80062562f, 0.13936065f, 0.94612038f, 1.0f),
+        /* 1 */		osg::Vec4f(0.89410239f, 0.020965897f, 0.95689327f, 1.0f),
+        /* 2 */		osg::Vec4f(1.0f, 0.98829633f, 0.56340885f, 1.0f),
+        /* 3 */		osg::Vec4f(1.0f, 0.99130237f, 0.60694283f, 1.0f),
+        /* 4 */		osg::Vec4f(1.0f, 0.0f, 0.80227357f, 1.0f),
+        /* 5 */		osg::Vec4f(0.97920197f, 0.0f, 0.71082628f, 1.0f),
+        /* 6 */		osg::Vec4f(0.49866483f, 0.06953536f, 0.94934005f, 1.0f),
+        /* 7 */		osg::Vec4f(0.58835739f, 0.11071946f, 0.92362857f, 1.0f),
+        /* 8 */		osg::Vec4f(1.0f, 0.15568779f, 0.58081943f, 1.0f),
+        /* 9 */		osg::Vec4f(1.0f, 0.04711986f, 0.56136417f, 1.0f),
+        /* 10 */	osg::Vec4f(0.69336998f, 0.017517358f, 0.98837262f, 1.0f),
+        /* 11 */	osg::Vec4f(0.80132753f, 0.44267949f, 0.95530635f, 1.0f),
+        /* 12 */	osg::Vec4f(1.0f, 0.52376592f, 0.41156635f, 1.0f),
+        /* 13 */	osg::Vec4f(1.0f, 0.62554359f, 0.47981995f, 1.0f),
+        /* 14 */	osg::Vec4f(1.0f, 0.15126269f, 0.19542229f, 1.0f),
+        /* 15 */	osg::Vec4f(1.0f, 0.15562676f, 0.16557565f, 1.0f),
+        /* 16 */	osg::Vec4f(1.0f, 0.73363853f, 0.0f, 1.0f),
+        /* 17 */	osg::Vec4f(1.0f, 0.74169528f, 0.0f, 1.0f),
+        /* 18 */	osg::Vec4f(1.0f, 0.3063859f, 0.33160907f, 1.0f),
+        /* 19 */	osg::Vec4f(1.0f, 0.36916152f, 0.35747311f, 1.0f),
+        /* 20 */	osg::Vec4f(1.0f, 0.88491648f, 0.52645153f, 1.0f),
+        /* 21 */	osg::Vec4f(1.0f, 0.86242467f, 0.50180817f, 1.0f),
+        /* 22 */	osg::Vec4f(1.0f, 0.51375604f, 0.49880216f, 1.0f),
+        /* 23 */	osg::Vec4f(1.0f, 0.52500188f, 0.49030289f, 1.0f),
+        /* 24 */	osg::Vec4f(1.0f, 0.9952392f, 0.86363012f, 1.0f),
+        /* 25 */	osg::Vec4f(1.0f, 0.9969787f, 0.86340123f, 1.0f),
+        /* 26 */	osg::Vec4f(1.0f, 0.97816432f, 0.0f, 1.0f),
+        /* 27 */	osg::Vec4f(1.0f, 0.96331733f, 0.0069733732f, 1.0f),
+        /* 28 */	osg::Vec4f(1.0f, 1.0f, 1.0f, 1.0f),
+        /* 29 */	osg::Vec4f(1.0f, 1.0f, 1.0f, 1.0f),
+        /* 30 */	osg::Vec4f(1.0f, 0.99310291f, 0.23929198f, 1.0f),
+        /* 31 */	osg::Vec4f(0.96932936f, 0.92982376f, 0.22809187f, 1.0f),
+        /* 32 */	osg::Vec4f(0.94447243f, 0.80633247f, 0.50565344f, 1.0f),
+        /* 33 */	osg::Vec4f(0.92018008f, 0.85848784f, 0.61857021f, 1.0f),
+        /* 34 */	osg::Vec4f(0.099382013f, 0.8874647f, 0.89571983f, 1.0f),
+        /* 35 */	osg::Vec4f(0.062867172f, 0.76806289f, 0.90629435f, 1.0f),
+        /* 36 */	osg::Vec4f(0.93400472f, 0.87553215f, 0.3565881f, 1.0f),
+        /* 37 */	osg::Vec4f(0.89787138f, 0.99188221f, 0.43889526f, 1.0f),
+        /* 38 */	osg::Vec4f(0.98750287f, 0.64711988f, 0.22232395f, 1.0f),
+        /* 39 */	osg::Vec4f(0.98046845f, 0.68416876f, 0.26109713f, 1.0f),
+        /* 40 */	osg::Vec4f(0.77787441f, 0.92979324f, 0.32025635f, 1.0f),
+        /* 41 */	osg::Vec4f(0.61332113f, 0.85714501f, 0.28570992f, 1.0f),
+        /* 42 */	osg::Vec4f(0.9444114f, 0.81309223f, 0.31055161f, 1.0f),
+        /* 43 */	osg::Vec4f(0.92962539f, 0.82113373f, 0.20189212f, 1.0f),
+        /* 44 */	osg::Vec4f(0.11247425f, 0.70312047f, 0.27020675f, 1.0f),
+        /* 45 */	osg::Vec4f(0.066971846f, 0.75324637f, 0.23851377f, 1.0f),
+        /* 46 */	osg::Vec4f(0.48876172f, 0.86549175f, 0.15286489f, 1.0f),
+        /* 47 */	osg::Vec4f(0.43691158f, 0.86878765f, 0.20390631f, 1.0f),
+        /* 48 */	osg::Vec4f(0.047623407f, 0.82670331f, 0.19949645f, 1.0f),
+        /* 49 */	osg::Vec4f(0.24744029f, 0.88975358f, 0.39743647f, 1.0f),
+        /* 50 */	osg::Vec4f(0.3284657f, 0.84571606f, 0.19032578f, 1.0f),
+        /* 51 */	osg::Vec4f(0.32675669f, 0.78713667f, 0.17766079f, 1.0f),
+        /* 52 */	osg::Vec4f(0.38753337f, 0.99688715f, 0.55497062f, 1.0f),
+        /* 53 */	osg::Vec4f(0.47486076f, 1.0f, 0.62685585f, 1.0f),
+        /* 54 */	osg::Vec4f(0.068436712f, 0.54044402f, 0.17508201f, 1.0f),
+        /* 55 */	osg::Vec4f(0.041275654f, 0.6317693f, 0.17706569f, 1.0f),
+        /* 56 */	osg::Vec4f(0.10542458f, 0.73089188f, 0.91239798f, 1.0f),
+        /* 57 */	osg::Vec4f(0.36777294f, 0.63620967f, 0.89065385f, 1.0f),
+        /* 58 */	osg::Vec4f(0.55085069f, 1.0f, 0.63308156f, 1.0f),
+        /* 59 */	osg::Vec4f(0.6440528f, 0.87278551f, 0.84861523f, 1.0f),
+        /* 60 */	osg::Vec4f(0.097398333f, 0.055634394f, 0.93968111f, 1.0f),
+        /* 61 */	osg::Vec4f(0.36871901f, 0.069138631f, 0.94883651f, 1.0f),
+        /* 62 */	osg::Vec4f(0.55817503f, 0.92266726f, 0.9033646f, 1.0f),
+        /* 63 */	osg::Vec4f(0.34676129f, 0.88827342f, 0.95902956f, 1.0f),
+    };
+
+
+
+    /**
+     * Class for reading from a VelodyneDataset.
+     */
+    class OSGJUNIPER_EXPORT VelodyneDataset : public osg::Referenced
+    {
+    public:
+        /**
+         *Creates a new VelodyneDataset from the given file.
+         */
+        VelodyneDataset(const std::string& filename);
+        /**
+         * Reads the next frame from the file.
+         */
+        osg::Node* nextFrame();
+
+        /**
+         * Resets reading to the beginning of the file.
+         */
+        void reset();
+    protected:
+        ~VelodyneDataset() {};
+        std::string _filename;
+        PcapReader _reader;
+        osg::ref_ptr< CalibrationDB > _calibrationDB;
+        PACKET _currPacket;
+        vls_firing_t* _currFiring;
+        int _firingNum;
+        int _lastPosition;
+    };
+
+    /**
+     * A StreamingNodeSource that streams velodyne data from a VelodyneDataset
+     */
+    class OSGJUNIPER_EXPORT VelodyneStreamingNodeSource : public StreamingNodeSource, public OpenThreads::Thread
+    {
+    public:
+        VelodyneStreamingNodeSource( VelodyneDataset* dataset );
+
+        virtual void startImplementation();
+        virtual void stopImplementation();
+
+        virtual void run();
+        virtual int cancel();
+
+        /**
+         * Sets how long each frame should last
+         */
+        void setFrameTime(float frameTime) { _frameTime = frameTime;}
+
+        /**
+         * Gets how long each frame should last.
+         */
+        float getFrameTime() const { return _frameTime;}
+
+    protected:
+        ~VelodyneStreamingNodeSource();
+        bool _done;
+        float _frameTime;
+        osg::ref_ptr< VelodyneDataset > _dataset;
+    };    
+} // namespace osgJuniper
+
+#endif // OSGJUNIPER_VELODYNE
+
+

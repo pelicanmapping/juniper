@@ -1,0 +1,160 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+ * Copyright 2010-2011 Pelican Ventures, Inc.
+ * http://wush.net/trac/juniper
+ *
+ * osgEarth is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ */
+
+#ifndef OSGJUNIPER_POINT
+#define OSGJUNIPER_POINT 1
+
+#include <osgJuniper/Common>
+#include <osg/ref_ptr>
+#include <osg/Object>
+#include <osg/Vec3>
+#include <osg/Vec4>
+#include <osg/BoundingBox>
+#include <osg/Version>
+#include <osgDB/ReaderWriter>
+
+
+#include <vector>
+#include <list>
+
+namespace osgJuniper
+{
+    /**
+     * A simple point
+     */
+    class OSGJUNIPER_EXPORT Point
+    {
+    public:
+        Point();
+        Point(const osg::Vec3& position, const osg::Vec3& normal, const osg::Vec4 &color);
+
+        osg::Vec3 _position;
+        osg::Vec4 _color;
+        osg::Vec3 _normal;    
+        float _minRange;
+        float _size;        
+    };
+
+    typedef std::list< Point > PointList;    
+
+    /**
+     * A cursor that lets you iterate over points from a PointSource
+     */
+    class OSGJUNIPER_EXPORT PointCursor : public osg::Referenced
+    {
+    public:
+        virtual bool hasMore() const = 0;
+        virtual bool nextPoint(Point& point) = 0;
+    };
+
+    /**
+     * A datasource that provides points
+     */
+    class OSGJUNIPER_EXPORT PointSource : public virtual osg::Object
+    {
+    public:
+        virtual osg::Object* cloneType() const { return 0; } // cloneType() not appropriate
+        virtual osg::Object* clone(const osg::CopyOp&) const { return 0; } // clone() not appropriate
+        virtual bool isSameKindAs(const osg::Object* obj) const { return dynamic_cast<const PointSource*>(obj)!=NULL; }
+        virtual const char* className() const { return "PointSource"; }
+        virtual const char* libraryName() const { return "osgJuniper"; }
+
+        /**
+         *Creates a point cursor for reading points from this PointSource 
+         */
+        virtual PointCursor* createPointCursor() = 0;
+        
+        /**
+         *Loads a point source from the given filename
+         */
+        static PointSource* loadPointSource(const std::string& filename, const osgDB::ReaderWriter::Options* options=0);
+    };
+
+    typedef std::vector< osg::ref_ptr< PointSource > > PointSourceList;
+
+
+    /**
+     * A simple cursor that iterates over points in a PointLists
+     */
+    class OSGJUNIPER_EXPORT PointListCursor : public PointCursor
+    {
+    public:
+        PointListCursor(PointList& points);
+        virtual bool hasMore() const;
+        virtual bool nextPoint(Point& point);
+    protected:
+        PointList& _points;
+        PointList::iterator _itr;
+        unsigned int _numRead;
+    };
+
+    /**
+     * A simple PointSource that provides points from a PointLists
+     */
+    class OSGJUNIPER_EXPORT PointListSource : public PointSource
+    {
+    public:
+        PointListSource();
+        PointListSource(PointList points);
+        virtual PointCursor* createPointCursor();
+
+        PointList& getPoints() { return _points; }
+        
+    protected:
+        PointList _points;
+    };
+
+    /**
+     * A PointCursor that returns points from a CompositePointSources
+     */
+    class OSGJUNIPER_EXPORT CompositePointSourceCursor : public PointCursor
+    {
+    public:
+        CompositePointSourceCursor(PointSourceList& pointSources);
+
+        virtual bool hasMore() const;
+        virtual bool nextPoint(Point& point);
+
+        PointSourceList& _pointSources;
+        osg::ref_ptr< PointCursor > _currentCursor;
+
+        PointSourceList::iterator _iter;
+        unsigned int _numRead;
+    };
+
+
+    /**
+     * A PointSource that combines multiple point sources and makes them behave as a single source
+     */    
+    class OSGJUNIPER_EXPORT CompositePointSource : public PointSource
+    {
+    public:
+
+        CompositePointSource();
+        CompositePointSource( const std::vector< std::string > &filenames );
+        virtual PointCursor* createPointCursor();
+        void addPointSource(PointSource* pointSource);              
+        void addPointSource(const std::string &filename);
+
+        PointSourceList _pointSources;
+
+    };
+}
+
+#endif

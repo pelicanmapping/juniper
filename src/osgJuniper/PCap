@@ -1,0 +1,100 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2011 Pelican Ventures, Inc.
+* http://wush.net/trac/juniper
+*
+* osgEarth is free software; you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>
+*/
+
+#ifndef OSGJUNIPER_PCAP
+#define OSGJUNIPER_PCAP 1
+
+#include <osgJuniper/Common>
+#include <iostream>
+#include <fstream>
+
+
+/* Following definitions taken from the Wireshark Libpcap File Format
+* page at http://wiki.wireshark.org/Development/LibpcapFileFormat.
+*/
+
+typedef unsigned int    guint32;
+typedef int				gint32;
+typedef unsigned short  guint16;
+typedef short int		gint16;
+typedef unsigned char	guint8;
+typedef unsigned int	guint;
+typedef unsigned char   guchar;
+
+
+/** Global header for the pcap file. */
+#define MAGIC_NUMBER_NOSWAP	0xa1b2c3d4	// File format and native reader use same byte-swapping format
+#define MAGIC_NUMBER_SWAP	0xd4c3b2a1	// File format and native reader use opposite byte-swapping formats
+
+typedef struct pcap_hdr_s {
+    guint32 magic_number;   /* magic number */
+    guint16 version_major;  /* major version number */
+    guint16 version_minor;  /* minor version number */
+    gint32  thiszone;       /* GMT to local correction */
+    guint32 sigfigs;        /* accuracy of timestamps */
+    guint32 snaplen;        /* max length of captured packets, in octets */
+    guint32 network;        /* data link type */
+} pcap_hdr_t;
+
+typedef struct pcaprec_hdr_s {
+    guint32 ts_sec;         /* timestamp, seconds since January 1, 1970 00:00:00 GMT*/
+    guint32 ts_usec;        /* timestamp microseconds, should be less than 1,000,000 */
+    guint32 incl_len;       /* number of octets of packet saved in file */
+    guint32 orig_len;       /* actual length of packet */
+} pcaprec_hdr_t;
+
+// Define the maximum packet length. This should really be the maximum size of
+// an Ethernet packet which is 1518, but we're lazy...
+#define MAX_PACKET_LENGTH	65536
+
+typedef struct __PACKET__ {
+    __int64		timestamp;
+    guint32		nBytes;
+    char		Bytes[MAX_PACKET_LENGTH];
+} PACKET;   
+
+namespace osgJuniper
+{
+    class OSGJUNIPER_EXPORT PcapReader
+    {
+    public:
+        PcapReader( const std::string& filename );
+        bool hasMore() const;
+        bool nextPacket(PACKET& packet);
+
+        /**
+         *Gets the file size in bytes of this pcap file
+         */
+        unsigned int getFileSize() const;
+
+        /**
+         *Resets reading back to the first packet
+         */
+        void reset();
+
+    private:
+        std::string _filename;       
+        std::ifstream _in;
+        unsigned int _filesize;
+        pcap_hdr_t _header;
+
+    };
+}
+
+#endif

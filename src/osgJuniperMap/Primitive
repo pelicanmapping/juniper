@@ -1,0 +1,196 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2011 Pelican Ventures, Inc.
+* http://wush.net/trac/juniper
+*
+* osgJuniper is free software; you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>
+*/
+
+#ifndef OSGJUNIPERMAP_PRIMITIVE_H
+#define OSGJUNIPERMAP_PRIMITIVE_H 1
+
+#include <osgJuniperMap/Common>
+#include <osgJuniperMap/MapContext>
+#include <osgJuniperMap/Location>
+
+#include <osgEarth/GeoData>
+#include <osgEarth/Terrain>
+
+#include <osg/Group>
+#include <osg/ClusterCullingCallback>
+#include <osg/LOD>
+#include <osg/Notify>
+
+namespace osgJuniper { namespace Map {
+    typedef __int64	      PrimitiveId;    
+
+    /**Property definitions*/
+#define PROP_TEXT      "text"
+#define PROP_FGCOLOR   "fgcolor" ///< int or triple-double - RGB as COLORREF or X(red), Y(green), Z(blue)
+#define PROP_BGCOLOR   "bgcolor" ///< int or triple-double - RGB as COLORREF or X(red), Y(green), Z(blue)
+#define PROP_LATITUDE  "lat"
+#define PROP_LONGITUDE "lon"
+#define PROP_COORD	   "coord"
+#define PROP_ALTITUDE  "altitude"
+#define PROP_SHOW      "show"
+#define	PROP_LINESTYLE		"linestyle"
+#define	PROP_LINEWIDTH		"linewidth"
+#define	PROP_FILEPATH		"filepath"
+#define	PROP_PITCH			"pitch"
+#define	PROP_YAW			"yaw"
+#define	PROP_ROLL			"roll"
+#define	PROP_ROTATION		"rotation"
+#define	PROP_SCALE   		"scale"
+#define PROP_SHOW           "show"
+#define PROP_POINTLIST      "pointlist"
+
+#define PROP_SIZE      "size" //New!  This can be used for text size.
+#define PROP_WIDTH     "width" //new!  The width of an image
+#define PROP_HEIGHT    "height" //New! The height of an image.
+#define PROP_MINRANGE  "minrange" //New!  The min range of a primitive
+#define PROP_MAXRANGE  "maxrange" //New!  the max range of a primitive
+
+#define PROP_DEPTH_TEST "depthtest" //New! whether or not to enable depth testing
+#define PROP_LIGHTING   "lighting"  //New! whether or not to enable lighting
+#define PROP_RENDER_ORDER "renderorder" //New! The relative rendering order
+#define PROP_ORIENT_TO_GROUND "orienttoground" //New! Whether a model should be oriented to the ground
+#define PROP_ALTITUDE_MODE "altitudemode" //New!  The altitude mode of a primitive, see the AltitudeMode enum for values
+#define PROP_ENABLE_CLUSTER_CULLING "enable_cluster_culling" //New!  A hint to tell primitives to enable cluster culling or not.
+#define PROP_FONT "font" //New!  The font to use for text
+#define PROP_BGTRANSPARENCY "bgtransparency"
+#define PROP_OUTLINECOLOR "outlinecolor"
+
+#define PROP_IMAGEOBJECT "imageobject" //New!  The object use for texturing
+
+
+
+    class OSGJUNIPERMAP_EXPORT Primitive : public osg::Group
+    {
+    public:
+
+        enum PrimitiveType {
+            TYPE_GEOLOCATED,
+            TYPE_SCREEN
+        };
+
+		class PrimitiveTerrainChangedCallback : public osgEarth::TerrainCallback
+        {
+        public:
+            PrimitiveTerrainChangedCallback( Primitive * primitive );
+
+            virtual void onTileAdded(const osgEarth::TileKey& tileKey, osg::Node* terrain, osgEarth::TerrainCallbackContext&);
+
+        private:
+            Primitive *_primitive;
+        };  
+
+		virtual const char* className() const { return "Primitive"; } 
+        virtual const char* libraryName() const { return "osgJuniperMap"; }
+
+        PrimitiveId getID() const;
+        std::string getIDAsString() const;
+
+        bool getVisible() const;
+        void setVisible( bool visible );
+
+        float getMinRange() const;
+        void setMinRange(float minRange);
+        
+        float getMaxRange() const;
+        void  setMaxRange(float maxRange);
+
+        bool getEnableClusterCulling() const;
+        virtual void setEnableClusterCulling(bool enableClusterCulling);
+
+        void setRange(float minRange, float maxRange);
+
+        int getRenderOrder() const;
+        void setRenderOrder(int renderOrder);
+
+        virtual void setMapContext( MapContext* context );
+        MapContext* getMapContext() { return _context.get(); }
+
+        virtual void terrainChanged(const osgEarth::TileKey& tileKey, osg::Node* terrain) { }
+
+		virtual void setPrimitiveType(PrimitiveType type);
+		virtual PrimitiveType getPrimitiveType() const { return _primType;}
+        
+        /**
+         * Property setters          
+         */
+        virtual void setProperty(const std::string& name, double value);
+        virtual void setProperty(const std::string& name, int    value);
+        virtual void setProperty(const std::string& name, bool   value);
+        virtual void setProperty(const std::string& name, const std::string& value) {}
+        virtual void setProperty(const std::string& name, const osg::Vec3d& value) {}
+        virtual void setProperty(const std::string& name, const osg::Vec2d& value) {}
+        virtual void setProperty(const std::string& name, const LocationList& locations) {}
+
+		virtual void setProperty(const std::string& name, const std::vector< osg::Vec2 > value) {}
+        virtual void setProperty(const std::string& name, const std::vector< osg::Vec3 >& value) {}
+        virtual void setProperty(const std::string& name, const std::vector< int >& value) {}
+        virtual void setProperty(const std::string& name, osg::Image* value) {}
+
+        static osg::Vec4 getColorFromDecimal(int decimal);
+
+        static const osg::EllipsoidModel* getWGS84Ellipsoid();
+
+        virtual bool addChild(osg::Node *child);
+        virtual bool removeChildren(unsigned int pos, unsigned int numChildrenToRemove);
+
+    protected:
+        Primitive(PrimitiveId id);
+        ~Primitive();
+        PrimitiveId _id;
+        bool _visible;
+        osg::ref_ptr< MapContext > _context;
+
+        osg::LOD* _lod;
+        osg::Group* _mainGroup;
+        float _minRange, _maxRange;
+        bool _enableClusterCulling;
+        int _renderOrder;
+        PrimitiveType _primType;
+
+        osg::ref_ptr< PrimitiveTerrainChangedCallback > _terrainChangedCallback;
+		osg::ClusterCullingCallback* _ccc;
+    };    
+
+    class OSGJUNIPERMAP_EXPORT PrimitiveManager : public osg::Referenced
+    {
+    public:
+        PrimitiveManager();
+        const Primitive* getPrimitive(PrimitiveId id) const;
+        Primitive* getPrimitive(PrimitiveId id);
+
+        void addPrimitive(Primitive* primitive);
+        void removePrimitive(PrimitiveId id);
+
+        void setMapContext( MapContext* context);
+
+    private:
+        ~PrimitiveManager();
+
+        //A map of ID to primitive
+        typedef std::map<PrimitiveId, osg::ref_ptr< Primitive > > PrimitiveMap;
+
+        PrimitiveMap _primitives;
+
+        OpenThreads::Mutex _mutex;
+    };
+
+
+}}
+
+#endif //OSGJUNIPERMAP_PRIMITIVE_H

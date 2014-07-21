@@ -1,0 +1,103 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+ * Copyright 2010-2011 Pelican Ventures, Inc.
+ * http://wush.net/trac/juniper
+ *
+ * osgEarth is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ */
+
+#ifndef OSGJUNIPER_NODESEQUENCE
+#define OSGJUNIPER_NODESEQUENCE 1
+
+#include <osg/Group>
+
+#include <osgJuniper/Common>
+
+namespace osgJuniper
+{
+    class OSGJUNIPER_EXPORT NodeSequence : public osg::Group
+    {
+    public:
+        NodeSequence();
+
+        /** Copy constructor using CopyOp to manage deep vs shallow copy.*/
+        NodeSequence(const NodeSequence&, const osg::CopyOp& copyop=osg::CopyOp::SHALLOW_COPY);
+
+        META_Node(osgJuniper, NodeSequence);
+
+        virtual void traverse(osg::NodeVisitor& nv);
+
+        /**
+         * Adds a file to the end of the filenames list
+         */
+        void addFile(const std::string& filename);
+
+        /**
+         * Gets the filename at position i
+         */
+        std::string getFilename(unsigned int i) const;
+
+        /**
+         * Gets the number of filenames in this NodeSequence
+         */
+        unsigned int getNumFilenames() const;
+
+        /**
+         * Sets the active frame index
+         */
+        void setActive(int index);
+
+        /**
+         * Gets the active frame index
+         */
+        int getActive() const;
+
+        /**
+         * Seeks the active frame index by the given offset.  Positive moves forward, negative moves backwards
+         */
+        void seek(int offset);
+
+        /**
+         *Gets the read ahead buffer size
+         */
+        unsigned int getBufferSize() const;
+
+        /**
+         * Sets the read ahead buffer size
+         */
+        void setBufferSize(unsigned int bufferSize);
+
+
+    protected:
+
+        typedef std::vector< osg::ref_ptr< osg::Group > > GroupList;
+        GroupList _groups;
+
+        int _bufferStartIndex;
+        int _bufferEndIndex;
+        unsigned int _bufferSize;
+        
+        typedef std::vector< std::string > FileNameList;
+        FileNameList _filenames;
+
+        typedef std::vector< osg::ref_ptr< osg::Referenced > > DatabaseRequestList;
+        DatabaseRequestList _requests;
+
+        int _activeIndex;
+
+        double _length;
+    };
+}
+
+#endif

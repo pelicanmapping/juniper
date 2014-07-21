@@ -1,0 +1,212 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2011 Pelican Ventures, Inc.
+* http://wush.net/trac/juniper
+*
+* osgEarth is free software; you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>
+*/
+#ifndef OSGJUNIPER_TRACKHISTORYNODE
+#define OSGJUNIPER_TRACKHISTORYNODE 1
+
+#include <osgJuniper/Common>
+#include <osg/Geometry>
+#include <osg/Group>
+#include <osg/Vec4>
+#include <osg/PrimitiveSet>
+#include <osg/MatrixTransform>
+
+#include <deque>
+
+namespace osgJuniper
+{
+    class OSGJUNIPER_EXPORT TrackHistoryNode : public osg::Group
+    {
+    public:
+        enum Style
+        {
+            //The trail will be rendered as a line
+            STYLE_LINE,
+            //The trail will be rendered as a plane
+            STYLE_PLANE
+        };
+
+        /**
+        *Creates a new TrackHistoryNode
+        */
+        TrackHistoryNode();
+
+        /**
+        * Gets the width of the ribbon.
+        */
+        float getRibbonWidth() const;
+
+        /**
+        * Sets the width of the ribbon
+        */
+        void  setRibbonWidth(float ribbon);
+
+        /**
+        * Gets the width of the line
+        */
+        float getLineWidth() const;
+
+        /**
+        * Sets the width of the line
+        */
+        void setLineWidth( float lineWidth );
+
+        /**
+        * Gets the primary color.  This is the color used for the top of the ribbon as well as the line
+        */
+        const osg::Vec4f& getColor() const;
+
+        /**
+        * Sets the primary color.  This is the color used for the top of the ribbon as well as the line.
+        */
+        void setColor( const osg::Vec4f& color );
+
+        /**
+        * Gets the bottom color used for ribbon.
+        */
+        const osg::Vec4f& getBottomColor() const;
+
+        /**
+        * Sets the bottom color used for the ribbon.
+        */
+        void setBottomColor( const osg::Vec4f& bottomColor);
+
+
+        /**
+        *Gets whether or not to fade the end of the trail.
+        */
+        bool getFade( ) const;
+
+        /**
+        *Sets whether or not to fade the end of the trail.
+        */
+        void setFade( bool fade );
+
+        /**
+        * Gets the style
+        */
+        TrackHistoryNode::Style getStyle() const;
+
+        /**
+        * Sets the style
+        */
+        void setStyle( TrackHistoryNode::Style style );
+
+        /**
+        * Gets the maximum number of vertices.
+        */
+        int getMaxNumVertices() const;
+
+        /**
+        * Sets the maximum number of vertices
+        */
+        void setMaxNumVertices( int maxNumVertices );
+
+        /**
+        * Sets the minimum distance between sample points
+        */
+        void setMinDelta(double minDelta);
+
+        /**
+        * Gets the minimum distance between sample points 
+        */			 
+        double getMinDelta() const;
+
+        /**
+        * Sets the maximum amount of distance between sample points before the trail is reset.
+        */
+        void setMaxDelta(double maxDelta);
+
+        /**
+        * Gets the maximum amount of distance between sample points before the trail is reset.
+        */
+        double getMaxDelta() const;
+
+        /**
+        *Resets the trail
+        */
+        void reset();
+
+        /**
+        * Gets the node that this ribbon is tracking.
+        */
+        osg::Node* getTrackNode() const;
+
+        /**
+        * Sets the node that this ribbon should track.
+        */
+        void setTrackNode( osg::Node* node );
+
+        virtual void traverse(osg::NodeVisitor &nv);
+    private:
+
+        void initLine();
+        void initPlane();
+
+        void clearLine();
+        void clearPlane();
+
+        void dirtyGeometryBounds();
+
+        void updateColors();
+
+        void addSample(const osg::Matrixd& matrix );
+
+        std::vector< osg::Matrixd > _samples;
+
+        osg::ref_ptr< osg::Vec4Array > _lineColors;
+        osg::ref_ptr< osg::Vec4Array > _topColors;
+        osg::ref_ptr< osg::Vec4Array > _bottomColors;
+
+        osg::ref_ptr< osg::MatrixTransform > _transform;
+
+        osg::ref_ptr< osg::Vec3Array > _planeVertices;
+        osg::ref_ptr< osg::DrawArrays > _planeDrawArrays;
+
+        osg::ref_ptr< osg::Vec3Array > _lineVertices;
+        osg::ref_ptr< osg::DrawArrays > _lineDrawArrays;
+        osg::ref_ptr< osg::Geometry > _lineGeometry;
+
+        osg::ref_ptr< osg::Geode > _lineGeode;
+        osg::ref_ptr< osg::Geode > _planeTopGeode;
+        osg::ref_ptr< osg::Geometry > _planeTopGeometry;
+
+        osg::ref_ptr< osg::Geode > _planeBottomGeode;
+        osg::ref_ptr< osg::Geometry > _planeBottomGeometry;
+
+        osg::ref_ptr< osg::Node > _trackNode;
+
+        osg::Vec3d _origin;
+
+        Style _style;
+        osg::Vec4f _color;
+        osg::Vec4f _bottomColor;
+
+        int _maxNumVertices;
+        double _minDelta;
+        double _maxDelta;
+
+        float _lineWidth;
+        float _ribbonWidth;	
+        bool _fade;
+
+        osg::Vec3d _lastPosition;
+    };	
+}
+
+#endif

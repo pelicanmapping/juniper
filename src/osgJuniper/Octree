@@ -1,0 +1,286 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+ * Copyright 2010-2011 Pelican Ventures, Inc.
+ * http://wush.net/trac/juniper
+ *
+ * osgEarth is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ */
+
+#ifndef OSGJUNIPER_OCTREE
+#define OSGJUNIPER_OCTREE 1
+
+#include <osgJuniper/Common>
+#include <osgJuniper/Point>
+
+#include <osg/Referenced>
+#include <osg/ref_ptr>
+#include <osg/Vec3>
+#include <osg/Vec4>
+#include <osg/BoundingBox>
+
+
+#include <vector>
+#include <list>
+
+namespace osgJuniper
+{
+    /**
+     * A unique id for a cell in an Octree
+     */
+    class OSGJUNIPER_EXPORT OctreeId
+    {
+    public:
+        OctreeId();         
+        OctreeId(int in_level, int in_x, int in_y, int in_z);
+
+        bool operator == (const OctreeId& rhs) const        
+        {
+            return (level==rhs.level) && (x==rhs.x) && (y==rhs.y) && (z==rhs.z);
+        }
+
+        bool operator != (const OctreeId& rhs) const        
+        {
+            return (level!=rhs.level) || (x!=rhs.x) || (y!=rhs.y) || (z!=rhs.z);
+        }
+
+        bool operator < (const OctreeId& rhs) const
+        {
+            if (level<rhs.level) return true;
+            if (level>rhs.level) return false;
+            if (x<rhs.x) return true;
+            if (x>rhs.x) return false;
+            if (y<rhs.y) return true;
+            if (y>rhs.y) return false;
+            return z<rhs.z;
+        }
+
+        bool valid() const { return level>=0; }
+
+        int level;   
+        int x;
+        int y;
+        int z;
+    };
+
+    class OctreeNodeVisitor;
+
+
+    /**
+     * A node in the Octree.  Stores points.
+     */
+    class OSGJUNIPER_EXPORT OctreeNode : public osg::Referenced
+    {
+    public:
+        OctreeNode();
+
+        /**
+         *Sets the OctreeId for this OctreeNode
+         */
+        void setId(const OctreeId& id);
+        /**
+         * Gets the OctreeId for this OctreeNode
+         */
+        const OctreeId& getID() const { return _id;}
+
+        /**
+         * Gets the BoundingBox for this OctreeNode
+         */
+        const osg::BoundingBoxd& getBoundingBox() const { return _boundingBox;}
+        osg::BoundingBoxd& getBoundingBox() { return _boundingBox;}
+
+        /**
+         *Sets the BoundingBox for this OctreeNode
+         */
+        void setBoundingBox(const osg::BoundingBoxd& boundingBox);        
+
+        /**
+        *Split this OctreeNode into it's 8 children
+        */
+        void split();
+        
+        /**
+        *Gets whether this OctreeNode has been split
+        */
+        bool isSplit() const;    
+
+        /**
+        *Gets whether this OctreeNode is a leaf node
+        */
+        bool isLeaf() const;
+
+        /**
+        *Gets the list of points in this OctreeNode
+        */
+        const PointList& getPoints() const;
+        PointList& getPoints();
+
+        typedef std::vector< osg::ref_ptr< OctreeNode > > OctreeNodeList;
+
+        /**
+         *Gets the children of this OctreeNode
+         */
+        const OctreeNodeList getChildren() const { return _children; }
+
+
+        void accept(OctreeNodeVisitor &v);
+        void traverse(OctreeNodeVisitor& v);
+
+        /**
+         * Creates the given child of the OctreeNode
+         */
+        OctreeNode* createChild(unsigned int childNumber);
+
+    protected:       
+
+        PointList _points;
+        OctreeId _id;
+        
+        OctreeNodeList _children;
+        osg::BoundingBoxd _boundingBox;
+        bool _split;
+    };
+
+    /**
+     * Visitor that traverses down the Octree.
+     */
+    class OSGJUNIPER_EXPORT OctreeNodeVisitor
+    {
+    public:
+        OctreeNodeVisitor();
+        virtual void apply(OctreeNode& node);
+        void traverse(OctreeNode& node);
+    };
+
+    /**
+     * NodeVisitor that counts all the points in the Octree.
+     */
+    class OSGJUNIPER_EXPORT CountPointsVisitor : public OctreeNodeVisitor
+    {
+    public:
+        CountPointsVisitor();
+        virtual void apply(OctreeNode& node);
+        unsigned int _numPoints;        
+    };
+
+    /**
+     * A NodeVisitor that adds a point to the given Octree
+     */
+    class OSGJUNIPER_EXPORT AddPointVisitor : public OctreeNodeVisitor
+    {
+    public:
+        enum Strategy
+        {
+            //Always accept the point
+            ACCEPT,
+            //Reject the point if it needs to go past the maximum level
+            REJECT
+        };
+
+        AddPointVisitor(const Point& point, unsigned int maxLevel);
+
+        /**
+         *Sets the strategy for the visitor.
+         */
+        void setStrategy(Strategy strategy);
+        /**
+         * Gets the strategy for the visitor.
+         */
+        Strategy getStrategy() const { return _strategy;}
+
+        /**
+         *Sets the maximum level that this visitor should traverse to.
+         */
+        void setMaxLevel(unsigned int maxLevel);
+        /**
+         * Gets the maximum level that this node should traverse to.
+         */
+        unsigned int getMaxLevel() const { return _maxLevel; }
+
+        /**
+         *Gets the point that is to be added.
+         */
+        const Point& getPoint() const { return _point;}
+
+        virtual void apply(OctreeNode& node);
+
+        /**
+         * Gets whether or not the point was added after a call to accept.
+         */
+        bool getPointAdded() const { return _pointAdded;}
+
+    protected:
+        Point _point;
+        Strategy _strategy;
+        unsigned int _maxLevel;
+        bool _pointAdded;
+    };
+
+    /**
+     * Collects all the points in the Octree
+     */
+    class OSGJUNIPER_EXPORT CollectPointsVisitor : public OctreeNodeVisitor
+    {
+    public:
+        CollectPointsVisitor();
+
+        /**
+         * Get whether or not to remove the point from the Octree when it is added to the visitor.
+         */
+        bool getRemove() const;
+
+        /**
+         * Set whether or not to remove the point from the Octree when it is added to the visitor.
+         */
+        void setRemove(bool remove);
+
+        virtual void apply(OctreeNode& node);
+
+        /**
+         * Gets the list of points that were collected.
+         */
+        PointList& getPoints();
+        const PointList& getPoints() const;
+
+    protected:
+        bool _remove;
+        PointList _points;
+    };
+
+    /**
+     * Choose representative points for the Node based on points that are contained in the leaves.
+     */
+    class OSGJUNIPER_EXPORT ChooseRepresentativePointVisitor : public OctreeNodeVisitor
+    {
+    public:
+        ChooseRepresentativePointVisitor();
+        virtual void apply(OctreeNode& node);   
+
+        PointList _points;
+        bool _valid;
+    };
+
+    /**
+     * Visitor used to collect representative points from leaf nodes and apply them to their parent nodes.
+     */
+    class OSGJUNIPER_EXPORT ApplyRepresentativePointVisitor : public OctreeNodeVisitor
+    {
+    public:
+        ApplyRepresentativePointVisitor();
+        virtual void apply(OctreeNode& node);
+    };
+
+
+}
+
+#endif

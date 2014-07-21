@@ -1,0 +1,288 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2011 Pelican Ventures, Inc.
+* http://wush.net/trac/juniper
+*
+* osgEarth is free software; you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>
+*/
+#ifndef OSGJUNIPER_QKDTREE
+#define OSGJUNIPER_QKDTREE 1
+
+#include <osgJuniper/Common>
+#include <osg/Shape>
+#include <osg/Geometry>
+#include <osg/Material>
+#include <osg/CullStack>
+#include <map>
+
+struct ViewerInfo
+{
+    osg::Matrix _modelview;
+    osg::Matrix _projection;
+    int _width;
+    int _height;
+
+    float      _pixelsPerRadian;
+    osg::Vec3  _cameraPosition;
+    osg::Plane _zproj;
+    float _minsize;
+
+    void compute(osg::CullStack* cs)
+    {
+        _modelview = *(cs->getModelViewMatrix());
+        _projection = *(cs->getProjectionMatrix());
+        _width = cs->getViewport()->width();
+        _height = cs->getViewport()->height();
+
+        osg::Matrix projectionModelView = _modelview * _projection;
+
+        // Compute some stuff
+        _cameraPosition[0] = -(_modelview.ptr()[0]*_modelview.ptr()[12] + _modelview.ptr()[1]*_modelview.ptr()[13] + _modelview.ptr()[2]*_modelview.ptr()[14]);
+        _cameraPosition[1] = -(_modelview.ptr()[4]*_modelview.ptr()[12] + _modelview.ptr()[5]*_modelview.ptr()[13] + _modelview.ptr()[6]*_modelview.ptr()[14]);
+        _cameraPosition[2] = -(_modelview.ptr()[8]*_modelview.ptr()[12] + _modelview.ptr()[9]*_modelview.ptr()[13] + _modelview.ptr()[10]*_modelview.ptr()[14]);
+
+        _pixelsPerRadian = 0.5f * _width * _projection.ptr()[0]; // Assume glFrustum only
+
+        _zproj[0] = -_modelview.ptr()[2];
+        _zproj[1] = -_modelview.ptr()[6];
+        _zproj[2] = -_modelview.ptr()[10];
+        _zproj[3] = -_modelview.ptr()[14];
+    }
+};
+
+class GeometryGraph : public osg::Group
+{
+public:
+
+    void setupGeometry();
+    osg::ref_ptr<osg::Geometry> _geometry;
+    osg::ref_ptr<osg::Material> _material;
+    osg::ref_ptr<osg::Vec3Array> _vertexes;
+    osg::ref_ptr<osg::Vec3Array> _normals;
+    osg::ref_ptr<osg::Vec4Array> _attributes;
+    osg::ref_ptr<osg::Vec4Array> _colors;
+    osg::ref_ptr<osg::DrawArrays> _drawarray;
+    osg::ref_ptr<osg::StateSet> _stateset;
+
+    float _minsize;
+    int _attributeBinding;
+
+    virtual void createSceneGraph() = 0;
+    virtual void addPoint(float zFromCamera, float cx, float cy, float cz,
+                          float r, float splatsize,
+                          const float *norm, const float *col);
+
+    virtual void update(const ViewerInfo& vi);
+
+    virtual void reset() {
+        if (!_vertexes.valid())
+            createSceneGraph();
+        _vertexes->clear();
+        _normals->clear();
+        _colors->clear();
+        _attributes->clear();
+    }
+    virtual void dirty() {
+        _vertexes->dirty();
+        _normals->dirty();
+        _colors->dirty();
+        _attributes->dirty();
+        _drawarray->setCount(_vertexes->size());
+        _geometry->dirtyBound();
+        computeBound();
+    }
+};
+
+class GeometryGraphBasic : public GeometryGraph
+{
+public:
+    virtual void createSceneGraph();
+};
+
+class GeometryGraphBasicOrientedSplat : public GeometryGraphBasic
+{
+public:
+    virtual void createSceneGraph();
+    virtual void update(const ViewerInfo& vi);
+};
+
+
+class QKdTree : public osg::Shape 
+{
+public:
+    QKdTree();
+    QKdTree(const QKdTree& rhs, const osg::CopyOp& copyop=osg::CopyOp::SHALLOW_COPY);
+    META_Shape(osgJuniperPlugin, QKdTree)
+
+    struct BuildOptions
+    {
+        BuildOptions() : _numVerticesProcessed(0),
+            _targetNumVertsPerLeaf(32),
+            _maxNumLevels(64)
+            {}
+
+        unsigned int _numVerticesProcessed;
+        unsigned int _targetNumVertsPerLeaf;
+        unsigned int _maxNumLevels;
+    };
+
+    /** Build the kdtree from the specified source geometry object.
+     * retun true on success. */ 
+    virtual bool build(BuildOptions& buildOptions, osg::Geometry* geometry);
+
+    typedef int value_type;
+
+    /**
+     * A node in the KdTree.
+     *
+     * If this is a non-leaf node, first>0 and second>0, and first and second are the
+     *    indices of the left and right children of this node.
+     *
+     * If this is a leaf node, first<0, -first is the index of the first vertex in the node,
+     *    and second is the number of vertices in the node.
+     */
+    struct KdNode
+    {
+        KdNode() : first(0), second(0), index(-1) {}
+        KdNode(value_type f, value_type s, value_type index = -1) : first(f), second(s), index(index) {}
+
+        osg::BoundingBox bb;
+        value_type first;
+        value_type second;
+        value_type index;
+    };
+
+    int createAverageSplat(value_type first, value_type second);
+
+    typedef std::vector< KdNode > KdNodeList;
+
+    int addNode(const KdNode& node)
+    {
+        int num = static_cast<int>(_kdNodes.size()); 
+        _kdNodes.push_back(node); 
+        return num;
+    }
+
+    KdNode& getNode(int nodeNum) { return _kdNodes[nodeNum]; }
+    const KdNode& getNode(int nodeNum) const { return _kdNodes[nodeNum]; }
+
+    KdNodeList& getNodes() { return _kdNodes; }
+    const KdNodeList& getNodes() const { return _kdNodes; }
+
+    void setVertices(osg::Vec3Array* vertices) { _vertices = vertices; }
+    const osg::Vec3Array* getVertices() const { return _vertices.get(); }
+
+    void setNormals(osg::Vec3Array* normals) { _normals = normals; }
+    const osg::Vec3Array* getNormals() const { return _normals.get(); }
+
+    void setColors(osg::Vec4Array* colors) { _colors = colors; }
+    const osg::Vec4Array* getColors() const { return _colors.get(); }
+
+    void setSize(osg::Vec4Array* size) { _size = size; }
+    const osg::Vec4Array* getSize() const { return _size.get(); }
+
+protected:
+
+    osg::ref_ptr<osg::Vec3Array> _vertices;
+    osg::ref_ptr<osg::Vec3Array> _normals;
+    osg::ref_ptr<osg::Vec4Array> _colors;
+    osg::ref_ptr<osg::Vec4Array> _size;
+    KdNodeList _kdNodes;
+
+};
+
+
+class KdTreeSplatModel : public osg::Operation
+{
+
+public:
+
+    GeometryGraph* createNewGeometry();
+    void setGeometry(GeometryGraph* geom);
+    GeometryGraph* getGeometry() { return _geometryGraph.get(); }
+    void operator()(osg::Object*);
+
+    enum GeometryGraphType {
+        BASIC,
+        ORIENTED_SPLAT,
+    };
+    
+    void setQuality(GeometryGraphType type) { _rendering = type; }
+
+    void setupBuild(const ViewerInfo& vi, float minsize, bool frustrumCulling, bool backfaceCulling);
+    bool build(bool frustrumCulling, bool backfaceCulling);
+    void collect(int nodeIndex, float r, bool backfaceCulling, bool frustrumCulling);
+
+    KdTreeSplatModel(QKdTree* tree) : osg::Operation("KdTreeSplatModel", false)
+    {
+        _tree = tree;
+        _frustumCulling = false;
+        _backfaceCulling = false;
+        _overallSplatSize = true;
+        _rendering = BASIC;
+    }
+
+    inline void drawpoint(float zFromCamera, float cx, float cy, float cz,
+                          float r, float splatsize,
+                          const float *norm, const float *col) 
+    { 
+        _geometryGraph->addPoint(zFromCamera, cx, cy, cz, r, splatsize, norm, col); 
+    }
+
+protected:
+
+    bool _overallSplatSize;
+    bool _frustumCulling;
+    bool _backfaceCulling;
+
+    OpenThreads::Mutex _mutex;
+
+    osg::ref_ptr<QKdTree> _tree;
+    ViewerInfo _viewInfo;
+
+    GeometryGraphType _rendering;
+    osg::ref_ptr<GeometryGraph> _geometryGraph;
+
+};
+
+
+class KdTreeBuilder : public osg::NodeVisitor
+{
+public:
+
+    KdTreeBuilder();
+
+    KdTreeBuilder(const KdTreeBuilder& rhs);
+
+    META_NodeVisitor("osgJuniper","KdTreeBuilder")
+
+    virtual KdTreeBuilder* clone() { return new KdTreeBuilder(*this); }
+
+    void apply(osg::Geode& geode);
+
+    QKdTree::BuildOptions _buildOptions;
+
+    osg::ref_ptr<QKdTree> _kdTreePrototype;
+
+
+
+protected:
+
+    virtual ~KdTreeBuilder() {}
+
+};
+
+#endif // OSGJUNIPER_KTREE
+
+
