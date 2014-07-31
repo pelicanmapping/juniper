@@ -40,7 +40,7 @@
 #include <osgGA/TerrainManipulator>
 
 #include <osgEarth/Utils>
-#include <osgEarth/FindNode>
+#include <osgEarth/NodeUtils>
 #include <osgEarth/MapNode>
 #include <osgEarthUtil/EarthManipulator>
 #include <osgEarthUtil/AutoClipPlaneHandler>

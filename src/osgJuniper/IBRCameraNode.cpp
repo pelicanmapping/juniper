@@ -32,7 +32,7 @@
 #include <osg/io_utils>
 
 #include <osgUtil/SmoothingVisitor>
-#include <osgEarth/FindNode>
+#include <osgEarth/NodeUtils>
 #include <osgEarth/ImageUtils>
 
 using namespace osgJuniper;

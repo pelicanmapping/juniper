@@ -42,7 +42,7 @@
 #include <osgEarth/GeoData>
 #include <osgEarth/Map>
 #include <osgEarth/MapNode>
-#include <osgEarth/FindNode>
+#include <osgEarth/NodeUtils>
 #include <osgEarth/GeoMath>
 #include <osgEarth/Registry>
 #include <osg/CoordinateSystemNode>
@@ -308,7 +308,7 @@ int main(int argc, char** argv)
 
     root->addChild( loadedModel.get() );
 
-    ControlCanvas* canvas = new ControlCanvas( &viewer );
+    ControlCanvas* canvas = ControlCanvas::getOrCreate( &viewer );
     root->addChild( canvas );   
     
 

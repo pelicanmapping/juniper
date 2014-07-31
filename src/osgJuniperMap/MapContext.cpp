@@ -25,7 +25,7 @@
 #include <osg/CoordinateSystemNode>
 #include <osgEarth/TerrainEngineNode>
 
-#include <osgEarth/FindNode>
+#include <osgEarth/NodeUtils>
 
 using namespace osgEarth;
 using namespace osgJuniper::Map;
