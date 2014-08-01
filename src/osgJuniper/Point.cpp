@@ -109,7 +109,14 @@ void
 CompositePointSource::addPointSource(const std::string &filename)
 {
     PointSource* pointSource = PointSource::loadPointSource( filename );
-    addPointSource( pointSource );
+    if (pointSource)
+    {
+        addPointSource( pointSource );
+    }
+    else
+    {
+        OSG_NOTICE << "Failed to load point source from " << filename << std::endl;
+    }
 }
 
 PointCursor*
