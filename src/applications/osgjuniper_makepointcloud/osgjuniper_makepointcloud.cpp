@@ -514,15 +514,7 @@ static OpenThreads::Mutex s_statsMutex;
 
 osg::Node*
 MakeSceneVisitor::makeNode(PointList& points)
-{
-    unsigned int batchSize = 100000;
-
-    osg::Geometry* geometry = NULL;
-    osg::Vec3Array* verts   = NULL;
-    osg::Vec4ubArray* colors  = NULL;    
-
-    osg::Geode* geode = new osg::Geode;
-
+{    
     //Update the stats    
     {
         OpenThreads::ScopedLock< OpenThreads::Mutex> statsMutex(s_statsMutex);
@@ -534,57 +526,40 @@ MakeSceneVisitor::makeNode(PointList& points)
 
     osg::Vec3d anchor = points.front()._position;
 
+    osg::Geometry* geometry = new osg::Geometry;
 
-    unsigned int numPoints = 0;
+    if (_useVBO)
+    {
+        geometry->setUseVertexBufferObjects( true );
+        geometry->setUseDisplayList( false );
+    }
+
+    osg::Vec3Array* verts = new osg::Vec3Array();
+    verts->reserve(points.size());
+    geometry->setVertexArray( verts );    
+
+    osg::Vec4ubArray* colors = new osg::Vec4ubArray();
+    colors->reserve(points.size());
+    geometry->setColorArray( colors );
+    geometry->setColorBinding( osg::Geometry::BIND_PER_VERTEX);
+
+
     while (points.size() > 0)
-    {         
-        if (!geometry)
-        {
-            numPoints = 0;
-            //Allocate the new geometry
-            geometry = new osg::Geometry;
-
-            if (_useVBO)
-            {
-                geometry->setUseVertexBufferObjects( true );
-                geometry->setUseDisplayList( false );
-            }
-
-            verts = new osg::Vec3Array(batchSize);
-            geometry->setVertexArray( verts );    
-
-            colors = new osg::Vec4ubArray(batchSize);
-            geometry->setColorArray( colors );
-            geometry->setColorBinding( osg::Geometry::BIND_PER_VERTEX);
-        }
-        
+    {                 
         osg::Vec3 position = points.front()._position - anchor;
-        (*verts)[numPoints] = position;
+        verts->push_back(position);
         osg::Vec4ub color = osg::Vec4ub(points.front()._color.r() * 255,
                                         points.front()._color.g() * 255,
                                         points.front()._color.b() * 255,
                                         points.front()._color.a() * 255);
-        (*colors)[numPoints] = color;
-
-        numPoints++;
-
+        colors->push_back(color);
         //Remove the point from the list to reduce memory usage
         points.pop_front();
-
-        if (numPoints >= batchSize)
-        {
-            geode->addDrawable( geometry );
-            geometry->addPrimitiveSet( new osg::DrawArrays(GL_POINTS, 0, numPoints) );
-            geometry = 0;
-        }
     }
 
-    if (geometry)
-    {
-        geode->addDrawable( geometry );
-        geometry->addPrimitiveSet( new osg::DrawArrays(GL_POINTS, 0, numPoints) );
-        geometry = 0;
-    }
+    osg::Geode* geode = new osg::Geode;
+    geode->addDrawable( geometry );
+    geometry->addPrimitiveSet( new osg::DrawArrays(GL_POINTS, 0, verts->size()) );
 
     osg::MatrixTransform* mt = new osg::MatrixTransform;
     mt->setMatrix(osg::Matrixd::translate(anchor));
