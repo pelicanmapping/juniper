@@ -127,7 +127,8 @@ SET(CMAKE_DEBUG_POSTFIX  "d")
 
 FIND_PACKAGE(OSG)
 FIND_PACKAGE(OSGEARTH)
-#FIND_PACKAGE(GDAL)
+FIND_PACKAGE(LIBLAS)
+FIND_PACKAGE(Boost COMPONENTS program_options thread)
 
 ################################################################################
 # Create bin and lib directories if required
