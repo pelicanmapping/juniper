@@ -42,9 +42,9 @@ namespace osgJuniper
     {
     public:
         Point();
-        Point(const osg::Vec3& position, const osg::Vec3& normal, const osg::Vec4 &color);
+        Point(const osg::Vec3d& position, const osg::Vec3& normal, const osg::Vec4 &color);
 
-        osg::Vec3 _position;
+        osg::Vec3d _position;
         osg::Vec4 _color;
         osg::Vec3 _normal;    
         float _minRange;

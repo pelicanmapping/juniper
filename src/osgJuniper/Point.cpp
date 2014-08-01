@@ -28,7 +28,7 @@ Point::Point()
 {
 }
 
-Point::Point(const osg::Vec3& position, const osg::Vec3& normal, const osg::Vec4 &color):
+Point::Point(const osg::Vec3d& position, const osg::Vec3& normal, const osg::Vec4 &color):
 _position(position),
 _normal(normal),
 _color(color),

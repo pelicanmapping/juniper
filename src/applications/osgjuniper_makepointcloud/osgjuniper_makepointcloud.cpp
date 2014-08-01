@@ -134,7 +134,7 @@ public:
           }
       }
 
-      bool contains(osg::Vec3& point)
+      bool contains(osg::Vec3d& point)
       {
           return _node->getBoundingBox().contains( point );
       }
@@ -203,8 +203,8 @@ protected:
         }
 
         osg::Vec3 color(point._color.r(), point._color.g(), point._color.b());
-        color *= 255.0f;
-        _out.write((char*)point._position._v, sizeof(float) * 3);
+        color *= 255.0f;        
+        _out.write((char*)point._position._v, sizeof(double) * 3);
         _out.write((char*)point._normal._v, sizeof(float) * 3);
         _out.write((char*)color._v, sizeof(float) * 3);
         _out.write((char*)&point._size, sizeof(float));
@@ -515,16 +515,11 @@ static OpenThreads::Mutex s_statsMutex;
 osg::Node*
 MakeSceneVisitor::makeNode(PointList& points)
 {
-    //SPTNode* node = new SPTNode();
-    //node->setPoints( points );    
-    //return node;    
-
-    unsigned int batchSize = 30000;
+    unsigned int batchSize = 100000;
 
     osg::Geometry* geometry = NULL;
     osg::Vec3Array* verts   = NULL;
-    osg::Vec4ubArray* colors  = NULL;
-    //osg::Vec3Array* normals = NULL;
+    osg::Vec4ubArray* colors  = NULL;    
 
     osg::Geode* geode = new osg::Geode;
 
@@ -536,6 +531,8 @@ MakeSceneVisitor::makeNode(PointList& points)
         if (s_maxSize < points.size()) s_maxSize = points.size();
         s_numNodes++;
     }
+
+    osg::Vec3d anchor = points.front()._position;
 
 
     unsigned int numPoints = 0;
@@ -556,30 +553,18 @@ MakeSceneVisitor::makeNode(PointList& points)
             verts = new osg::Vec3Array(batchSize);
             geometry->setVertexArray( verts );    
 
-            //colors = new osg::Vec4Array(batchSize);
-            //geometry->setColorArray( colors );
-            //geometry->setColorBinding( osg::Geometry::BIND_PER_VERTEX);
             colors = new osg::Vec4ubArray(batchSize);
             geometry->setColorArray( colors );
             geometry->setColorBinding( osg::Geometry::BIND_PER_VERTEX);
-
-
-            /*
-            normals = new osg::Vec3Array(batchSize);
-            geometry->setNormalArray( normals );
-            geometry->setNormalBinding( osg::Geometry::BIND_PER_VERTEX );
-            */
         }
         
-        (*verts)[numPoints] = points.front()._position;
+        osg::Vec3 position = points.front()._position - anchor;
+        (*verts)[numPoints] = position;
         osg::Vec4ub color = osg::Vec4ub(points.front()._color.r() * 255,
                                         points.front()._color.g() * 255,
                                         points.front()._color.b() * 255,
                                         points.front()._color.a() * 255);
         (*colors)[numPoints] = color;
-
-        //(*colors)[numPoints] = points.front()._color;
-        //(*normals)[numPoints] = points.front()._normal;
 
         numPoints++;
 
@@ -600,7 +585,11 @@ MakeSceneVisitor::makeNode(PointList& points)
         geometry->addPrimitiveSet( new osg::DrawArrays(GL_POINTS, 0, numPoints) );
         geometry = 0;
     }
-    return geode;
+
+    osg::MatrixTransform* mt = new osg::MatrixTransform;
+    mt->setMatrix(osg::Matrixd::translate(anchor));
+    mt->addChild(geode);
+    return mt;    
 }
 
 std::string MakeSceneVisitor::createRejectionFile( OctreeNode& node)

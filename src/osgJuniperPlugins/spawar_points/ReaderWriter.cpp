@@ -56,11 +56,11 @@ public:
         {
             if (hasMore())
             {
-                osg::Vec3 vert;
+                osg::Vec3d vert;
                 osg::Vec3 norm;
                 osg::Vec4 col;
                 float size; 
-                if (_in.read((char*)(vert._v), 12) && _in.read((char*)(norm._v), 12) && _in.read((char*)(col._v), 12) && _in.read((char*)(&size), 4))
+                if (_in.read((char*)(vert._v), sizeof(double)*3) && _in.read((char*)(norm._v), 12) && _in.read((char*)(col._v), 12) && _in.read((char*)(&size), 4))
                 {
                     col *= 1.0f/255.0f;
                     col[3] = 1.0;
