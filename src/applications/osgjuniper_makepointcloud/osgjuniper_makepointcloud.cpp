@@ -338,14 +338,16 @@ void MakeSceneVisitor::addRejectionFile(RejectionFile* rejectionFile, OctreeNode
 void
 MakeSceneVisitor::apply(OctreeNode& node)
 {
-    //osg::notify(osg::NOTICE) << "Building scene from filename " << _filename << std::endl;
+    // Load the point source
     if (!_pointSource.valid())
     {
         _pointSource = PointSource::loadPointSource( _filename );
     }
 
+    // Get a cursor for this point source.
     osg::ref_ptr< PointCursor > pointCursor = _pointSource->createPointCursor();
 
+    // Allocate the 8 rejection files
     std::vector< osg::ref_ptr< RejectionFile > > rejectionFiles;
     rejectionFiles.reserve(8);
     for (unsigned int i = 0; i < 8; ++i)
@@ -395,41 +397,15 @@ MakeSceneVisitor::apply(OctreeNode& node)
                 if (!addedPointToRejectionFile)
                 {
                     osg::notify(osg::WARN) << "ERROR:  Could not add point " << p._position << " to rejection file" << std::endl;
-                    if (node.getBoundingBox().contains(p._position))
-                    {
-                        OSG_NOTICE << "Root bounding box contains point." << std::endl;
-                    }
-                    else
-                    {
-                        OSG_NOTICE << "Root bounding box does NOT contain point." << std::endl;
-                    }
-                    for (unsigned int i = 0; i < 8; ++i)
-                    {
-                        for (unsigned int c = 0; c < 8; c++)
-                        {
-                            osg::Vec3d corner = rejectionFiles[i]->getNode()->getBoundingBox().corner(c);
-                            double dist = (corner - p._position).length();
-                            if (dist < 1.0)
-                            {
-                                OSG_NOTICE << "Distance from corner " << std::setprecision(20) << corner << "=" <<  std::setprecision(20) << dist << std::endl;
-                                OSG_NOTICE << "Rejection file node width " << rejectionFiles[i]->getNode()->getBoundingBox().radius() << std::endl;
-                            }
-
-                        }
-                        
-                        //OSG_NOTICE << "Rejection file " << i << " " <<  rejectionFiles[i]->getNode()->getBoundingBox()._min << " to " << rejectionFiles[i]->getNode()->getBoundingBox()._max << std::endl;
-                    }
                 }
             }
             else
             {
                 numPointsAdded++;
             }
-        }
-        //if (numPointsRead % 50000 == 0) osg::notify(osg::NOTICE) << "Read " << numPointsRead << " points..." << std::endl;
+        }        
     }
 
-   
     unsigned int maxSize = 60000;
 
     if (numPointsAdded + numPointsRejected < maxSize)
@@ -459,24 +435,18 @@ MakeSceneVisitor::apply(OctreeNode& node)
 
     }
 
-    //osg::notify(osg::NOTICE) << "Read " << numPointsRead << " points  Added=" << numPointsAdded << " Rejected=" << numPointsRejected << std::endl;
     if (numPointsAdded + numPointsRejected != numPointsRead)
     {
+        //osg::notify(osg::NOTICE) << "Read " << numPointsRead << " points  Added=" << numPointsAdded << " Rejected=" << numPointsRejected << std::endl;
         OSG_WARN << "Something wrong..." << std::endl;
     }
-
-    //Write out this node
-    //ApplyRepresentativePointVisitor arpv;
-    //innerOctree.accept( arpv );
 
     CollectPointsVisitor pointCollector;
     innerOctree.accept( pointCollector );
 
     //Create the node to render the points for OctreeNode
-    //osg::ref_ptr<SPTNode> points = new SPTNode();
-    //points->setPoints( pointCollector.getPoints() );
-    //points->getOrCreateStateSet()->setAttributeAndModes(new osg::Point(1.1), osg::StateAttribute::ON);
-    //points->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);    
+    OSG_NOTICE << "Creating node with " << pointCollector.getPoints().size() << std::endl;
+
     osg::ref_ptr< osg::Node > points = makeNode( pointCollector.getPoints() );
     std::string nodeFilename = createURI(node);
 
@@ -502,7 +472,6 @@ MakeSceneVisitor::apply(OctreeNode& node)
         }
     }
     std::string filename = createURI(node);
-    //osg::notify(osg::NOTICE) << "Writing node" << filename << std::endl;
     osgDB::writeNodeFile(*pagedLOD, filename);
 
     //Increment the progress
@@ -512,7 +481,6 @@ MakeSceneVisitor::apply(OctreeNode& node)
     {
         if (rejectionFiles[i]->getNeedsProcessed())
         {
-            //MakeSceneVisitor msv(rejectionFiles[i]->getFilename(), _innerMaxLevel, _outerMaxLevel);
             MakeSceneVisitor msv(rejectionFiles[i]->createPointSource(), _innerMaxLevel, _outerMaxLevel);
             msv.setOperationQueue( _operationQueue.get() );
             msv.setExtension( _ext );
@@ -521,8 +489,7 @@ MakeSceneVisitor::apply(OctreeNode& node)
             msv.setUseVBO( _useVBO );
 
             //Make the max number of operations configurable            
-            _operationQueue->add( new MakeSceneOp(rejectionFiles[i]->getNode(), msv, false));
-            //_operationQueue->add( new MakeSceneOp(rejectionFiles[i]->getNode(), rejectionFiles[i]->getFilename(), _innerMaxLevel, _outerMaxLevel, _ext, _prefix, _radiusFactor, _operationQueue.get(), true));
+            _operationQueue->add( new MakeSceneOp(rejectionFiles[i]->getNode(), msv, false));         
         }
     }
 }
