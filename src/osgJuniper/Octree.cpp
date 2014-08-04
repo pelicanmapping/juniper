@@ -43,9 +43,9 @@ OctreeNode*
 OctreeNode::createChild(unsigned int childNumber)
 {
     //Compute the new dimensions of this child
-    double width  = (_boundingBox.xMax() - _boundingBox.xMin()) / 2.0f;
-    double height = (_boundingBox.zMax() - _boundingBox.zMin()) / 2.0f;
-    double depth  = (_boundingBox.yMax() - _boundingBox.yMin()) / 2.0f;
+    double width  = (_boundingBox.xMax() - _boundingBox.xMin()) / 2.0;
+    double height = (_boundingBox.zMax() - _boundingBox.zMin()) / 2.0;
+    double depth  = (_boundingBox.yMax() - _boundingBox.yMin()) / 2.0;
 
     double xMin = _boundingBox.xMin();
     double yMin = _boundingBox.yMin();

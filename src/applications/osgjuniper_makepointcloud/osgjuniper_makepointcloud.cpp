@@ -40,6 +40,7 @@
 #include <osgViewer/ViewerEventHandlers>
 
 #include <iostream>
+#include <iomanip>
 #include <map>
 #include <osgJuniper/Utils>
 #include <osgJuniper/Octree>
@@ -163,7 +164,7 @@ public:
               }
               else
               {
-                  osg::notify(osg::NOTICE) << "Rejection file has over " << maxPoints << ", dumping to disk" << std::endl;
+                  OSG_DEBUG << "Rejection file has over " << maxPoints << ", dumping to disk" << std::endl;
                   _isFile = true;
                   //The file is not open, and we're at the max points in memory.  Write all the points to disk and move to a file based system
                   for (PointList::iterator itr = _points.begin(); itr != _points.end(); ++itr)
@@ -393,10 +394,30 @@ MakeSceneVisitor::apply(OctreeNode& node)
                 }
                 if (!addedPointToRejectionFile)
                 {
-                    osg::notify(osg::NOTICE) << "Could not add point " << p._position << " to rejection file" << std::endl;
+                    osg::notify(osg::WARN) << "ERROR:  Could not add point " << p._position << " to rejection file" << std::endl;
+                    if (node.getBoundingBox().contains(p._position))
+                    {
+                        OSG_NOTICE << "Root bounding box contains point." << std::endl;
+                    }
+                    else
+                    {
+                        OSG_NOTICE << "Root bounding box does NOT contain point." << std::endl;
+                    }
                     for (unsigned int i = 0; i < 8; ++i)
                     {
-                        osg::notify(osg::NOTICE) << "Rejection file " << i << " " <<  rejectionFiles[i]->getNode()->getBoundingBox()._min << " to " << rejectionFiles[i]->getNode()->getBoundingBox()._max << std::endl;
+                        for (unsigned int c = 0; c < 8; c++)
+                        {
+                            osg::Vec3d corner = rejectionFiles[i]->getNode()->getBoundingBox().corner(c);
+                            double dist = (corner - p._position).length();
+                            if (dist < 1.0)
+                            {
+                                OSG_NOTICE << "Distance from corner " << std::setprecision(20) << corner << "=" <<  std::setprecision(20) << dist << std::endl;
+                                OSG_NOTICE << "Rejection file node width " << rejectionFiles[i]->getNode()->getBoundingBox().radius() << std::endl;
+                            }
+
+                        }
+                        
+                        //OSG_NOTICE << "Rejection file " << i << " " <<  rejectionFiles[i]->getNode()->getBoundingBox()._min << " to " << rejectionFiles[i]->getNode()->getBoundingBox()._max << std::endl;
                     }
                 }
             }
@@ -413,7 +434,7 @@ MakeSceneVisitor::apply(OctreeNode& node)
 
     if (numPointsAdded + numPointsRejected < maxSize)
     {       
-        OSG_NOTICE << "Adding points from rejection file, total size of node is < " << maxSize << std::endl;
+        OSG_DEBUG << "Adding points from rejection file, total size of node is < " << maxSize << std::endl;
         for (unsigned int i = 0; i < 8; ++i)
         {
             addRejectionFile(rejectionFiles[i], innerOctree);
@@ -429,7 +450,7 @@ MakeSceneVisitor::apply(OctreeNode& node)
         {
             if (rejectionFiles[i]->getNumPoints() < rejectionThreshold)
             {
-                OSG_NOTICE << "Adding in small rejection file with " << rejectionFiles[i]->getNumPoints() << std::endl;
+                OSG_DEBUG << "Adding in small rejection file with " << rejectionFiles[i]->getNumPoints() << std::endl;
                 addRejectionFile(rejectionFiles[i], innerOctree);
                 numPointsAdded += rejectionFiles[i]->getNumPoints();
                 numPointsRejected -= rejectionFiles[i]->getNumPoints();
@@ -441,7 +462,7 @@ MakeSceneVisitor::apply(OctreeNode& node)
     //osg::notify(osg::NOTICE) << "Read " << numPointsRead << " points  Added=" << numPointsAdded << " Rejected=" << numPointsRejected << std::endl;
     if (numPointsAdded + numPointsRejected != numPointsRead)
     {
-        osg::notify(osg::NOTICE) << "Something wrong..." << std::endl;
+        OSG_WARN << "Something wrong..." << std::endl;
     }
 
     //Write out this node
@@ -660,7 +681,7 @@ int main(int argc, char** argv)
     while (arguments.read("--radiusFactor", radiusFactor));
     osg::notify(osg::NOTICE) << "radiusFactor " << radiusFactor << std::endl;
 
-    std::string ext = "ive";
+    std::string ext = "osgb";
     while (arguments.read("--ext", ext));
     osg::notify(osg::NOTICE) << "ext " << ext << std::endl;
 
@@ -749,6 +770,12 @@ int main(int argc, char** argv)
                 numPoints++;
             }
         }        
+
+        // Expand the bounding box a little bit to help combat precision errors
+
+        osg::Vec3d buffer(10.0, 10.0, 10.0);
+        bb._min -= buffer;
+        bb._max += buffer;       
 
         s_progress.setTotal( numPoints );
         osg::notify(osg::NOTICE) << "Read " << numPoints << " points, bounding box is " << bb._min << " to " << bb._max << std::endl;

@@ -44,12 +44,11 @@ public:
           _totalPoints(0),
           _numRead(0)
         {               
-            OSG_NOTICE << "LASPointCursor" << _filename << std::endl;
+            //OSG_NOTICE << "LASPointCursor" << _filename << std::endl;
             liblas::Header const& header = _reader.GetHeader();
-            OSG_NOTICE << "Got header" << std::endl;
 
-            std::cout << "Compressed: " << (header.Compressed() == true) ? "true":"false";
-            std::cout << "Signature: " << header.GetFileSignature() << '\n';
+            //std::cout << "Compressed: " << (header.Compressed() == true) ? "true":"false";
+            //std::cout << "Signature: " << header.GetFileSignature() << '\n';
             _totalPoints = header.GetPointRecordsCount();
             OSG_NOTICE << "Points count: " << header.GetPointRecordsCount() << '\n';            
           }
@@ -62,10 +61,12 @@ public:
         virtual bool nextPoint(Point& point)
         {                  
             _numRead++;
+            /*
             if (_numRead % 5000 == 0)
             {
                 OSG_NOTICE << "Read " << _numRead << " of " << _totalPoints << std::endl;
             }
+            */
                         
             _hasMore = _reader.ReadNextPoint();
             liblas::Point const& p = _reader.GetPoint();
