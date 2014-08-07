@@ -30,6 +30,7 @@
 #include <osgJuniper/Utils>
 
 #include <osgEarth/MapNode>
+#include <osgEarthUtil/LatLongFormatter>
 #include <osgEarthUtil/ExampleResources>
 #include <osgEarthSymbology/Color>
 
@@ -40,6 +41,8 @@ using namespace osgEarth;
 using namespace osgEarth::Util;
 
 static osg::Point* s_point;
+
+static LabelControl* s_status;
 
 osg::Node::NodeMask MaskMapNode = 0x01;
 osg::Node::NodeMask MaskPointCloud = 0x02;
@@ -73,6 +76,9 @@ void buildControls(osgViewer::Viewer& viewer)
     pointSlider->setHeight( 12 );
     pointSlider->setHorizFill( true, 200 );
     pointSlider->addEventHandler( new PointSizeHandler(s_point));   
+
+    // Add a status label
+    s_status = container->addControl(new LabelControl());
 }
 
 
@@ -141,17 +147,23 @@ protected:
 
             osg::Matrixd localToWorld = osg::computeLocalToWorld(hit.nodePath);
 
+            // Get the geocentric world coordinate
             osg::Vec3d world = vert * localToWorld;            
 
+            // Convert the geocentric coordinate to lat long
             osgEarth::GeoPoint point;
             point.fromWorld(_wgs84.get(), world);
 
-            OSG_NOTICE << "Lat Long=" << point.y() << ", " << point.x() << ", " << point.z() << std::endl;            
-            
+
+            LatLongFormatter formatter;
+            formatter.setPrecision(8);
+            std::stringstream buf;
+            buf << formatter.format(point) << ", " << point.z();
+            s_status->setText( buf.str() );            
         }
         else
         {
-            OSG_NOTICE << "No hits :(" << std::endl;
+            s_status->setText("");            
         }
     }
 
