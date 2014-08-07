@@ -13,6 +13,7 @@ SET(TARGET_DEFAULT_LABEL_PREFIX "Sample")
 
 ADD_SUBDIRECTORY(osgjuniper_articulation)
 ADD_SUBDIRECTORY(osgjuniper_pointcloud)
+ADD_SUBDIRECTORY(osgjuniper_pointcloudtools)
 ADD_SUBDIRECTORY(osgjuniper_bundlerviewer)
 ADD_SUBDIRECTORY(osgjuniper_optimize)
 ADD_SUBDIRECTORY(osgjuniper_ibrdemo)
