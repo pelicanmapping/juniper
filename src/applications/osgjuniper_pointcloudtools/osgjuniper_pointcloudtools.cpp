@@ -21,13 +21,12 @@
 #include <osgUtil/PolytopeIntersector>
 #include <osg/CoordinateSystemNode>
 #include <osg/Point>
+#include <osg/LineWidth>
 
 #include <osgViewer/Viewer>
 #include <osgViewer/ViewerEventHandlers>
 
 #include <osgGA/StateSetManipulator>
-
-#include <osgJuniper/Utils>
 
 #include <osgEarth/MapNode>
 #include <osgEarthUtil/LatLongFormatter>
@@ -36,7 +35,6 @@
 
 #include <iostream>
 
-using namespace osgJuniper;
 using namespace osgEarth;
 using namespace osgEarth::Util;
 
@@ -82,7 +80,9 @@ void buildControls(osgViewer::Viewer& viewer)
 }
 
 
-// Handler to identify a point's location
+/**
+ * Handler to identify a point's location
+ */
 class IdentifyPointHandler : public osgGA::GUIEventHandler
 {
 public:
@@ -154,7 +154,6 @@ protected:
             osgEarth::GeoPoint point;
             point.fromWorld(_wgs84.get(), world);
 
-
             LatLongFormatter formatter;
             formatter.setPrecision(8);
             std::stringstream buf;
@@ -167,16 +166,149 @@ protected:
         }
     }
 
-
-
     osg::ref_ptr< SpatialReference > _wgs84;
     osg::ref_ptr< osg::Vec4ubArray > _prevColorArray;
     osg::Vec4ub _prevSelectedColor;
     int _prevSelectedIndex;
     osg::Vec4ub _selectedColor;    
+};
+
+/**
+ * Point to point measure handler
+ */
+class P2PMeasureHandler : public osgGA::GUIEventHandler
+{
+public:
+    P2PMeasureHandler(osg::Group* root):
+      _wgs84(SpatialReference::create("epsg:4326")),
+      _root(root)
+    {
+    }
+
+    bool handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa)
+    {
+        osgViewer::Viewer* viewer = dynamic_cast<osgViewer::Viewer*>(&aa);
+        if (!viewer) return false;
+
+        switch (ea.getEventType())
+        {
+        case osgGA::GUIEventAdapter::PUSH:
+            if (ea.getButton() == osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON)
+            {
+                pick(ea.getX(), ea.getY(), viewer);
+            }
+            else if (ea.getButtonMask() == osgGA::GUIEventAdapter::RIGHT_MOUSE_BUTTON)
+            {
+                clear();
+            }
+            break;   
+        }
+        return false;
+    }
+
+    void clear()
+    {
+        _points.clear();
+        updateMeasurement();
+    }
 
 
+protected:
+    void pick(float x, float y, osgViewer::Viewer* viewer)
+    {        
+        double w = 5.0;
+        double h = 5.0;
+        osgUtil::PolytopeIntersector *picker = new osgUtil::PolytopeIntersector(osgUtil::Intersector::WINDOW, x - w, y- h, x + w, y + h);
+        osgUtil::IntersectionVisitor iv(picker);
+        iv.setTraversalMask(MaskPointCloud);
+        viewer->getCamera()->accept(iv);
+        if (picker->containsIntersections())
+        {
+            // Get the point that was clicked.
+            osgUtil::PolytopeIntersector::Intersection hit = picker->getFirstIntersection();
+            osg::Geometry* geometry = hit.drawable->asGeometry();
 
+            osg::Vec3Array* verts = static_cast<osg::Vec3Array*>(geometry->getVertexArray());
+            // Since we are just drawing points the point that was clicked is just the primitive index.
+            osg::Vec3 vert = (*verts)[hit.primitiveIndex];            
+
+            osg::Matrixd localToWorld = osg::computeLocalToWorld(hit.nodePath);
+
+            // Get the geocentric world coordinate
+            osg::Vec3d world = vert * localToWorld;            
+
+            _points.push_back( world );
+            updateMeasurement();
+        }
+    }
+
+    void updateMeasurement()
+    {
+        // Remove the line.
+        if (_line.valid())
+        {
+            _root->removeChild( _line.get() );
+            _line = 0;
+        }
+
+        if (_points.size() >=2 )
+        {
+            // Build the line
+            osg::MatrixTransform* mt = new osg::MatrixTransform;
+            osg::Vec3d anchor = _points[0];
+            mt->setMatrix(osg::Matrixd::translate(anchor));
+
+            osg::Geometry* geometry = new osg::Geometry;
+            osg::Vec3Array* verts = new osg::Vec3Array;
+            verts->reserve(_points.size());
+            geometry->setVertexArray( verts );
+
+            osg::Vec4Array* colors = new osg::Vec4Array(1);
+            (*colors)[0] = osg::Vec4(1.0f, 0.0, 0.0f, 1.0f);            
+            geometry->setColorArray( colors );
+            geometry->setColorBinding( osg::Geometry::BIND_OVERALL);
+
+            double dist = 0.0;
+
+            for (unsigned int i = 0; i < _points.size(); i++)
+            {
+                if (i != 0)
+                {
+                    dist += (_points[i] - _points[i-1]).length();
+                }
+                verts->push_back(_points[i] - anchor );
+            }
+
+            geometry->addPrimitiveSet(new osg::DrawArrays(GL_LINE_STRIP, 0, verts->size()));
+
+            osg::Geode* geode = new osg::Geode;
+            geode->addDrawable(geometry);
+
+            mt->addChild( geode );
+
+            mt->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+            mt->getOrCreateStateSet()->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
+            mt->getOrCreateStateSet()->setAttribute(new osg::LineWidth(2.0));
+            _line = mt;
+
+            _root->addChild( _line.get() );
+
+            // Display the measurement
+            std::stringstream buf;
+            buf << "Distance = " << dist << " m";
+            s_status->setText(buf.str());
+
+        }
+        else
+        {
+            s_status->setText("");   
+        }
+    }
+
+    osg::ref_ptr< SpatialReference > _wgs84;
+    std::vector< osg::Vec3d > _points;
+    osg::ref_ptr< osg::Node > _line;
+    osg::ref_ptr< osg::Group > _root;
 };
 
 
@@ -214,14 +346,30 @@ int main(int argc, char** argv)
     pointClouds->getOrCreateStateSet()->setAttributeAndModes(s_point);
 
     root->addChild( pointClouds );
-
-             
+                 
     // any option left unread are converted into errors to write out later.
     arguments.reportRemainingOptionsAsUnrecognized();
 
     buildControls(viewer);
 
-    viewer.addEventHandler( new IdentifyPointHandler());
+    bool measure = arguments.read("--measure");    
+
+    if (measure)
+    {
+        OSG_NOTICE << "measuring" << std::endl;
+    }
+    else
+    {
+        OSG_NOTICE << "identifying" << std::endl;
+    }
+    if (!measure)
+    {
+        viewer.addEventHandler( new IdentifyPointHandler());
+    }
+    else
+    {
+        viewer.addEventHandler(new P2PMeasureHandler(root));
+    }
   
     viewer.setSceneData( root );    
 
