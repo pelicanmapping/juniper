@@ -17,34 +17,26 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 
-#include <osg/Shape>
-#include <osg/ShapeDrawable>
 #include <osg/io_utils>
 #include <osgDB/FileUtils>
 #include <osgDB/FileNameUtils>
 
-#include <osgText/Text>
 #include <osg/Geode>
 #include <osg/Group>
 #include <osg/MatrixTransform>
 #include <osg/Point>
+#include <osg/PagedLOD>
 
 #include <osgDB/ReadFile>
 #include <osgDB/WriteFile>
 #include <osgDB/FileUtils>
 #include <osgDB/FileNameUtils>
 
-#include <osgGA/StateSetManipulator>
-
-#include <osgViewer/Viewer>
-#include <osgViewer/ViewerEventHandlers>
-
 #include <iostream>
 #include <iomanip>
 #include <map>
 #include <osgJuniper/Utils>
 #include <osgJuniper/Octree>
-#include <osgJuniper/SPTNode>
 
 #include <fstream>
 #include <sstream>
@@ -396,6 +388,10 @@ MakeSceneVisitor::apply(OctreeNode& node)
                 }
                 if (!addedPointToRejectionFile)
                 {
+                    // HACK.  Just add it to the current node and increment the complete value.  Not sure why it's rejecting some points.
+                    apv.setStrategy(AddPointVisitor::ACCEPT);
+                    innerOctree.accept(apv);
+                    numPointsAdded++;
                     osg::notify(osg::WARN) << "ERROR:  Could not add point " << p._position << " to rejection file" << std::endl;
                 }
             }
@@ -408,6 +404,7 @@ MakeSceneVisitor::apply(OctreeNode& node)
 
     unsigned int maxSize = 60000;
 
+    /*
     if (numPointsAdded + numPointsRejected < maxSize)
     {       
         OSG_DEBUG << "Adding points from rejection file, total size of node is < " << maxSize << std::endl;
@@ -432,8 +429,21 @@ MakeSceneVisitor::apply(OctreeNode& node)
                 numPointsRejected -= rejectionFiles[i]->getNumPoints();
             }
         }       
-
     }
+    */
+
+    unsigned int rejectionThreshold = 2000;
+    //Include trivially small rejection files
+    for (unsigned int i = 0; i < 8; ++i)
+    {
+        if (rejectionFiles[i]->getNumPoints() < rejectionThreshold)
+        {
+            OSG_DEBUG << "Adding in small rejection file with " << rejectionFiles[i]->getNumPoints() << std::endl;
+            addRejectionFile(rejectionFiles[i], innerOctree);
+            numPointsAdded += rejectionFiles[i]->getNumPoints();
+            numPointsRejected -= rejectionFiles[i]->getNumPoints();
+        }
+    }       
 
     if (numPointsAdded + numPointsRejected != numPointsRead)
     {
@@ -612,7 +622,7 @@ int main(int argc, char** argv)
     arguments.getApplicationUsage()->setApplicationName(arguments.getApplicationName());
     arguments.getApplicationUsage()->setDescription(arguments.getApplicationName()+" is the standard osgjuniper application to build point cloud paged lod.");
     arguments.getApplicationUsage()->setCommandLineUsage(arguments.getApplicationName()+" [options] filename ...");
-    arguments.getApplicationUsage()->addCommandLineOption("--innerMaxLevel <number>","inner octree max level, default is 5.");
+    arguments.getApplicationUsage()->addCommandLineOption("--innerMaxLevel <number>","inner octree max level, default is 6.");
     arguments.getApplicationUsage()->addCommandLineOption("--outerMaxLevel <number>","outer octree max level, default is 11.");
     arguments.getApplicationUsage()->addCommandLineOption("--radiusFactor <number>","factor to set the final radius of a node, default is 5.");
     arguments.getApplicationUsage()->addCommandLineOption("--directory <directory> or -d <directory>","Specify a directory of files to load.");
@@ -657,11 +667,11 @@ int main(int argc, char** argv)
     while (arguments.read("--directory", directory));
     osg::notify(osg::NOTICE) << "Directory " << directory << std::endl;
 
-    unsigned int innerMaxLevel = 5;
+    unsigned int innerMaxLevel = 6;
     while (arguments.read("--innerMaxLevel", innerMaxLevel));
     osg::notify(osg::NOTICE) << "innerMaxLevel " << innerMaxLevel << std::endl;
 
-    unsigned int outerMaxLevel = 11;
+    unsigned int outerMaxLevel = 10;
     while (arguments.read("--outerMaxLevel", outerMaxLevel));
     osg::notify(osg::NOTICE) << "outerMaxLevel " << outerMaxLevel << std::endl;
 
