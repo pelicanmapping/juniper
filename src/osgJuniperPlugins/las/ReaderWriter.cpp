@@ -19,6 +19,7 @@
 #include <osgDB/FileNameUtils>
 #include <osgDB/Registry>
 #include <osgDB/ReaderWriter>
+#include <osgEarth/GeoData>
 #include <osg/io_utils>
 #include <liblas/liblas.hpp>
 #include <fstream>
@@ -44,12 +45,22 @@ public:
           _totalPoints(0),
           _numRead(0)
         {               
-            //OSG_NOTICE << "LASPointCursor" << _filename << std::endl;
+            OSG_NOTICE << "LASPointCursor" << _filename << std::endl;
             liblas::Header const& header = _reader.GetHeader();
 
             //std::cout << "Compressed: " << (header.Compressed() == true) ? "true":"false";
             //std::cout << "Signature: " << header.GetFileSignature() << '\n';
             _totalPoints = header.GetPointRecordsCount();
+            
+            // Hong kong grid
+            _srs = osgEarth::SpatialReference::create("epsg:2326");
+
+            // Yarra
+            //_srs = osgEarth::SpatialReference::create("epsg:28355");
+
+            // Pauls files
+            //_srs = osgEarth::SpatialReference::create("epsg:26911");
+            _destSRS = osgEarth::SpatialReference::create("epsg:4326");
             OSG_NOTICE << "Points count: " << header.GetPointRecordsCount() << '\n';            
           }
 
@@ -59,41 +70,64 @@ public:
         }
 
         virtual bool nextPoint(Point& point)
-        {                  
-            _numRead++;
-            /*
-            if (_numRead % 5000 == 0)
+        {                
+            if (hasMore())
             {
+                _numRead++;
+                /*
+                if (_numRead % 5000 == 0)
+                {
                 OSG_NOTICE << "Read " << _numRead << " of " << _totalPoints << std::endl;
+                }
+                */
+
+
+                _hasMore = _reader.ReadNextPoint();
+                liblas::Point const& p = _reader.GetPoint();
+                //osg::Vec4f color = osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+                float scale = 65280.0f;
+                osg::Vec4f color(p.GetColor().GetRed()/scale, p.GetColor().GetGreen()/scale, p.GetColor().GetBlue()/scale, 1.0f);
+                //OSG_NOTICE << "Color " << color.r() << ", " << color.g() << ", " << color.b() << std::endl;
+
+                bool classify = true;
+
+                if (classify)
+                {            
+                    std::string className = p.GetClassification().GetClassName();
+                    if (className == "Ground")
+                    {
+                        color = osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f);
+                    }
+                    else if (className == "Low Vegetation" ||
+                        className == "Medium Vegetation" ||
+                        className == "High Vegetation")
+                    {
+                        color = osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f);
+                    }
+                    else if (className == "Building")
+                    {
+                        color = osg::Vec4(0.5, 0.5, 0.5, 1.0f);
+                    }
+                    else if (className == "Water")
+                    {
+                        color = osg::Vec4(0.0, 0.0, 1.0f, 0.0f);
+                    }
+                }
+
+                osg::Vec3d position = osg::Vec3d(p.GetX(), p.GetY(), p.GetZ());
+                osgEarth::GeoPoint geoPoint(_srs.get(), position);
+                osgEarth::GeoPoint latLong;
+                geoPoint.transform(_destSRS, latLong);
+                //OSG_NOTICE << "latLong=" << latLong.x() << ", " << latLong.y() << ", " << latLong.z() << std::endl;
+                osg::Vec3d world;
+                latLong.toWorld(world);
+                //OSG_NOTICE << "World " << world.x() << ", " << world.y() << ", " << world.z() << std::endl;
+                point._position = world;                       
+                point._color = color;
+                //OSG_NOTICE << "Read point " << point._position.x() << ", " << point._position.y() << " " << point._position.z() << std::endl;          
+                return true;    
             }
-            */
-                        
-            _hasMore = _reader.ReadNextPoint();
-            liblas::Point const& p = _reader.GetPoint();
-            osg::Vec4f color = osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f);
-            std::string className = p.GetClassification().GetClassName();
-            if (className == "Ground")
-            {
-                color = osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f);
-            }
-            else if (className == "Low Vegetation" ||
-                     className == "Medium Vegetation" ||
-                     className == "High Vegetation")
-            {
-                color = osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f);
-            }
-            else if (className == "Building")
-            {
-                color = osg::Vec4(0.5, 0.5, 0.5, 1.0f);
-            }
-            else if (className == "Water")
-            {
-                color = osg::Vec4(0.0, 0.0, 1.0f, 0.0f);
-            }
-            point._position = osg::Vec3d(p.GetX(), p.GetY(), p.GetZ());
-            point._color = color;
-            //OSG_NOTICE << "Read point " << point._position.x() << ", " << point._position.y() << " " << point._position.z() << std::endl;          
-            return true;        
+            return false;
         }
 
         std::string _filename;
@@ -102,6 +136,8 @@ public:
         bool _hasMore;
         unsigned int _totalPoints;
         unsigned int _numRead;
+        osg::ref_ptr< osgEarth::SpatialReference > _srs;
+        osg::ref_ptr< osgEarth::SpatialReference > _destSRS;
     };
 
 
