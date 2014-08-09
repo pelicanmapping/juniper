@@ -323,7 +323,8 @@ int main(int argc, char** argv)
     osg::Group* root = MapNodeHelper().load(arguments, &viewer);
 
     osg::ref_ptr< MapNode > mapNode = MapNode::findMapNode(root);
-    mapNode->setNodeMask(MaskMapNode);
+    mapNode->getTerrainEngine()->setNodeMask(MaskMapNode);
+    mapNode->getModelLayerGroup()->setNodeMask(MaskPointCloud);
 
     osg::ref_ptr< osg::Group > pointClouds = new osg::Group;
     pointClouds->setNodeMask(MaskPointCloud);
@@ -343,7 +344,7 @@ int main(int argc, char** argv)
 
     pointClouds->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
     s_point = new osg::Point(1.0);
-    pointClouds->getOrCreateStateSet()->setAttributeAndModes(s_point);
+    root->getOrCreateStateSet()->setAttributeAndModes(s_point);
 
     root->addChild( pointClouds );
                  
