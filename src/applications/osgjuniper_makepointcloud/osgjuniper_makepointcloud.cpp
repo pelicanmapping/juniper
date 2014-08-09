@@ -288,7 +288,7 @@ _filename(filename),
 _innerMaxLevel(innerMaxLevel),
 _outerMaxLevel(outerMaxLevel),
 _ext("ive"),
-_radiusFactor(20.0f),
+_radiusFactor(30.0f),
 _useVBO( true )
 {
 }
@@ -298,7 +298,7 @@ _pointSource(pointSource),
 _innerMaxLevel(innerMaxLevel),
 _outerMaxLevel(outerMaxLevel),
 _ext("ive"),
-_radiusFactor(20.0f),
+_radiusFactor(30.0f),
 _useVBO( true )
 {
 }
@@ -654,7 +654,7 @@ int main(int argc, char** argv)
     while (arguments.read("--prefix", prefix));
     osg::notify(osg::NOTICE) << "prefix " << prefix << std::endl;
 
-    float radiusFactor = 10.0f;
+    float radiusFactor = 30.0f;
     while (arguments.read("--radiusFactor", radiusFactor));
     osg::notify(osg::NOTICE) << "radiusFactor " << radiusFactor << std::endl;
 
