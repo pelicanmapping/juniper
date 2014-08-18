@@ -482,7 +482,9 @@ MakeSceneVisitor::apply(OctreeNode& node)
         }
     }
     std::string filename = createURI(node);
-    osgDB::writeNodeFile(*pagedLOD, filename);
+    osg::ref_ptr< osgDB::Options > opt = new osgDB::Options;
+    opt->setOptionString( "Compressor=zlib" );
+    osgDB::writeNodeFile(*pagedLOD, filename, opt.get());
 
     //Increment the progress
     s_progress.incrementComplete(numPointsAdded);
