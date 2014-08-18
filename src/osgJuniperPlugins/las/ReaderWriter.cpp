@@ -20,6 +20,7 @@
 #include <osgDB/Registry>
 #include <osgDB/ReaderWriter>
 #include <osgEarth/GeoData>
+#include <osgEarth/URI>
 #include <osg/io_utils>
 #include <liblas/liblas.hpp>
 #include <fstream>
@@ -51,9 +52,22 @@ public:
             //std::cout << "Compressed: " << (header.Compressed() == true) ? "true":"false";
             //std::cout << "Signature: " << header.GetFileSignature() << '\n';
             _totalPoints = header.GetPointRecordsCount();
+
+             std::string prjLocation = osgDB::getNameLessExtension(_filename) + std::string(".prj");
+             OSG_NOTICE << "Proj file " << prjLocation << std::endl;
+
+             osgEarth::ReadResult rr = osgEarth::URI(prjLocation).readString();
+             if (rr.succeeded())
+             {
+                 _srs = osgEarth::SpatialReference::create(rr.getString());
+             }
+             else
+             {
+                 _srs = osgEarth::SpatialReference::create("epsg:4326");
+             }
             
             // Hong kong grid
-            _srs = osgEarth::SpatialReference::create("epsg:2326");
+            //_srs = osgEarth::SpatialReference::create("epsg:2326");
 
             // Yarra
             //_srs = osgEarth::SpatialReference::create("epsg:28355");
@@ -89,7 +103,7 @@ public:
                 osg::Vec4f color(p.GetColor().GetRed()/scale, p.GetColor().GetGreen()/scale, p.GetColor().GetBlue()/scale, 1.0f);
                 //OSG_NOTICE << "Color " << color.r() << ", " << color.g() << ", " << color.b() << std::endl;
 
-                bool classify = true;
+                bool classify = false;
 
                 if (classify)
                 {            
