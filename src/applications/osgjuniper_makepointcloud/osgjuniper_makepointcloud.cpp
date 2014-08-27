@@ -621,6 +621,8 @@ int main(int argc, char** argv)
     // use an ArgumentParser object to manage the program arguments.
     osg::ArgumentParser arguments(&argc,argv);
 
+    osgDB::Registry::instance()->addFileExtensionAlias("laz", "las");
+
     arguments.getApplicationUsage()->setApplicationName(arguments.getApplicationName());
     arguments.getApplicationUsage()->setDescription(arguments.getApplicationName()+" is the standard osgjuniper application to build point cloud paged lod.");
     arguments.getApplicationUsage()->setCommandLineUsage(arguments.getApplicationName()+" [options] filename ...");
