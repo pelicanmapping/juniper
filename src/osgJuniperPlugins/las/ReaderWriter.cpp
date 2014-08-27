@@ -51,17 +51,7 @@ public:
               lasreadopener.set_file_name(filename.c_str());
               _reader = lasreadopener.open();              
 
-              std::string prjLocation = osgDB::getNameLessExtension(_filename) + std::string(".prj");              
-
-              osgEarth::ReadResult rr = osgEarth::URI(prjLocation).readString();
-              if (rr.succeeded())
-              {
-                  _srs = osgEarth::SpatialReference::create(rr.getString());
-              }
-              else
-              {
-                  _srs = osgEarth::SpatialReference::create("epsg:4326");
-              }
+              
 
               // Hong kong grid
               //_srs = osgEarth::SpatialReference::create("epsg:2326");
@@ -78,20 +68,45 @@ public:
               _header = &(_reader->header);              
               OSG_NOTICE << "Number of point records " << _header->number_of_point_records << std::endl;
               OSG_NOTICE << "Scale factor " << _header->x_scale_factor << ", " << _header->y_scale_factor << ", " << _header->z_scale_factor << std::endl;                            
+                            
               
-              /*
+              // Small chunk from lasinfo to get the epsg code.
               for (unsigned int i = 0; i < _header->number_of_variable_length_records; i++)
               {
-                  if (strcmp(_header->vlrs[i].user_id, "LASF_Projection") == 0 )
+                  if (strcmp(_header->vlrs[i].user_id, "LASF_Projection") == 0 && (_header->vlrs[i].data != 0))
                   {
-                      OSG_NOTICE << "Got LASF_Projection" << std::endl;
+                      if (_header->vlrs[i].record_id == 34735)
+                      {
+                          for (int j = 0; j < _header->vlr_geo_keys->number_of_keys; j++)
+                          {
+                              switch(_header->vlr_geo_key_entries[j].key_id)
+                              {
+                              case 3072: // GTModelTypeGeoKey 
+                                  int epsg = _header->vlr_geo_key_entries[j].value_offset;
+                                  std::stringstream buf;
+                                  buf << "epsg:" << epsg;                                  
+                                  _srs = osgEarth::SpatialReference::create(buf.str());                                  
+                              }                              
+                          }                          
+                      }
+                  }                  
+              }       
+
+              // Try to read the prj if we don't have a srs yet.
+              if (!_srs.valid())
+              {
+                  std::string prjLocation = osgDB::getNameLessExtension(_filename) + std::string(".prj");              
+
+                  osgEarth::ReadResult rr = osgEarth::URI(prjLocation).readString();
+                  if (rr.succeeded())
+                  {
+                      _srs = osgEarth::SpatialReference::create(rr.getString());
                   }
-                  OSG_NOTICE << "VLR " << _header->vlrs[i].user_id << std::endl;
+                  else
+                  {
+                      _srs = osgEarth::SpatialReference::create("epsg:4326");
+                  }
               }
-              */
-
-
-
           }
           
           LASPointCursor::~LASPointCursor()
@@ -152,13 +167,15 @@ public:
 
                   }                  
                   
-                  osg::Vec3d position = osg::Vec3d((double)_reader->point.X * _header->x_scale_factor, (double)_reader->point.Y * _header->y_scale_factor, (double)_reader->point.Z * _header->z_scale_factor);                  
-                  osgEarth::GeoPoint geoPoint(_srs.get(), position);
+                  osg::Vec3d position = osg::Vec3d((double)(_reader->point.X * _header->x_scale_factor) + _header->x_offset,
+                                                   (double)(_reader->point.Y * _header->y_scale_factor) + _header->y_offset ,
+                                                   (double)(_reader->point.Z * _header->z_scale_factor) + _header->z_offset);                  
+                  osgEarth::GeoPoint geoPoint(_srs.get(), position);                  
                   osgEarth::GeoPoint latLong;
-                  geoPoint.transform(_destSRS, latLong);                  
+                  geoPoint.transform(_destSRS, latLong);                                    
                   osg::Vec3d world;
                   latLong.toWorld(world);
-                  point._position = position;                       
+                  point._position = world;                       
                   point._color = color;                  
                   return true;                
               }              
