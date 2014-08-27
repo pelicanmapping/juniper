@@ -58,8 +58,7 @@ namespace osgJuniper
      */
     class OSGJUNIPER_EXPORT PointCursor : public osg::Referenced
     {
-    public:
-        virtual bool hasMore() const = 0;
+    public:        
         virtual bool nextPoint(Point& point) = 0;
     };
 
@@ -96,7 +95,6 @@ namespace osgJuniper
     {
     public:
         PointListCursor(PointList& points);
-        virtual bool hasMore() const;
         virtual bool nextPoint(Point& point);
     protected:
         PointList& _points;
@@ -128,7 +126,6 @@ namespace osgJuniper
     public:
         CompositePointSourceCursor(PointSourceList& pointSources);
 
-        virtual bool hasMore() const;
         virtual bool nextPoint(Point& point);
 
         PointSourceList& _pointSources;

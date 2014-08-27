@@ -42,8 +42,7 @@ public:
 
         LASPointCursor(const std::string& filename):
           _filename(filename),
-              _in(_filename, std::ios::in | std::ios::binary),          
-              _hasMore(true),
+              _in(_filename, std::ios::in | std::ios::binary),                        
               _totalPoints(0),
               _numRead(0),
               _reader(0)
@@ -101,12 +100,6 @@ public:
               {
                   delete _reader;
               }
-          }
-
-
-          virtual bool hasMore() const
-          {                           
-              return _hasMore;
           }
           
           virtual bool nextPoint(Point& point)
@@ -168,16 +161,14 @@ public:
                   point._position = position;                       
                   point._color = color;                  
                   return true;                
-              }
-              _hasMore = false;
+              }              
               return false;                                                
           }
 
           std::string _filename;
           std::ifstream _in;      
           LASreader* _reader;
-          LASheader* _header;
-          bool _hasMore;
+          LASheader* _header;          
           unsigned int _totalPoints;
           unsigned int _numRead;
           osg::ref_ptr< osgEarth::SpatialReference > _srs;

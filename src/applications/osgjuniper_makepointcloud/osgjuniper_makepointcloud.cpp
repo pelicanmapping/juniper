@@ -311,10 +311,9 @@ void MakeSceneVisitor::addRejectionFile(RejectionFile* rejectionFile, OctreeNode
     unsigned int numReadRejectionFile = 0;
     osg::ref_ptr< PointSource > rejectionSource = rejectionFile->createPointSource();
     osg::ref_ptr< PointCursor > rejectionCursor = rejectionSource->createPointCursor();                
-    while (rejectionCursor->hasMore())
-    {
-        Point p;
-        if (rejectionCursor->nextPoint(p))
+    Point p;
+    while (rejectionCursor->nextPoint(p))
+    {               
         {            
             AddPointVisitor apv(p, _innerMaxLevel);
             apv.setStrategy(AddPointVisitor::ACCEPT);
@@ -354,52 +353,50 @@ MakeSceneVisitor::apply(OctreeNode& node)
     int numPointsRead     = 0;
     int numPointsAdded    = 0;
     int numPointsRejected = 0;
-    while (pointCursor->hasMore())
+    Point p;
+    while (pointCursor->nextPoint(p))
     {
-        Point p;
-        if (pointCursor->nextPoint(p))
+
+        numPointsRead++;
+        AddPointVisitor apv(p, _innerMaxLevel);
+        if (node.getID().level <= _outerMaxLevel)
         {
-            numPointsRead++;
-            AddPointVisitor apv(p, _innerMaxLevel);
-            if (node.getID().level <= _outerMaxLevel)
+            apv.setStrategy(AddPointVisitor::REJECT);
+        }
+        else
+        {                    
+            osg::notify(osg::NOTICE) << "Reached max level of " << _outerMaxLevel << ", accepting all points" << std::endl;
+            //We can't break it down any further, just accept the points and move on
+            apv.setStrategy(AddPointVisitor::ACCEPT);
+        }
+        innerOctree.accept(apv);
+        if (!apv.getPointAdded())
+        {
+            bool addedPointToRejectionFile = false;
+            numPointsRejected++;
+            //Choose which rejection file to use and write the point to it
+            for (unsigned int i = 0; i < 8; ++i)
             {
-                apv.setStrategy(AddPointVisitor::REJECT);
+                if (rejectionFiles[i]->contains(p._position))
+                {
+                    rejectionFiles[i]->addPoint( p );
+                    addedPointToRejectionFile = true;
+                    break;
+                }
             }
-            else
-            {                    
-                osg::notify(osg::NOTICE) << "Reached max level of " << _outerMaxLevel << ", accepting all points" << std::endl;
-                //We can't break it down any further, just accept the points and move on
+            if (!addedPointToRejectionFile)
+            {
+                // HACK.  Just add it to the current node and increment the complete value.  Not sure why it's rejecting some points.
                 apv.setStrategy(AddPointVisitor::ACCEPT);
-            }
-            innerOctree.accept(apv);
-            if (!apv.getPointAdded())
-            {
-                bool addedPointToRejectionFile = false;
-                numPointsRejected++;
-                //Choose which rejection file to use and write the point to it
-                for (unsigned int i = 0; i < 8; ++i)
-                {
-                    if (rejectionFiles[i]->contains(p._position))
-                    {
-                        rejectionFiles[i]->addPoint( p );
-                        addedPointToRejectionFile = true;
-                        break;
-                    }
-                }
-                if (!addedPointToRejectionFile)
-                {
-                    // HACK.  Just add it to the current node and increment the complete value.  Not sure why it's rejecting some points.
-                    apv.setStrategy(AddPointVisitor::ACCEPT);
-                    innerOctree.accept(apv);
-                    numPointsAdded++;
-                    osg::notify(osg::WARN) << "ERROR:  Could not add point " << p._position << " to rejection file" << std::endl;
-                }
-            }
-            else
-            {
+                innerOctree.accept(apv);
                 numPointsAdded++;
+                osg::notify(osg::WARN) << "ERROR:  Could not add point " << p._position << " to rejection file" << std::endl;
             }
-        }        
+        }
+        else
+        {
+            numPointsAdded++;
+        }
     }
 
     unsigned int maxSize = 60000;
@@ -742,14 +739,11 @@ int main(int argc, char** argv)
         //Come up with the initial bounding box
         osg::BoundingBoxd bb;
         unsigned int numPoints = 0;
-        while (cursor->hasMore())
+        Point p;
+        while (cursor->nextPoint(p))
         {
-            Point p;
-            if (cursor->nextPoint(p))
-            {
-                bb.expandBy( p._position );
-                numPoints++;
-            }
+            bb.expandBy( p._position );
+            numPoints++;
         }        
 
         // Expand the bounding box a little bit to help combat precision errors

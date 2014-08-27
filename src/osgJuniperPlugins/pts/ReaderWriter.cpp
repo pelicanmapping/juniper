@@ -49,11 +49,6 @@ public:
             }
         }
 
-        virtual bool hasMore() const
-        {
-            return _in.is_open() && !_in.eof();
-        }
-
         virtual bool nextPoint(Point& point)
         {
             if (!_in.eof())

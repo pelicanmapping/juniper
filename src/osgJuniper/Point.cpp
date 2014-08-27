@@ -52,15 +52,9 @@ _numRead(0)
 }
 
 bool
-PointListCursor::hasMore() const
-{
-    return _itr != _points.end();
-}
-
-bool
 PointListCursor::nextPoint( Point &point )
 {
-    if (hasMore())
+    if (_itr != _points.end())
     {
         point = *_itr;
         _itr++;
@@ -136,18 +130,12 @@ _numRead(0)
 
 
 bool
-CompositePointSourceCursor::hasMore() const
-{
-    return _iter != _pointSources.end();
-}
-
-bool
 CompositePointSourceCursor::nextPoint(Point& point)
 {
     bool gotPoint = false;
     while (!gotPoint)
     {
-        if (!hasMore()) break;
+        if (_iter == _pointSources.end()) break;
         //If the current cursor is valid, try to get a point from it
         if (_currentCursor.valid())
         {

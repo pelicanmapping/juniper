@@ -48,16 +48,13 @@ SPTNode* makeSceneFromPointSource(PointSource *source, unsigned int maxVerts = U
     unsigned int numRead = 0;
     //Initialize the bounding box from the points
     osg::BoundingBoxd bb;
-    while (cursor->hasMore() && numRead < maxVerts)
+    Point p;
+    while (cursor->nextPoint(p) && numRead < maxVerts)
     {
-        Point p;
-        if (cursor->nextPoint(p))
-        {
-            bb.expandBy( p._position );
-            numRead++;
-            if (numRead%1000 == 0) 
-                osg::notify(osg::NOTICE) << "Expanded by " << numRead+1 << " points " << std::endl;
-        }
+        bb.expandBy( p._position );
+        numRead++;
+        if (numRead%1000 == 0) 
+            osg::notify(osg::NOTICE) << "Expanded by " << numRead+1 << " points " << std::endl;
     }
 
    
@@ -68,18 +65,14 @@ SPTNode* makeSceneFromPointSource(PointSource *source, unsigned int maxVerts = U
 
     //Reset the cursor
     numRead = 0;
-    cursor = source->createPointCursor();
-    while (cursor->hasMore() && numRead < maxVerts)
-    {
-        Point p;
-        if (cursor->nextPoint(p))
-        {
-            AddPointVisitor apv(p, maxLevel);
-            root->accept(apv);
-            if (numRead%1000 == 0) 
-                osg::notify(osg::NOTICE) << "Added " << numRead+1 << " points " << std::endl;
-            numRead++;
-        }
+    cursor = source->createPointCursor();    
+    while (cursor->nextPoint(p) && numRead < maxVerts)
+    {        
+        AddPointVisitor apv(p, maxLevel);
+        root->accept(apv);
+        if (numRead%1000 == 0) 
+            osg::notify(osg::NOTICE) << "Added " << numRead+1 << " points " << std::endl;
+        numRead++;
     }
 
     osg::notify(osg::NOTICE) << "Added a total of " << numRead << " points" << std::endl;

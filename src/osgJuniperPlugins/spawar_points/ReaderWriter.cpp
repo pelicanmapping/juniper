@@ -47,14 +47,10 @@ public:
                 osg::notify(osg::NOTICE) << "Failed when opening " << filename << " for reading" << std::endl;
             }
         }
-
-        virtual bool hasMore() const
-        {
-            return _in.is_open() && !_in.eof();
-        }
+        
         virtual bool nextPoint(Point& point)
         {
-            if (hasMore())
+            if (_in.is_open() && !_in.eof())
             {
                 osg::Vec3d vert;
                 osg::Vec3 norm;
