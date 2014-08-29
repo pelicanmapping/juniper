@@ -91,7 +91,12 @@ namespace osgJuniper
         /**
          * Gets the OctreeId for this OctreeNode
          */
-        const OctreeId& getID() const { return _id;}
+        const OctreeId& getID() const { return _id;}        
+
+        /**
+         * Gets the parent id for this OctreeNode
+         */
+        OctreeId getParentID() const;
 
         /**
          * Gets the BoundingBox for this OctreeNode
@@ -151,6 +156,7 @@ namespace osgJuniper
         double getDepth() const;
 
         OctreeId getID(const osg::Vec3d& point, unsigned int level) const;        
+               
 
     protected:       
 

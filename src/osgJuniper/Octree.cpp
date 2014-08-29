@@ -100,6 +100,16 @@ OctreeNode* OctreeNode::createChild(const OctreeId& id)
                                             minX + width, minY + depth, minZ + height));
     return node;
 }
+        
+OctreeId OctreeNode::getParentID() const
+{    
+    unsigned int level = _id.level -1;
+    unsigned int x = _id.x / 2;
+    unsigned int y = _id.y / 2;
+    unsigned int z = _id.z / 2;
+    return OctreeId(level, x, y, z);
+
+}
 
 OctreeNode*
 OctreeNode::createChild(unsigned int childNumber)
