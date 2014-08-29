@@ -39,13 +39,75 @@ _split(false)
 {    
 }
 
+double OctreeNode::getWidth() const
+{
+    return _boundingBox.xMax() - _boundingBox.xMin();
+}
+
+double OctreeNode::getHeight() const
+{
+    return _boundingBox.zMax() - _boundingBox.zMin();
+}
+
+double OctreeNode::getDepth() const
+{
+    return _boundingBox.yMax() - _boundingBox.yMin();
+}
+
+OctreeId
+OctreeNode::getID(const osg::Vec3d& point, unsigned int level) const
+{
+    unsigned int dim = 1;
+    for (unsigned int i = 0; i < level; i++)
+    {
+        dim *= 2;
+    }
+
+    double width  = getWidth();
+    double height = getHeight();
+    double depth  = getDepth();
+    
+    double rx = (point.x() - _boundingBox.xMin()) / width;
+    double ry = (point.y() - _boundingBox.yMin()) / depth;
+    double rz = (point.z() - _boundingBox.zMin()) / height;
+
+    int tileX = osg::clampBelow( (unsigned int)(rx * (double)dim), dim-1 );
+    int tileY = osg::clampBelow( (unsigned int)(ry * (double)dim), dim-1 );
+    int tileZ = osg::clampBelow( (unsigned int)(rz * (double)dim), dim-1 );    
+
+    return OctreeId(level, tileX, tileY, tileZ);
+}
+
+OctreeNode* OctreeNode::createChild(const OctreeId& id)
+{
+    unsigned int dim = 1;
+    for (unsigned int i = 0; i < id.level; i++)
+    {
+        dim *= 2;
+    }
+
+    double width  = getWidth() / (double)dim;
+    double height = getHeight() / (double)dim;
+    double depth  = getDepth() / (double)dim;
+
+    double minX = _boundingBox.xMin() + (double)id.x * width;
+    double minY = _boundingBox.yMin() + (double)id.y * depth;
+    double minZ = _boundingBox.zMin() + (double)id.z * height;
+
+    OctreeNode* node = new OctreeNode();
+    node->setId(id);
+    node->setBoundingBox( osg::BoundingBoxd(minX, minY, minZ,
+                                            minX + width, minY + depth, minZ + height));
+    return node;
+}
+
 OctreeNode*
 OctreeNode::createChild(unsigned int childNumber)
 {
     //Compute the new dimensions of this child
-    double width  = (_boundingBox.xMax() - _boundingBox.xMin()) / 2.0;
-    double height = (_boundingBox.zMax() - _boundingBox.zMin()) / 2.0;
-    double depth  = (_boundingBox.yMax() - _boundingBox.yMin()) / 2.0;
+    double width  = getWidth() / 2.0;
+    double height = getHeight() / 2.0;
+    double depth  = getDepth() / 2.0;
 
     double xMin = _boundingBox.xMin();
     double yMin = _boundingBox.yMin();

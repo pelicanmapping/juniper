@@ -141,6 +141,17 @@ namespace osgJuniper
          */
         OctreeNode* createChild(unsigned int childNumber);
 
+        /**
+         * Creates an octree node with the given id.  Assumes this is the root node.
+         */
+        OctreeNode* createChild(const OctreeId& id);
+
+        double getWidth() const;
+        double getHeight() const;
+        double getDepth() const;
+
+        OctreeId getID(const osg::Vec3d& point, unsigned int level) const;        
+
     protected:       
 
         PointList _points;
