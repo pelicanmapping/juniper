@@ -25,6 +25,7 @@
 #include <osg/BoundingBox>
 #include <osgDB/FileUtils>
 #include <osgDB/FileNameUtils>
+#include <osg/ArgumentParser>
 #include <iostream>
 
 using namespace osgEarth;
@@ -103,6 +104,16 @@ public:
     void setDeleteInputs(bool deleteInputs)
     {
         _deleteInputs = deleteInputs;
+    }
+
+    unsigned int getTargetNumPoints() const
+    {
+        return _targetNumPoints;
+    }
+
+    void setTargetNumPoints(unsigned int targetNumPoints)
+    {
+        _targetNumPoints = targetNumPoints;
     }
 
     void build()
@@ -286,6 +297,9 @@ public:
             {
                 osg::ref_ptr< OctreeNode > node = _children[i];                
                 OctreeCellBuilder builder;
+                // Copy settings from parent
+                builder.setTargetNumPoints(_targetNumPoints);
+                builder.setInnerLevel(_innerLevel);
                 builder.setNode(node.get());         
                 builder.getInputFiles().push_back(_outputFiles[i]);
                 builder.setDeleteInputs(true);
@@ -448,6 +462,25 @@ int main(int argc, char** argv)
     osg::Timer_t startTime = osg::Timer::instance()->tick();
     std::vector< std::string > filenames;
 
+    osg::ArgumentParser arguments(&argc,argv);
+
+    //Read in the filenames to process
+    for(int pos=1;pos<arguments.argc();++pos)
+    {
+        if (!arguments.isOption(pos))
+        {
+            filenames.push_back( arguments[pos]);
+        }
+    }
+
+    unsigned int targetNumPoints = 100000;
+    arguments.read("--target", targetNumPoints);
+
+    unsigned int innerLevel = 6;
+    arguments.read("--innerLevel", innerLevel);
+
+
+    
     /*
     osgDB::DirectoryContents contents = osgDB::getDirectoryContents("C:/geodata/aam/PointClouds/HongKong2/HongKong_ALS");
     for (unsigned int i = 0; i < contents.size(); i++)
@@ -466,6 +499,7 @@ int main(int argc, char** argv)
     }
     */
     
+    /*
     filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000001.laz");
     filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000002.laz");
     filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000003.laz");
@@ -495,12 +529,18 @@ int main(int argc, char** argv)
     filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000027.laz");
     filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000028.laz");
     filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000029.laz"); 
+    */
+
+
 
     OctreeCellBuilder builder;    
     for (unsigned int i = 0; i < filenames.size(); i++)
     {
         builder.getInputFiles().push_back(filenames[i]);
+        OSG_NOTICE << "Adding filename " << filenames[i] << std::endl;
     }
+    builder.setInnerLevel(innerLevel);
+    builder.setTargetNumPoints(targetNumPoints);
     builder.build();
     builder.buildChildren();    
 

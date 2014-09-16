@@ -38,234 +38,165 @@
 #include <osgGA/TerrainManipulator>
 #include <osgGA/SphericalManipulator>
 
-#include <osgJuniper/Utils>
-
 #include <iostream>
+
+#include <osgDB/FileNameUtils>
+#include <osgDB/FileUtils>
+
+#include <osg/PagedLOD>
+
+#include <osgJuniper/Octree>
+
+#include <cctype>
+#include <iomanip>
+#include <string>
 
 using namespace osgJuniper;
 
-
-
-static const char *vertSource = {        
-    "void main(void)\n"
-    "{\n"    
-    "    gl_Position = ftransform();\n"
-    "    gl_FrontColor = gl_Color;\n"
-    "}\n"
-};
-
-static const char *fragSource = {    
-    "uniform float fadeTime;\n"
-    "uniform float fadeStartTime;\n"
-    "uniform float osg_FrameTime;\n"
-    "void main(void)\n"
-    "{\n"
-    "    float a = clamp((osg_FrameTime - fadeStartTime)/fadeTime, 0, 1);\n"
-    "    gl_FragColor = vec4(gl_Color.rgb, a);\n"
-    "}\n"
-};
-
-class FadeNode : public osg::Group
+std::string getFilename(OctreeId id)
 {
-public:
-    FadeNode():
-      _lastCulledFrame(-1),
-      _fadeTime(0.5),
-      _startTime(0.0f)
-    {
-        getOrCreateStateSet()->getOrCreateUniform("fadeTime",      osg::Uniform::FLOAT)->set(_fadeTime);
-        getOrCreateStateSet()->getOrCreateUniform("fadeStartTime", osg::Uniform::FLOAT)->set(_startTime);
-        getOrCreateStateSet()->setMode(GL_BLEND, osg::StateAttribute::ON);
-
-        osg::Program* program = new osg::Program();
-        program->addShader(new osg::Shader(osg::Shader::VERTEX,   vertSource));
-        program->addShader(new osg::Shader(osg::Shader::FRAGMENT, fragSource));
-        getOrCreateStateSet()->setAttributeAndModes(program, osg::StateAttribute::ON);
-    }
-
-    void setFadeTime( double fadeTime ) 
-    {
-        if (_fadeTime != fadeTime) 
-        {
-            _fadeTime = fadeTime;    
-            getOrCreateStateSet()->getOrCreateUniform("fadeTime",      osg::Uniform::FLOAT)->set(_fadeTime);        
-        }
-    }
-
-    double getFadeTime() const
-    {
-        return _fadeTime;
-    }
-
-    virtual void traverse(osg::NodeVisitor& nv)
-    {
-        if (nv.getVisitorType() == osg::NodeVisitor::CULL_VISITOR)
-        {
-            //We are being culled
-            if (_lastCulledFrame < 0 || nv.getFrameStamp()->getFrameNumber() - _lastCulledFrame > 1) {                
-                _startTime = nv.getFrameStamp()->getReferenceTime();
-                getOrCreateStateSet()->getOrCreateUniform("fadeStartTime", osg::Uniform::FLOAT)->set(_startTime);
-            }
-            _lastCulledFrame = nv.getFrameStamp()->getFrameNumber();
-        }
-
-        osg::Group::traverse(nv);
-    }
-protected:    
-    float _fadeTime;
-    int _lastCulledFrame;
-    float _startTime;
-};
-
-struct FindGeode : public osg::NodeVisitor
-{
-    std::vector< osg::ref_ptr< osg::Geode > > _geodes;
-
-    FindGeode() : osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN) {}
-    void apply(osg::Geode& geode) {
-        _geodes.push_back( &geode );        
-    }
-};
-
-class MyReadFileCallback : public osgDB::Registry::ReadFileCallback
-{
-public:
-    virtual osgDB::ReaderWriter::ReadResult readNode(const std::string& fileName, const osgDB::ReaderWriter::Options* options)
-    {
-        // note when calling the Registry to do the read you have to call readNodeImplementation NOT readNode, as this will
-        // cause on infinite recusive loop.
-        osgDB::ReaderWriter::ReadResult result = osgDB::Registry::instance()->readNodeImplementation(fileName,options);
-        //Wrap any Geode with a FadeNode
-        FindGeode geodeFinder;
-        result.getNode()->accept( geodeFinder );
-        for (unsigned int i = 0; i < geodeFinder._geodes.size(); i++)
-        {            
-            osg::Geode* geode = geodeFinder._geodes[i].get();
-            FadeNode* fade = new FadeNode();
-            fade->addChild( geode  );
-            osg::Group* parent = geode->getParent(0);
-            parent->replaceChild( geode, fade );            
-
-            for (unsigned int j = 0; j < geode->getNumDrawables(); j++ )
-            {
-                geode->getDrawable(j)->asGeometry()->setUseVertexBufferObjects(true);
-                geode->getDrawable(j)->asGeometry()->setUseDisplayList(false);
-            }
-        }
-        return result;
-    }
-};
-
-osg::Node* buildPointNode(unsigned int numPoints)
-{    
-    osg::Vec3Array* verts = new osg::Vec3Array( numPoints );
-    osg::Vec4Array* colors = new osg::Vec4Array( numPoints );
-
-    osg::Geometry* geometry = new osg::Geometry;
-    geometry->setVertexArray( verts );
-    geometry->setColorArray( colors );
-    geometry->setColorBinding( osg::Geometry::BIND_PER_VERTEX );
-    geometry->setUseVertexBufferObjects( true );
-
-    for (unsigned int i = 0; i < numPoints; i++) 
-    {
-        (*verts)[i]  = Utils::randomVert();
-        (*colors)[i] = Utils::randomColor();
-    }
-
-    geometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, verts->size()));
-    
-    osg::Geode* geode = new osg::Geode;
-    geode->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-    geode->addDrawable( geometry );
-
-    FadeNode* fade = new FadeNode;
-    fade->addChild( geode );
-    osg::LOD* lod = new osg::LOD;
-    lod->addChild(fade, 0, 5);
-    return lod;       
+    std::stringstream buf;
+    buf << "tile_" << id.level << "_" << id.z << "_" << id.x << "_" << id.y << ".laz";    
+    return buf.str();
 }
+
+struct ToggleFullHandler : public osgGA::GUIEventHandler 
+{
+    ToggleFullHandler(osg::Node* tiled, osg::Node* full):
+    _tiled(tiled),
+    _full(full),
+    _showFull(false)
+    {        
+        updateMask();
+    }
+
+    void updateMask()
+    {
+        _tiled->setNodeMask(_showFull ? 0 : ~0);
+        _full->setNodeMask(_showFull ? ~0 : 0);
+    }
+
+    bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
+    {
+        if ( ea.getEventType() == ea.KEYDOWN && ea.getKey() == 't' )
+        {            
+            _showFull = !_showFull;
+            OSG_NOTICE << "Show full=" << _showFull << std::endl;
+            updateMask();
+        }
+        return false;
+    }
+
+    bool _showFull;
+    osg::ref_ptr< osg::Node > _tiled;
+    osg::ref_ptr< osg::Node > _full;
+};
+
+
+class PointTileReader : public osgDB::ReaderWriter
+{
+public:
+    PointTileReader()
+    {
+        supportsExtension( "point_tile", className() );
+    }
+
+    virtual const char* className()
+    {
+        return "Point tile reader";
+    }    
+
+    virtual ReadResult readNode( const std::string& location, const osgDB::ReaderWriter::Options* options ) const
+    {
+        if ( !acceptsExtension( osgDB::getLowerCaseFileExtension( location ) ) )
+            return ReadResult::FILE_NOT_HANDLED;
+
+        OSG_NOTICE << "Point tile reader " << location << std::endl;
+        std::string file = osgDB::getNameLessExtension( location );
+        osg::Node* node = osgDB::readNodeFile( file );
+        if (!node) return ReadResult::FILE_NOT_FOUND;
+
+        osg::PagedLOD* plod = new osg::PagedLOD;
+        osg::Vec3d center = node->getBound().center();
+        plod->setRadius(node->getBound().radius());
+        plod->setCenter(center);
+        plod->addChild(node);
+        plod->setRange(0,0,FLT_MAX);
+
+        std::string path = osgDB::getFilePath(file);
+
+        // Get the octree tile name.        
+        std::string tileID = osgDB::getNameLessExtension(osgDB::getSimpleFileName(file));
+        unsigned int level, x, y, z;
+        sscanf(tileID.c_str(), "tile_%d_%d_%d_%d", &level, &z, &x, &y);
+
+        double radiusFactor = 5;
+
+        OctreeId id(level, x, y, z);
+        osg::ref_ptr< OctreeNode > octree = new OctreeNode();
+        octree->setId(id);               
+        unsigned int childNum = 1;
+        
+        double childRadius = node->getBound().radius() / 2.0;        
+        for (unsigned int i = 0; i < 8; ++i)
+        {
+            osg::ref_ptr< OctreeNode > child = octree->createChild(i);
+            std::string childFilename = osgDB::concatPaths(path, getFilename(child->getID()));            
+
+            if (osgDB::fileExists(childFilename))
+            {
+                childFilename += ".point_tile";            
+                plod->setFileName(childNum, childFilename);
+                plod->setRange(childNum, 0, childRadius * radiusFactor);
+                childNum++;
+            }
+            else
+            {
+                OSG_NOTICE << "Child " << childFilename << " doesn't exist" << std::endl;
+            }
+        }        
+
+        return plod;
+    }
+
+};
+
+REGISTER_OSGPLUGIN(point_tile, PointTileReader)
+
+
+
+ bool startsWith( const std::string& ref, const std::string& pattern)
+{
+    if ( pattern.length() > ref.length() )
+        return false;
+
+    for( unsigned i=0; i<pattern.length(); ++i )
+    {
+        if ( ref[i] != pattern[i] )
+            return false;
+    }
+    return true;
+}
+
+
 
 int main(int argc, char** argv)
 {
+    osgDB::Registry::instance()->addFileExtensionAlias("laz", "las");
+
     // use an ArgumentParser object to manage the program arguments.
     osg::ArgumentParser arguments(&argc,argv);
 
-    osgDB::Registry::instance()->setReadFileCallback(new MyReadFileCallback());
-
-    arguments.getApplicationUsage()->setApplicationName(arguments.getApplicationName());
-    arguments.getApplicationUsage()->setDescription(arguments.getApplicationName()+" is the standard OpenSceneGraph example which loads and visualises 3d models.");
-    arguments.getApplicationUsage()->setCommandLineUsage(arguments.getApplicationName()+" [options] filename ...");
-    arguments.getApplicationUsage()->addCommandLineOption("--image <filename>","Load an image and render it on a quad");
-    arguments.getApplicationUsage()->addCommandLineOption("--dem <filename>","Load an image/DEM and render it on a HeightField");
-    arguments.getApplicationUsage()->addCommandLineOption("--login <url> <username> <password>","Provide authentication information for http file access.");
-
     osgViewer::Viewer viewer(arguments);
-
-    unsigned int helpType = 0;
-    if ((helpType = arguments.readHelpType()))
-    {
-        arguments.getApplicationUsage()->write(std::cout, helpType);
-        return 1;
-    }
-
-    // report any errors if they have occurred when parsing the program arguments.
-    if (arguments.errors())
-    {
-        arguments.writeErrorMessages(std::cout);
-        return 1;
-    }
-
-    // set up the camera manipulators.
-    {
-        osg::ref_ptr<osgGA::KeySwitchMatrixManipulator> keyswitchManipulator = new osgGA::KeySwitchMatrixManipulator;
-
-        keyswitchManipulator->addMatrixManipulator( '1', "Trackball", new osgGA::TrackballManipulator() );
-        keyswitchManipulator->addMatrixManipulator( '2', "Flight", new osgGA::FlightManipulator() );
-        keyswitchManipulator->addMatrixManipulator( '3', "Drive", new osgGA::DriveManipulator() );
-        keyswitchManipulator->addMatrixManipulator( '4', "Terrain", new osgGA::TerrainManipulator() );
-        keyswitchManipulator->addMatrixManipulator( '5', "Orbit", new osgGA::OrbitManipulator() );
-        keyswitchManipulator->addMatrixManipulator( '6', "FirstPerson", new osgGA::FirstPersonManipulator() );
-        keyswitchManipulator->addMatrixManipulator( '7', "Spherical", new osgGA::SphericalManipulator() );
-
-        std::string pathfile;
-        double animationSpeed = 1.0;
-        while(arguments.read("--speed",animationSpeed) ) {}
-        char keyForAnimationPath = '8';
-        while (arguments.read("-p",pathfile))
-        {
-            osgGA::AnimationPathManipulator* apm = new osgGA::AnimationPathManipulator(pathfile);
-            if (apm || !apm->valid())
-            {
-                apm->setTimeScale(animationSpeed);
-
-                unsigned int num = keyswitchManipulator->getNumMatrixManipulators();
-                keyswitchManipulator->addMatrixManipulator( keyForAnimationPath, "Path", apm );
-                keyswitchManipulator->selectMatrixManipulator(num);
-                ++keyForAnimationPath;
-            }
-        }
-
-        viewer.setCameraManipulator( keyswitchManipulator.get() );
-    }
-
     // add the state manipulator
     viewer.addEventHandler( new osgGA::StateSetManipulator(viewer.getCamera()->getOrCreateStateSet()) );
 
-    // add the thread model handler
-    viewer.addEventHandler(new osgViewer::ThreadingHandler);
 
     // add the window size toggle handler
     viewer.addEventHandler(new osgViewer::WindowSizeHandler);
 
     // add the stats handler
     viewer.addEventHandler(new osgViewer::StatsHandler);
-
-    // add the help handler
-    viewer.addEventHandler(new osgViewer::HelpHandler(arguments.getApplicationUsage()));
-
-    // add the record camera path handler
-    viewer.addEventHandler(new osgViewer::RecordCameraPathHandler);
 
     // add the LOD Scale handler
     viewer.addEventHandler(new osgViewer::LODScaleHandler);
@@ -275,10 +206,57 @@ int main(int argc, char** argv)
 
     // load the data
     osg::Group* root = new osg::Group;
-    //root->addChild( buildPointNode( 100000 ) );
-    root->addChild( osgDB::readNodeFiles(arguments) );
-    root->getOrCreateStateSet()->setAttributeAndModes( new osg::Point() );
+
+    std::vector< std::string > filenames;
+    //Read in the filenames to process
+    for(int pos=1;pos<arguments.argc();++pos)
+    {
+        if (!arguments.isOption(pos))
+        {
+            filenames.push_back( arguments[pos]);
+        }
+    }
+
     
+   
+    root->getOrCreateStateSet()->setAssociatedModes(new osg::Point(1.2), osg::StateAttribute::ON);
+
+    for (unsigned int i = 0; i < filenames.size(); i++)
+    {
+        std::stringstream buf;
+        buf << filenames[i] << ".point_tile";
+        root->addChild(osgDB::readNodeFile(buf.str()));
+    }
+
+    //osg::Node* tiled = osgDB::readNodeFile("C:/geodata/aam/PointClouds/Yarra/tile_0_0_0_0.laz.point_tile");
+    //osg::Node* tiled = osgDB::readNodeFile("C:/geodata/aam/PointClouds/HongKong2/HongKong_ALS/tile_0_0_0_0.laz.point_tile");
+    /*
+    root->addChild(osgDB::readNodeFile("C:/geodata/aam/PointClouds/Yarra/tile_1_0_0_0.laz.point_tile"));
+    root->addChild(osgDB::readNodeFile("C:/geodata/aam/PointClouds/Yarra/tile_1_0_0_1.laz.point_tile"));
+    root->addChild(osgDB::readNodeFile("C:/geodata/aam/PointClouds/Yarra/tile_1_0_1_0.laz.point_tile"));
+    root->addChild(osgDB::readNodeFile("C:/geodata/aam/PointClouds/Yarra/tile_1_0_1_1.laz.point_tile"));
+    root->addChild(osgDB::readNodeFile("C:/geodata/aam/PointClouds/Yarra/tile_1_1_0_0.laz.point_tile"));
+    root->addChild(osgDB::readNodeFile("C:/geodata/aam/PointClouds/Yarra/tile_1_1_0_1.laz.point_tile"));
+    root->addChild(osgDB::readNodeFile("C:/geodata/aam/PointClouds/Yarra/tile_1_1_1_0.laz.point_tile"));
+    root->addChild(osgDB::readNodeFile("C:/geodata/aam/PointClouds/Yarra/tile_1_1_1_1.laz.point_tile"));   
+    */
+    
+    //osg::Node* full = osgDB::readNodeFile("pt000001.laz");        
+    //root->addChild(full);
+
+    //viewer.addEventHandler(new ToggleFullHandler(tiled, full));
+    /*
+    osgDB::DirectoryContents contents = osgDB::getDirectoryContents("C:/geodata/aam/PointClouds/Yarra/");
+    for (unsigned int i = 0; i < contents.size(); i++)
+    {
+
+        if (startsWith(contents[i], "tile"))
+        {
+            root->addChild(osgDB::readNodeFile(contents[i]));
+        }
+    }
+    */
+
     // any option left unread are converted into errors to write out later.
     arguments.reportRemainingOptionsAsUnrecognized();
 
@@ -289,9 +267,9 @@ int main(int argc, char** argv)
         return 1;
     }
     
-    viewer.setSceneData( root );
+    viewer.setSceneData( root );   
 
-    viewer.realize();
+    viewer.getCamera()->setNearFarRatio(0.00002);
 
     return viewer.run();
 
