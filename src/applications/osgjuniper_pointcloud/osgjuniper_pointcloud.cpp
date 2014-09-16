@@ -220,6 +220,7 @@ int main(int argc, char** argv)
     
    
     root->getOrCreateStateSet()->setAssociatedModes(new osg::Point(1.2), osg::StateAttribute::ON);
+    root->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 
     for (unsigned int i = 0; i < filenames.size(); i++)
     {

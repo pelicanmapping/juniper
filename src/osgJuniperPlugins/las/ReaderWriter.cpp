@@ -22,6 +22,7 @@
 #include <osgEarth/GeoData>
 #include <osgEarth/URI>
 #include <osg/io_utils>
+#include <osg/MatrixTransform>
 
 #include "lasreader.hpp"
 
@@ -113,6 +114,8 @@ public:
           {
               if (_reader)
               {
+                  OSG_NOTICE << "~LASPointCursor" << std::endl;
+                  _reader->close();
                   delete _reader;
               }
           }
@@ -170,12 +173,7 @@ public:
                   osg::Vec3d position = osg::Vec3d((double)(_reader->point.X * _header->x_scale_factor) + _header->x_offset,
                                                    (double)(_reader->point.Y * _header->y_scale_factor) + _header->y_offset ,
                                                    (double)(_reader->point.Z * _header->z_scale_factor) + _header->z_offset);                  
-                  osgEarth::GeoPoint geoPoint(_srs.get(), position);                  
-                  osgEarth::GeoPoint latLong;
-                  geoPoint.transform(_destSRS, latLong);                                    
-                  osg::Vec3d world;
-                  latLong.toWorld(world);
-                  point._position = world;                       
+                  point._position = position;                       
                   point._color = color;                  
                   return true;                
               }              
@@ -209,6 +207,51 @@ protected:
     std::string _filename;
 };
 
+osg::Node* makeNode(PointCursor* points)
+{    
+    osg::Vec3d anchor;
+    bool first = true;
+
+    osg::Geometry* geometry = new osg::Geometry;
+
+    geometry->setUseVertexBufferObjects( true );
+    geometry->setUseDisplayList( false );
+
+    osg::Vec3Array* verts = new osg::Vec3Array();
+    geometry->setVertexArray( verts );    
+
+    osg::Vec4ubArray* colors = new osg::Vec4ubArray();   
+    geometry->setColorArray( colors );
+    geometry->setColorBinding( osg::Geometry::BIND_PER_VERTEX);
+
+
+    Point point;
+    while (points->nextPoint(point))
+    {                 
+        if (first)
+        {
+            anchor = point._position;
+            first = false;
+        }
+        osg::Vec3 position = point._position - anchor;
+        verts->push_back(position);
+        osg::Vec4ub color = osg::Vec4ub(point._color.r() * 255,
+                                        point._color.g() * 255,
+                                        point._color.b() * 255,
+                                        point._color.a() * 255);
+        colors->push_back(color);        
+    }
+
+    osg::Geode* geode = new osg::Geode;
+    geode->addDrawable( geometry );
+    geometry->addPrimitiveSet( new osg::DrawArrays(GL_POINTS, 0, verts->size()) );
+
+    osg::MatrixTransform* mt = new osg::MatrixTransform;
+    mt->setMatrix(osg::Matrixd::translate(anchor));
+    mt->addChild(geode);
+    return mt;    
+}
+
 class LASPointsReaderWriter : public osgDB::ReaderWriter
 {
 public:
@@ -229,6 +272,22 @@ public:
             return ReadResult::FILE_NOT_HANDLED;
 
         return new LASPointSource(file_name);
+    }
+
+    virtual ReadResult readNode( const std::string& location, const osgDB::ReaderWriter::Options* options ) const
+    {
+        if ( !acceptsExtension( osgDB::getLowerCaseFileExtension( location ) ) )
+            return ReadResult::FILE_NOT_HANDLED;
+
+        ReadResult rr = readObject(location, options);
+        if (rr.validObject())
+        {
+            osg::ref_ptr< PointSource > source = dynamic_cast<PointSource*>(rr.takeObject());
+            osg::ref_ptr< PointCursor > cursor = source->createPointCursor();
+            return makeNode(cursor.get());
+        }        
+
+        return ReadResult::FILE_NOT_HANDLED;
     }
 };
 
