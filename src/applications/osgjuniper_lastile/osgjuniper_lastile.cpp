@@ -23,10 +23,12 @@
 #include <osgEarth/StringUtils>
 #include <osgEarth/FileUtils>
 #include <osg/BoundingBox>
+#include <osg/OperationThread>
 #include <osgDB/FileUtils>
 #include <osgDB/FileNameUtils>
 #include <osg/ArgumentParser>
 #include <iostream>
+#include <osgJuniper/Utils>
 
 using namespace osgEarth;
 using namespace osgJuniper;
@@ -38,7 +40,74 @@ std::string getFilename(OctreeId id)
     return buf.str();
 }
 
-static unsigned int s_numProcessed = 0;
+osg::ref_ptr< osg::OperationQueue > queue = new osg::OperationQueue();
+
+std::vector< osg::ref_ptr< osg::OperationsThread > > threads;
+
+
+class Progress
+{
+public:
+    Progress():
+      _complete(0),
+      _total(0)
+    {
+    }
+
+    unsigned int getTotal()
+    {
+        OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
+        return _total;
+    }
+
+    void setTotal(unsigned int total)
+    {
+        OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
+        _total = total;
+    }
+
+    unsigned int getComplete()
+    {
+        OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
+        return _complete;
+    }
+
+    bool isComplete()
+    {
+        OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
+        return _complete == _total;
+    }
+
+    void incrementComplete(unsigned int complete)
+    {
+        {
+            OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
+            _complete += complete;
+        }
+
+        if (_complete % 10000 == 0)
+        {
+            OSG_NOTICE << "Completed " << _complete << " of " << _total << ".   " << getPercentComplete() << "% complete" << std::endl;
+        }
+    }
+
+    float getPercentComplete()
+    {
+        OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
+        return ((float)_complete / (float)_total) * 100.0;
+    }
+
+
+
+private:
+    unsigned int _total;
+    unsigned int _complete;
+    OpenThreads::Mutex _mutex;
+};
+
+static Progress s_progress;
+
+
 
 /**
  * Class used to build the output of an octree from a series of input files.
@@ -48,7 +117,7 @@ class OctreeCellBuilder
 public:
     OctreeCellBuilder():
       _innerLevel(6),
-      _targetNumPoints(262144),
+      _targetNumPoints(100000),
       _writer(0),
       _reader(0),
       _numPoints(0),
@@ -132,7 +201,6 @@ public:
             }
 
             OSG_NOTICE << "Building cell " << _node->getID().level << ": " << _node->getID().x << ", " << _node->getID().y << ", " << _node->getID().z << "  with " << _reader->header.number_of_point_records << " points limit=" << _limit << std::endl;
-            OSG_NOTICE << "Cell currently has " << _numPoints << " points " << std::endl;
 
             unsigned int numAdded = 0;
 
@@ -155,8 +223,7 @@ public:
             LASpoint* point = new LASpoint;
             point->init(&_reader->header, _reader->header.point_data_format, _reader->header.point_data_record_length);
 
-            unsigned int total = _reader->header.number_of_point_records;
-            unsigned int complete = 0;        
+            unsigned int total = _reader->header.number_of_point_records;            
             unsigned int numRejected = 0;
 
 
@@ -169,7 +236,7 @@ public:
                     *point = _reader->point;   
                     _writer->write_point(point);
                     _writer->update_inventory(point);
-                    s_numProcessed++;
+                    s_progress.incrementComplete(1);
                     _numPoints += 1;
                 }                
             }
@@ -203,7 +270,7 @@ public:
                         // The point passed, so write it to the output file.
                         _writer->write_point(point);
                         _writer->update_inventory(point);
-                        s_numProcessed++;
+                        s_progress.incrementComplete(1);
                         incrementPointsInCell(id, 1);
                         numAdded++;
                     }
@@ -216,7 +283,7 @@ public:
                             _writer->write_point(point);
                             _writer->update_inventory(point);                            
                             incrementPointsInCell(id, 1);        
-                            s_numProcessed++;
+                            s_progress.incrementComplete(1);
                         }
                         else
                         {
@@ -225,13 +292,6 @@ public:
                             numRejected++;
                         }                                                
                     }
-
-                    complete++;                    
-                    if (complete % 50000 == 0)
-                    {
-                        double percentComplete = ((double)complete / (double)total) * 100.0;
-                        std::cout << "Completed " << complete << " of " << total << " points. " << (int)percentComplete << "% complete" << std::endl;
-                    }                    
                 }        
             }
 
@@ -252,14 +312,15 @@ public:
                 if (_limit == 1)
                 {
                     unsigned int numCellsWithData = _cellCount.size();
-                    _limit = (int)((float)_targetNumPoints / (float)numCellsWithData);
-                    OSG_NOTICE << "NumcellsWithData=" << numCellsWithData << " Target=" << _targetNumPoints << " New Limit=" << _limit << std::endl;
+                    // For the second pass, do at least a minimum of 2
+                    _limit = osg::maximum((int)((float)_targetNumPoints / (float)numCellsWithData), 2);
+                    //OSG_NOTICE << "NumcellsWithData=" << numCellsWithData << " Target=" << _targetNumPoints << " New Limit=" << _limit << std::endl;
                 }
                 else
                 {
                     _limit++;
                 }
-                OSG_NOTICE << "Doing another pass with limit of " << _limit << std::endl;
+                //OSG_NOTICE << "Doing another pass with limit of " << _limit << std::endl;
 
                 // Delete any old inputs if needed.
                 deleteInputs();
@@ -464,6 +525,24 @@ int main(int argc, char** argv)
 
     osg::ArgumentParser arguments(&argc,argv);
 
+    std::string directory;
+    arguments.read("--directory", directory);
+
+    if (!directory.empty())
+    {        
+        //Load the filenames from a directory
+        std::vector< std::string > contents = Utils::getFilesFromDirectory(directory, "laz");
+        for (unsigned int i = 0; i < contents.size(); i++)
+        {
+            filenames.push_back(contents[i]);
+        }
+        contents = Utils::getFilesFromDirectory(directory, "las");
+        for (unsigned int i = 0; i < contents.size(); i++)
+        {         
+            filenames.push_back(contents[i]);
+        }
+    }
+
     //Read in the filenames to process
     for(int pos=1;pos<arguments.argc();++pos)
     {
@@ -472,6 +551,14 @@ int main(int argc, char** argv)
             filenames.push_back( arguments[pos]);
         }
     }
+
+    if (filenames.size() == 0)
+    {
+        OSG_NOTICE << "Please specify a filename" << std::endl;
+        return 1;
+    }
+
+
 
     unsigned int targetNumPoints = 100000;
     arguments.read("--target", targetNumPoints);
@@ -532,12 +619,45 @@ int main(int argc, char** argv)
     */
 
 
+    // Open up all the files to get the total number of points
+    // Open up the reader for the input files
+    LASreadOpener lasreadopener;
+    for (unsigned int i = 0; i < filenames.size(); i++)
+    {
+        lasreadopener.add_file_name(filenames[i].c_str());
+    }
+    lasreadopener.set_merged(TRUE);
+    lasreadopener.set_populate_header(TRUE);
+
+    LASreader *reader = lasreadopener.open();   
+    s_progress.setTotal(reader->header.number_of_point_records);
+    reader->close();
+    delete reader;
+
+    OSG_NOTICE << "Processing " << s_progress.getTotal() << " points" << std::endl;
+
+
+
+    // Initialize the threads
+    unsigned int numThreads = OpenThreads::GetNumberOfProcessors();
+    arguments.read("--threads", numThreads);
+
+    /*
+    for (unsigned int i = 0; i < numThreads; i++)
+    {
+        osg::OperationsThread* thread = new osg::OperationsThread();
+        thread->setOperationQueue(queue);
+        thread->start();
+        threads.push_back(thread);
+    }
+    */
+
 
     OctreeCellBuilder builder;    
     for (unsigned int i = 0; i < filenames.size(); i++)
     {
         builder.getInputFiles().push_back(filenames[i]);
-        OSG_NOTICE << "Adding filename " << filenames[i] << std::endl;
+        OSG_NOTICE << "Processing filenames " << filenames[i] << std::endl;
     }
     builder.setInnerLevel(innerLevel);
     builder.setTargetNumPoints(targetNumPoints);
@@ -546,5 +666,5 @@ int main(int argc, char** argv)
 
     osg::Timer_t endTime = osg::Timer::instance()->tick();
 
-    OSG_NOTICE << "Completed " << s_numProcessed << " in " << osgEarth::prettyPrintTime(osg::Timer::instance()->delta_s(startTime, endTime)) << std::endl;
+    OSG_NOTICE << "Completed " << s_progress.getTotal() << " in " << osgEarth::prettyPrintTime(osg::Timer::instance()->delta_s(startTime, endTime)) << std::endl;
 }
