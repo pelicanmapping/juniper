@@ -80,20 +80,17 @@ public:
 
     void incrementComplete(unsigned int complete)
     {
-        {
-            OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
-            _complete += complete;
-        }
+        OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
+        _complete += complete;
 
         if (_complete % 10000 == 0)
         {
-            OSG_NOTICE << "Completed " << _complete << " of " << _total << ".   " << getPercentComplete() << "% complete" << std::endl;
-        }
+            OSG_NOTICE << "Finished " << _complete << " of " << _total << ". " << getPercentComplete()<< "% complete" << std::endl;
+        }        
     }
 
     float getPercentComplete()
-    {
-        OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
+    {        
         return ((float)_complete / (float)_total) * 100.0;
     }
 
@@ -108,392 +105,62 @@ private:
 static Progress s_progress;
 
 
-
+/**************************************************/
 /**
  * Class used to build the output of an octree from a series of input files.
  */
 class OctreeCellBuilder
 {
 public:
-    OctreeCellBuilder():
-      _innerLevel(6),
-      _targetNumPoints(100000),
-      _writer(0),
-      _reader(0),
-      _numPoints(0),
-      _limit(1),
-      _deleteInputs(false)
-    {
-    }
+    OctreeCellBuilder();
+    
+    ~OctreeCellBuilder();
 
-    ~OctreeCellBuilder()
-    {                 
-    }
+    unsigned int getNumPoints() const;
 
-    unsigned int getNumPoints() const
-    {
-        return _numPoints;
-    }
+    OctreeNode* getNode() const;
 
-    OctreeNode* getNode() const
-    {
-        return _node;
-    }
+    void setNode( OctreeNode *node );
 
-    void setNode( OctreeNode *node )
-    {
-        _node = node;
-    }
+    unsigned int getInnerLevel() const;
 
-    unsigned int getInnerLevel() const
-    {
-        return _innerLevel;
-    }
+    void setInnerLevel(unsigned int innerLevel);
 
-    void setInnerLevel(unsigned int innerLevel)
-    {
-        _innerLevel = innerLevel;
-    }
+    std::vector<std::string>& getInputFiles();
+    
+    std::vector<std::string>& getOutputFiles();
 
-    std::vector<std::string>& getInputFiles()
-    {
-        return _inputFiles;
-    }
+    bool getDeleteInputs() const;
 
-    std::vector<std::string>& getOutputFiles()
-    {
-        return _outputFiles;
-    } 
+    void setDeleteInputs(bool deleteInputs);
 
-    bool getDeleteInputs() const
-    {
-        return _deleteInputs;
-    }
+    unsigned int getTargetNumPoints() const;
 
-    void setDeleteInputs(bool deleteInputs)
-    {
-        _deleteInputs = deleteInputs;
-    }
+    void setTargetNumPoints(unsigned int targetNumPoints);
 
-    unsigned int getTargetNumPoints() const
-    {
-        return _targetNumPoints;
-    }
+    void build();
+    
 
-    void setTargetNumPoints(unsigned int targetNumPoints)
-    {
-        _targetNumPoints = targetNumPoints;
-    }
+    void buildChildren();
+    
+    void initWriter();
 
-    void build()
-    {        
-        while (true)
-        {
-            initReader();
+    void initReader();
 
-            // If we aren't given a node, assume we are the root
-            if (!_node.valid())
-            {
-                osg::BoundingBoxd bounds(_reader->header.min_x, _reader->header.min_y,_reader->header.min_z,
-                    _reader->header.max_x, _reader->header.max_y, _reader->header.max_z);
-                _node = new OctreeNode();
-                _node->setBoundingBox(bounds);
-            }
+    void closeReader();
 
-            OSG_NOTICE << "Building cell " << _node->getID().level << ": " << _node->getID().x << ", " << _node->getID().y << ", " << _node->getID().z << "  with " << _reader->header.number_of_point_records << " points limit=" << _limit << std::endl;
-
-            unsigned int numAdded = 0;
-
-            // Initialize the main writer for this cell.
-            initWriter();            
-
-            // Initialize the child arrays.
-            _childWriters.clear();
-            _children.clear();
-            _outputFiles.clear();
-
-            // Initialize the octree children and set their writers to NULL
-            for (unsigned int i = 0; i < 8; i++)
-            {
-                _childWriters.push_back(0);
-                _children.push_back(_node->createChild(i));
-                _outputFiles.push_back("");
-            }
-
-            LASpoint* point = new LASpoint;
-            point->init(&_reader->header, _reader->header.point_data_format, _reader->header.point_data_record_length);
-
-            unsigned int total = _reader->header.number_of_point_records;            
-            unsigned int numRejected = 0;
+    LASwriter* getOrCreateWriter(const osg::Vec3d& location);
 
 
-            if (_numPoints + total < _targetNumPoints)            
-            {
-                OSG_NOTICE << "Taking all points.  input=" << total << ", target=" << _targetNumPoints << std::endl;
-                // If the total number of incoming points is less than the target just take them all.
-                while (_reader->read_point())
-                {
-                    *point = _reader->point;   
-                    _writer->write_point(point);
-                    _writer->update_inventory(point);
-                    s_progress.incrementComplete(1);
-                    _numPoints += 1;
-                }                
-            }
-            else
-            {            
+    void closeChildWriters();
 
-                // Read all the points
-                while (_reader->read_point())
-                {
-                    *point = _reader->point;    
-                    osg::Vec3d location((point->X * _reader->header.x_scale_factor) + _reader->header.x_offset,
-                        (point->Y * _reader->header.y_scale_factor) + _reader->header.y_offset,
-                        (point->Z * _reader->header.z_scale_factor) + _reader->header.z_offset);
-                    
-                    // Figure out what cell this point should go in.
-                    OctreeId id = _node->getID(location, _innerLevel);
-                    
-                    // See how many points are currently in this cell
-                    int count = getPointsInCell(id);
+    void closeWriter();
 
-                    /*
-                    bool finished = _numPoints >= _targetNumPoints;
-                    if (_node->getID().level == 0 && _limit == 1)
-                    {
-                        finished = false;
-                    }
-                    */
+    unsigned int getPointsInCell(const OctreeId& id);
 
-                    if (/*!finished && */ count < _limit)
-                    {
-                        // The point passed, so write it to the output file.
-                        _writer->write_point(point);
-                        _writer->update_inventory(point);
-                        s_progress.incrementComplete(1);
-                        incrementPointsInCell(id, 1);
-                        numAdded++;
-                    }
-                    else
-                    {
-                        // The point didn't pass, so write it to one of the output files.                
-                        LASwriter* writer = getOrCreateWriter(location);
-                        if (!writer)
-                        {
-                            _writer->write_point(point);
-                            _writer->update_inventory(point);                            
-                            incrementPointsInCell(id, 1);        
-                            s_progress.incrementComplete(1);
-                        }
-                        else
-                        {
-                            writer->write_point(point);
-                            writer->update_inventory(point);                            
-                            numRejected++;
-                        }                                                
-                    }
-                }        
-            }
+    void incrementPointsInCell(const OctreeId& id, unsigned int count=1);
 
-            closeChildWriters();
-            closeReader();
-
-            OSG_NOTICE << "Points added in pass = " << numAdded << std::endl;
-            OSG_NOTICE << "Total number of points " << _numPoints << std::endl;
-            OSG_NOTICE << "Remaining points " << numRejected << std::endl;
-
-            if (numRejected == 0 || _numPoints >= _targetNumPoints || _limit > 1)
-            {
-                //OSG_NOTICE << "Quitting" << std::endl;
-                break;
-            }
-            else
-            {
-                if (_limit == 1)
-                {
-                    unsigned int numCellsWithData = _cellCount.size();
-                    // For the second pass, do at least a minimum of 2
-                    _limit = osg::maximum((int)((float)_targetNumPoints / (float)numCellsWithData), 2);
-                    //OSG_NOTICE << "NumcellsWithData=" << numCellsWithData << " Target=" << _targetNumPoints << " New Limit=" << _limit << std::endl;
-                }
-                else
-                {
-                    _limit++;
-                }
-                //OSG_NOTICE << "Doing another pass with limit of " << _limit << std::endl;
-
-                // Delete any old inputs if needed.
-                deleteInputs();
-                
-                // These new files for this pass will be temporary and should be deleted.
-                setDeleteInputs(true);
-
-                // Replace the input files with the output files.                
-                _inputFiles.clear();
-                for (unsigned int i = 0; i < _outputFiles.size(); i++)
-                {
-                    if (!_outputFiles[i].empty())
-                    {
-                        _inputFiles.push_back(_outputFiles[i]);
-                    }
-                }
-            }
-        }
-
-        // We keep the main writer open until the bitter end.
-        closeWriter();
-
-        // Delete any inputs
-        deleteInputs();
-
-        OSG_NOTICE << _numPoints << " generated for node " << _node->getID().level << ": " << _node->getID().x << ", " << _node->getID().y << ", " << _node->getID().z << std::endl;
-    }
-
-    void buildChildren()
-    {
-        // Build any of the child nodes that have an output file.
-        for (unsigned int i = 0; i < 8; i++)
-        {
-            if (!_outputFiles[i].empty())
-            {
-                osg::ref_ptr< OctreeNode > node = _children[i];                
-                OctreeCellBuilder builder;
-                // Copy settings from parent
-                builder.setTargetNumPoints(_targetNumPoints);
-                builder.setInnerLevel(_innerLevel);
-                builder.setNode(node.get());         
-                builder.getInputFiles().push_back(_outputFiles[i]);
-                builder.setDeleteInputs(true);
-                builder.build();
-                builder.buildChildren();                
-            }
-        }        
-    }
-
-    void initWriter()
-    {
-        // Only open the writer once.
-        if (!_writer)
-        {
-            LASwriteOpener opener;
-            std::string filename = getFilename(_node->getID());            
-            opener.set_file_name(filename.c_str());            
-            osgDB::makeDirectoryForFile(filename);
-            _writer = opener.open(&_reader->header);
-        }
-    }
-
-    void initReader()
-    {        
-        // Open up the reader for the input files
-        LASreadOpener lasreadopener;
-        for (unsigned int i = 0; i < _inputFiles.size(); i++)
-        {
-            lasreadopener.add_file_name(_inputFiles[i].c_str());
-        }
-
-        lasreadopener.set_merged(TRUE);
-        lasreadopener.set_populate_header(TRUE);
-
-        _reader = lasreadopener.open();        
-    }
-
-    void closeReader()
-    {        
-        _reader->close();
-        delete _reader;   
-        _reader = 0;
-    }
-
-    LASwriter* getOrCreateWriter(const osg::Vec3d& location)
-    {
-        int child = -1;
-        for (unsigned int i = 0; i < 8; i++)
-        {
-            if (_children[i]->getBoundingBox().contains(location))
-            {          
-                child = i;
-                break;                
-            }                
-        }
-
-        // We couldn't find a writer, something is wrong.
-        if (child < 0)
-        {
-            return NULL;
-        }
-
-        if (!_childWriters[child])
-        {
-            LASwriteOpener opener;
-            // Generate a temporay file for the child.
-            std::string filename = getFilename(_children[child]->getID());
-            filename = getTempName("", filename);            
-            osgEarth::makeDirectoryForFile(filename);
-            opener.set_file_name(filename.c_str());            
-            _childWriters[child] = opener.open(&_reader->header);
-            _outputFiles[child] = filename;
-        }
-        return _childWriters[child];
-    }
-
-    void closeChildWriters()
-    {
-        for (unsigned int i = 0; i < 8; i++)
-        {            
-            if (_childWriters[i])
-            {
-                _childWriters[i]->update_header(&_reader->header, TRUE);
-                _childWriters[i]->close();
-                delete _childWriters[i];   
-                _childWriters[i] = 0;
-            }
-        }
-    }
-
-    void closeWriter()
-    {
-        if (_writer)
-        {
-            _writer->update_header(&_reader->header, TRUE);
-            _writer->close();
-            delete _writer;
-            _writer = 0;
-        }
-    }
-
-    unsigned int getPointsInCell(const OctreeId& id)
-    {
-        CellCount::iterator itr = _cellCount.find(id);
-        if (itr != _cellCount.end())
-        {
-            return itr->second;
-        }
-        return 0;
-    }
-
-    void incrementPointsInCell(const OctreeId& id, unsigned int count=1)
-    {
-        unsigned int current = getPointsInCell(id);
-        _cellCount[id] = current + count;
-
-        // Increment the total number of points in this octree node.
-        _numPoints += count;
-    }
-
-    void deleteInputs()
-    {
-        if (_deleteInputs)
-        {
-            for (unsigned int i = 0; i < _inputFiles.size(); i++)
-            {
-                //OSG_NOTICE << "Deleting " << _inputFiles[i] << std::endl;
-                unlink(_inputFiles[i].c_str());
-            }
-        }
-    }
-
-
+    void deleteInputs();
 
 private:
     LASreader* _reader;
@@ -516,7 +183,405 @@ private:
 
     bool _deleteInputs;
 };
+/**************************************************/
 
+class BuildCellOperator : public osg::Operation
+{
+public:
+    BuildCellOperator(const OctreeCellBuilder& builder):
+      _builder(builder)
+    {
+    }
+
+    void operator()(osg::Object* object)
+    {
+        _builder.build();
+        _builder.buildChildren();
+    }
+
+    OctreeCellBuilder _builder;
+};
+
+OctreeCellBuilder::OctreeCellBuilder():
+_innerLevel(6),
+    _targetNumPoints(100000),
+    _writer(0),
+    _reader(0),
+    _numPoints(0),
+    _limit(1),
+    _deleteInputs(false)
+{
+}
+
+OctreeCellBuilder::~OctreeCellBuilder()
+{                 
+}
+
+unsigned int OctreeCellBuilder::getNumPoints() const
+{
+    return _numPoints;
+}
+
+OctreeNode* OctreeCellBuilder::getNode() const
+{
+    return _node;
+}
+
+void OctreeCellBuilder::setNode( OctreeNode *node )
+{
+    _node = node;
+}
+
+unsigned int OctreeCellBuilder::getInnerLevel() const
+{
+    return _innerLevel;
+}
+
+void OctreeCellBuilder::setInnerLevel(unsigned int innerLevel)
+{
+    _innerLevel = innerLevel;
+}
+
+std::vector<std::string>& OctreeCellBuilder::getInputFiles()
+{
+    return _inputFiles;
+}
+
+std::vector<std::string>& OctreeCellBuilder::getOutputFiles()
+{
+    return _outputFiles;
+} 
+
+bool OctreeCellBuilder::getDeleteInputs() const
+{
+    return _deleteInputs;
+}
+
+void OctreeCellBuilder::setDeleteInputs(bool deleteInputs)
+{
+    _deleteInputs = deleteInputs;
+}
+
+unsigned int OctreeCellBuilder::getTargetNumPoints() const
+{
+    return _targetNumPoints;
+}
+
+void OctreeCellBuilder::setTargetNumPoints(unsigned int targetNumPoints)
+{
+    _targetNumPoints = targetNumPoints;
+}
+
+void OctreeCellBuilder::build()
+{        
+    while (true)
+    {
+        initReader();
+
+        // If we aren't given a node, assume we are the root
+        if (!_node.valid())
+        {
+            osg::BoundingBoxd bounds(_reader->header.min_x, _reader->header.min_y,_reader->header.min_z,
+                _reader->header.max_x, _reader->header.max_y, _reader->header.max_z);
+            _node = new OctreeNode();
+            _node->setBoundingBox(bounds);
+        }
+
+        OSG_NOTICE << "Building cell " << _node->getID().level << ": " << _node->getID().x << ", " << _node->getID().y << ", " << _node->getID().z << "  with " << _reader->header.number_of_point_records << " points limit=" << _limit << std::endl;
+
+        unsigned int numAdded = 0;
+
+        // Initialize the main writer for this cell.
+        initWriter();            
+
+        // Initialize the child arrays.
+        _childWriters.clear();
+        _children.clear();
+        _outputFiles.clear();
+
+        // Initialize the octree children and set their writers to NULL
+        for (unsigned int i = 0; i < 8; i++)
+        {
+            _childWriters.push_back(0);
+            _children.push_back(_node->createChild(i));
+            _outputFiles.push_back("");
+        }
+
+        LASpoint* point = new LASpoint;
+        point->init(&_reader->header, _reader->header.point_data_format, _reader->header.point_data_record_length);
+
+        unsigned int total = _reader->header.number_of_point_records;            
+        unsigned int numRejected = 0;
+
+
+        if (_numPoints + total < _targetNumPoints)            
+        {
+            OSG_INFO << "Taking all points.  input=" << total << ", target=" << _targetNumPoints << std::endl;
+            // If the total number of incoming points is less than the target just take them all.
+            while (_reader->read_point())
+            {
+                *point = _reader->point;   
+                _writer->write_point(point);
+                _writer->update_inventory(point);
+                s_progress.incrementComplete(1);
+                _numPoints += 1;
+            }                
+        }
+        else
+        {            
+
+            // Read all the points
+            while (_reader->read_point())
+            {
+                *point = _reader->point;    
+                osg::Vec3d location((point->X * _reader->header.x_scale_factor) + _reader->header.x_offset,
+                    (point->Y * _reader->header.y_scale_factor) + _reader->header.y_offset,
+                    (point->Z * _reader->header.z_scale_factor) + _reader->header.z_offset);
+
+                // Figure out what cell this point should go in.
+                OctreeId id = _node->getID(location, _innerLevel);
+
+                // See how many points are currently in this cell
+                int count = getPointsInCell(id);
+
+                /*
+                bool finished = _numPoints >= _targetNumPoints;
+                if (_node->getID().level == 0 && _limit == 1)
+                {
+                finished = false;
+                }
+                */
+
+                if (/*!finished && */ count < _limit)
+                {
+                    // The point passed, so write it to the output file.
+                    _writer->write_point(point);
+                    _writer->update_inventory(point);
+                    s_progress.incrementComplete(1);
+                    incrementPointsInCell(id, 1);
+                    numAdded++;
+                }
+                else
+                {
+                    // The point didn't pass, so write it to one of the output files.                
+                    LASwriter* writer = getOrCreateWriter(location);
+                    if (!writer)
+                    {
+                        _writer->write_point(point);
+                        _writer->update_inventory(point);                            
+                        incrementPointsInCell(id, 1);        
+                        s_progress.incrementComplete(1);
+                    }
+                    else
+                    {
+                        writer->write_point(point);
+                        writer->update_inventory(point);                            
+                        numRejected++;
+                    }                                                
+                }
+            }        
+        }
+
+        closeChildWriters();
+        closeReader();
+
+        OSG_INFO << "Points added in pass = " << numAdded << std::endl;
+        OSG_INFO << "Total number of points " << _numPoints << std::endl;
+        OSG_INFO << "Remaining points " << numRejected << std::endl;
+
+        if (numRejected == 0 || _numPoints >= _targetNumPoints || _limit > 1)
+        {
+            //OSG_NOTICE << "Quitting" << std::endl;
+            break;
+        }
+        else
+        {
+            if (_limit == 1)
+            {
+                unsigned int numCellsWithData = _cellCount.size();
+                // For the second pass, do at least a minimum of 2
+                _limit = osg::maximum((int)((float)_targetNumPoints / (float)numCellsWithData), 2);
+                //OSG_NOTICE << "NumcellsWithData=" << numCellsWithData << " Target=" << _targetNumPoints << " New Limit=" << _limit << std::endl;
+            }
+            else
+            {
+                _limit++;
+            }
+            //OSG_NOTICE << "Doing another pass with limit of " << _limit << std::endl;
+
+            // Delete any old inputs if needed.
+            deleteInputs();
+
+            // These new files for this pass will be temporary and should be deleted.
+            setDeleteInputs(true);
+
+            // Replace the input files with the output files.                
+            _inputFiles.clear();
+            for (unsigned int i = 0; i < _outputFiles.size(); i++)
+            {
+                if (!_outputFiles[i].empty())
+                {
+                    _inputFiles.push_back(_outputFiles[i]);
+                }
+            }
+        }
+    }
+
+    // We keep the main writer open until the bitter end.
+    closeWriter();
+
+    // Delete any inputs
+    deleteInputs();
+
+    OSG_NOTICE << _numPoints << " generated for node " << _node->getID().level << ": " << _node->getID().x << ", " << _node->getID().y << ", " << _node->getID().z << std::endl;
+}
+
+void OctreeCellBuilder::buildChildren()
+{
+    // Build any of the child nodes that have an output file.
+    for (unsigned int i = 0; i < 8; i++)
+    {
+        if (!_outputFiles[i].empty())
+        {
+            osg::ref_ptr< OctreeNode > node = _children[i];                
+            OctreeCellBuilder builder;
+            // Copy settings from parent
+            builder.setTargetNumPoints(_targetNumPoints);
+            builder.setInnerLevel(_innerLevel);
+            builder.setNode(node.get());         
+            builder.getInputFiles().push_back(_outputFiles[i]);
+            builder.setDeleteInputs(true);
+            /*
+            builder.build();
+            builder.buildChildren();                
+            */
+            queue->add(new BuildCellOperator(builder));
+        }
+    }        
+}
+
+void OctreeCellBuilder::initWriter()
+{
+    // Only open the writer once.
+    if (!_writer)
+    {
+        LASwriteOpener opener;
+        std::string filename = getFilename(_node->getID());            
+        opener.set_file_name(filename.c_str());            
+        osgDB::makeDirectoryForFile(filename);
+        _writer = opener.open(&_reader->header);
+    }
+}
+
+void OctreeCellBuilder::initReader()
+{        
+    // Open up the reader for the input files
+    LASreadOpener lasreadopener;
+    for (unsigned int i = 0; i < _inputFiles.size(); i++)
+    {
+        lasreadopener.add_file_name(_inputFiles[i].c_str());
+    }
+
+    lasreadopener.set_merged(TRUE);
+    lasreadopener.set_populate_header(TRUE);
+
+    _reader = lasreadopener.open();        
+}
+
+void OctreeCellBuilder::closeReader()
+{        
+    _reader->close();
+    delete _reader;   
+    _reader = 0;
+}
+
+LASwriter* OctreeCellBuilder::getOrCreateWriter(const osg::Vec3d& location)
+{
+    int child = -1;
+    for (unsigned int i = 0; i < 8; i++)
+    {
+        if (_children[i]->getBoundingBox().contains(location))
+        {          
+            child = i;
+            break;                
+        }                
+    }
+
+    // We couldn't find a writer, something is wrong.
+    if (child < 0)
+    {
+        return NULL;
+    }
+
+    if (!_childWriters[child])
+    {
+        LASwriteOpener opener;
+        // Generate a temporay file for the child.
+        std::string filename = getFilename(_children[child]->getID());
+        filename = getTempName("", filename);            
+        osgEarth::makeDirectoryForFile(filename);
+        opener.set_file_name(filename.c_str());            
+        _childWriters[child] = opener.open(&_reader->header);
+        _outputFiles[child] = filename;
+    }
+    return _childWriters[child];
+}
+
+void OctreeCellBuilder::closeChildWriters()
+{
+    for (unsigned int i = 0; i < 8; i++)
+    {            
+        if (_childWriters[i])
+        {
+            _childWriters[i]->update_header(&_reader->header, TRUE);
+            _childWriters[i]->close();
+            delete _childWriters[i];   
+            _childWriters[i] = 0;
+        }
+    }
+}
+
+void OctreeCellBuilder::closeWriter()
+{
+    if (_writer)
+    {
+        _writer->update_header(&_reader->header, TRUE);
+        _writer->close();
+        delete _writer;
+        _writer = 0;
+    }
+}
+
+unsigned int OctreeCellBuilder::getPointsInCell(const OctreeId& id)
+{
+    CellCount::iterator itr = _cellCount.find(id);
+    if (itr != _cellCount.end())
+    {
+        return itr->second;
+    }
+    return 0;
+}
+
+void OctreeCellBuilder::incrementPointsInCell(const OctreeId& id, unsigned int count)
+{
+    unsigned int current = getPointsInCell(id);
+    _cellCount[id] = current + count;
+
+    // Increment the total number of points in this octree node.
+    _numPoints += count;
+}
+
+void OctreeCellBuilder::deleteInputs()
+{
+    if (_deleteInputs)
+    {
+        for (unsigned int i = 0; i < _inputFiles.size(); i++)
+        {
+            //OSG_NOTICE << "Deleting " << _inputFiles[i] << std::endl;
+            unlink(_inputFiles[i].c_str());
+        }
+    }
+}
 
 int main(int argc, char** argv)
 {    
@@ -642,7 +707,6 @@ int main(int argc, char** argv)
     unsigned int numThreads = OpenThreads::GetNumberOfProcessors();
     arguments.read("--threads", numThreads);
 
-    /*
     for (unsigned int i = 0; i < numThreads; i++)
     {
         osg::OperationsThread* thread = new osg::OperationsThread();
@@ -650,7 +714,6 @@ int main(int argc, char** argv)
         thread->start();
         threads.push_back(thread);
     }
-    */
 
 
     OctreeCellBuilder builder;    
@@ -663,6 +726,12 @@ int main(int argc, char** argv)
     builder.setTargetNumPoints(targetNumPoints);
     builder.build();
     builder.buildChildren();    
+
+    // Wait for completion
+    while (!s_progress.isComplete())
+    {        
+        OpenThreads::Thread::microSleep(5 * 1000 * 1000);
+    }
 
     osg::Timer_t endTime = osg::Timer::instance()->tick();
 
