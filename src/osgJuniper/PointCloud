@@ -23,6 +23,8 @@
 #include <osg/Group>
 #include <osg/OperationThread>
 
+#include <osg/Point>
+
 namespace osgJuniper
 {
 
@@ -35,6 +37,32 @@ namespace osgJuniper
     protected:
 
         osg::ref_ptr<osg::OperationThread> _operationThread;
+    };
+
+
+    class OSGJUNIPER_EXPORT PointCloudDecorator : public osg::Group
+    {
+    public:
+        PointCloudDecorator();
+
+        float getPointSize() const;
+        void setPointSize(float pointSize);       
+
+        bool getColorByClassification() const;
+        void setColorByClassification(bool colorByClassification);
+
+        unsigned int getMaxReturn() const;
+        void setMaxReturn(unsigned int maxReturn);
+
+    private:
+
+        float _pointSize;
+
+        osg::Point* _point;
+
+        bool _colorByClassification;
+
+        unsigned int _maxReturn;
     };
 
 } // namespace osgJuniper

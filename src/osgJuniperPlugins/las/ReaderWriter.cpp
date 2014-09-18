@@ -55,17 +55,8 @@ public:
               
 
               // Hong kong grid
-              //_srs = osgEarth::SpatialReference::create("epsg:2326");
-
-              // Yarra
-              //_srs = osgEarth::SpatialReference::create("epsg:28355");
-
-              // Pauls files
-              //_srs = osgEarth::SpatialReference::create("epsg:26911");
-              _destSRS = osgEarth::SpatialReference::create("epsg:4326");     
+              //_srs = osgEarth::SpatialReference::create("epsg:2326");           
               
-              
-
               _header = &(_reader->header);              
               OSG_NOTICE << "Number of point records " << _header->number_of_point_records << std::endl;
               OSG_NOTICE << "Scale factor " << _header->x_scale_factor << ", " << _header->y_scale_factor << ", " << _header->z_scale_factor << std::endl;                            
@@ -126,12 +117,6 @@ public:
               if (_reader->read_point())
               {   
                   _numRead++;           
-                  /*
-                  if (_numRead % 10000 == 0)
-                  {
-                      OSG_NOTICE << "Read " << _numRead << " points" << std::endl;
-                  }
-                  */
 
                   osg::Vec4 color = osg::Vec4(0.0, 0.0f, 0.0f, 1.0f);
                   // Color by RGB if we have it.
@@ -170,10 +155,8 @@ public:
 
                   }                  
                   
-                  osg::Vec3d position = osg::Vec3d((double)(_reader->point.X * _header->x_scale_factor) + _header->x_offset,
-                                                   (double)(_reader->point.Y * _header->y_scale_factor) + _header->y_offset ,
-                                                   (double)(_reader->point.Z * _header->z_scale_factor) + _header->z_offset);                  
-                  point._position = position;                       
+                  osg::Vec3d position = osg::Vec3d(_reader->point.get_x(), _reader->point.get_y(), _reader->point.get_z());
+                  point._position = position;                        
                   point._color = color;                  
                   return true;                
               }              
@@ -207,7 +190,7 @@ protected:
     std::string _filename;
 };
 
-osg::Node* makeNode(PointCursor* points)
+osg::Node* makeNode(const std::string& filename)
 {    
     osg::Vec3d anchor;
     bool first = true;
@@ -220,27 +203,55 @@ osg::Node* makeNode(PointCursor* points)
     osg::Vec3Array* verts = new osg::Vec3Array();
     geometry->setVertexArray( verts );    
 
-    osg::Vec4ubArray* colors = new osg::Vec4ubArray();   
+
+    osg::Vec4ubArray* colors =new osg::Vec4ubArray();    
     geometry->setColorArray( colors );
     geometry->setColorBinding( osg::Geometry::BIND_PER_VERTEX);
 
+    osg::Vec4Array* dataArray = new osg::Vec4Array();    
+    geometry->setVertexAttribArray(osg::Drawable::ATTRIBUTE_6, dataArray);
+    geometry->setVertexAttribBinding(osg::Drawable::ATTRIBUTE_6, osg::Geometry::BIND_PER_VERTEX);
+    geometry->setVertexAttribNormalize(osg::Drawable::ATTRIBUTE_6, false);
 
-    Point point;
-    while (points->nextPoint(point))
+
+    // Read all the points
+    LASreadOpener lasreadopener;        
+    lasreadopener.set_file_name(filename.c_str());
+    LASreader* reader = lasreadopener.open();              
+
+        
+    while(reader->read_point())
     {                 
+        osg::Vec3d point = osg::Vec3d(reader->point.get_x(), reader->point.get_y(), reader->point.get_z());        
+
+        osg::Vec4f data;
+        data.x() = reader->point.classification;
+        data.y() = reader->point.return_number;
+        data.z() = reader->point.intensity;
+        dataArray->push_back(data);
+
         if (first)
         {
-            anchor = point._position;
+            anchor = point;
             first = false;
         }
-        osg::Vec3 position = point._position - anchor;
+        osg::Vec3 position = point - anchor;
         verts->push_back(position);
-        osg::Vec4ub color = osg::Vec4ub(point._color.r() * 255,
-                                        point._color.g() * 255,
-                                        point._color.b() * 255,
-                                        point._color.a() * 255);
+
+        osg::Vec4ub color = osg::Vec4ub(0, 0, 0, 255);
+        // Color by RGB if we have it.
+        if (reader->point.have_rgb)                  
+        {                          
+            color.set(U8_CLAMP(reader->point.rgb[0]/256),
+                      U8_CLAMP(reader->point.rgb[1]/256),
+                      U8_CLAMP(reader->point.rgb[2]/256),
+                      U8_CLAMP(reader->point.rgb[3]/256));
+        }
         colors->push_back(color);        
     }
+
+    reader->close();
+    delete reader;
 
     osg::Geode* geode = new osg::Geode;
     geode->addDrawable( geometry );
@@ -279,15 +290,7 @@ public:
         if ( !acceptsExtension( osgDB::getLowerCaseFileExtension( location ) ) )
             return ReadResult::FILE_NOT_HANDLED;
 
-        ReadResult rr = readObject(location, options);
-        if (rr.validObject())
-        {
-            osg::ref_ptr< PointSource > source = dynamic_cast<PointSource*>(rr.takeObject());
-            osg::ref_ptr< PointCursor > cursor = source->createPointCursor();
-            return makeNode(cursor.get());
-        }        
-
-        return ReadResult::FILE_NOT_HANDLED;
+        return makeNode(location);       
     }
 };
 

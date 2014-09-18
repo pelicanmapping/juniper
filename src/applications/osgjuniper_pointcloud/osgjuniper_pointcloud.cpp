@@ -51,6 +51,8 @@
 #include <iomanip>
 #include <string>
 
+#include <osgJuniper/PointCloud>
+
 using namespace osgJuniper;
 
 std::string getFilename(OctreeId id)
@@ -59,39 +61,6 @@ std::string getFilename(OctreeId id)
     buf << "tile_" << id.level << "_" << id.z << "_" << id.x << "_" << id.y << ".laz";    
     return buf.str();
 }
-
-struct ToggleFullHandler : public osgGA::GUIEventHandler 
-{
-    ToggleFullHandler(osg::Node* tiled, osg::Node* full):
-    _tiled(tiled),
-    _full(full),
-    _showFull(false)
-    {        
-        updateMask();
-    }
-
-    void updateMask()
-    {
-        _tiled->setNodeMask(_showFull ? 0 : ~0);
-        _full->setNodeMask(_showFull ? ~0 : 0);
-    }
-
-    bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
-    {
-        if ( ea.getEventType() == ea.KEYDOWN && ea.getKey() == 't' )
-        {            
-            _showFull = !_showFull;
-            OSG_NOTICE << "Show full=" << _showFull << std::endl;
-            updateMask();
-        }
-        return false;
-    }
-
-    bool _showFull;
-    osg::ref_ptr< osg::Node > _tiled;
-    osg::ref_ptr< osg::Node > _full;
-};
-
 
 class PointTileReader : public osgDB::ReaderWriter
 {
@@ -178,6 +147,45 @@ REGISTER_OSGPLUGIN(point_tile, PointTileReader)
     return true;
 }
 
+struct PointCloudHandler : public osgGA::GUIEventHandler 
+{
+    PointCloudHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
+
+    bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
+    {
+        if ( ea.getEventType() == ea.KEYDOWN)
+        {
+            switch (ea.getKey())
+            {
+            case 'u':
+                _pointCloud->setPointSize(_pointCloud->getPointSize()+0.2);
+                OSG_NOTICE << "Point size " << _pointCloud->getPointSize() << std::endl;
+                break;
+            case 'U':
+                _pointCloud->setPointSize(_pointCloud->getPointSize()-0.2);
+                OSG_NOTICE << "Point size " << _pointCloud->getPointSize() << std::endl;
+                break;
+            case 'c':
+                _pointCloud->setColorByClassification(!_pointCloud->getColorByClassification());
+                break;
+            case 'r':
+                _pointCloud->setMaxReturn(_pointCloud->getMaxReturn() + 1);
+                OSG_NOTICE << "Max return " << _pointCloud->getMaxReturn() << std::endl;
+                break;
+            case 'R':
+                _pointCloud->setMaxReturn(_pointCloud->getMaxReturn() -1);
+                OSG_NOTICE << "Max return " << _pointCloud->getMaxReturn() << std::endl;
+                break;
+            default:
+                break;
+            }
+        }
+        return false;
+    }
+
+    osg::observer_ptr< PointCloudDecorator > _pointCloud;
+};
+
 
 
 int main(int argc, char** argv)
@@ -205,7 +213,7 @@ int main(int argc, char** argv)
     viewer.addEventHandler(new osgViewer::ScreenCaptureHandler);
 
     // load the data
-    osg::Group* root = new osg::Group;
+    PointCloudDecorator* pointCloud = new PointCloudDecorator();
 
     std::vector< std::string > filenames;
     //Read in the filenames to process
@@ -217,46 +225,16 @@ int main(int argc, char** argv)
         }
     }
 
-    
-   
-    root->getOrCreateStateSet()->setAssociatedModes(new osg::Point(1.2), osg::StateAttribute::ON);
-    root->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+    pointCloud->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 
     for (unsigned int i = 0; i < filenames.size(); i++)
     {
         std::stringstream buf;
         buf << filenames[i] << ".point_tile";
-        root->addChild(osgDB::readNodeFile(buf.str()));
+        pointCloud->addChild(osgDB::readNodeFile(buf.str()));
     }
 
-    //osg::Node* tiled = osgDB::readNodeFile("C:/geodata/aam/PointClouds/Yarra/tile_0_0_0_0.laz.point_tile");
-    //osg::Node* tiled = osgDB::readNodeFile("C:/geodata/aam/PointClouds/HongKong2/HongKong_ALS/tile_0_0_0_0.laz.point_tile");
-    /*
-    root->addChild(osgDB::readNodeFile("C:/geodata/aam/PointClouds/Yarra/tile_1_0_0_0.laz.point_tile"));
-    root->addChild(osgDB::readNodeFile("C:/geodata/aam/PointClouds/Yarra/tile_1_0_0_1.laz.point_tile"));
-    root->addChild(osgDB::readNodeFile("C:/geodata/aam/PointClouds/Yarra/tile_1_0_1_0.laz.point_tile"));
-    root->addChild(osgDB::readNodeFile("C:/geodata/aam/PointClouds/Yarra/tile_1_0_1_1.laz.point_tile"));
-    root->addChild(osgDB::readNodeFile("C:/geodata/aam/PointClouds/Yarra/tile_1_1_0_0.laz.point_tile"));
-    root->addChild(osgDB::readNodeFile("C:/geodata/aam/PointClouds/Yarra/tile_1_1_0_1.laz.point_tile"));
-    root->addChild(osgDB::readNodeFile("C:/geodata/aam/PointClouds/Yarra/tile_1_1_1_0.laz.point_tile"));
-    root->addChild(osgDB::readNodeFile("C:/geodata/aam/PointClouds/Yarra/tile_1_1_1_1.laz.point_tile"));   
-    */
-    
-    //osg::Node* full = osgDB::readNodeFile("pt000001.laz");        
-    //root->addChild(full);
-
-    //viewer.addEventHandler(new ToggleFullHandler(tiled, full));
-    /*
-    osgDB::DirectoryContents contents = osgDB::getDirectoryContents("C:/geodata/aam/PointClouds/Yarra/");
-    for (unsigned int i = 0; i < contents.size(); i++)
-    {
-
-        if (startsWith(contents[i], "tile"))
-        {
-            root->addChild(osgDB::readNodeFile(contents[i]));
-        }
-    }
-    */
+    viewer.addEventHandler(new PointCloudHandler(pointCloud));
 
     // any option left unread are converted into errors to write out later.
     arguments.reportRemainingOptionsAsUnrecognized();
@@ -268,7 +246,7 @@ int main(int argc, char** argv)
         return 1;
     }
     
-    viewer.setSceneData( root );   
+    viewer.setSceneData( pointCloud );   
 
     viewer.getCamera()->setNearFarRatio(0.00002);
 

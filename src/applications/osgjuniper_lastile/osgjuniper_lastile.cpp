@@ -83,7 +83,7 @@ public:
         OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
         _complete += complete;
 
-        if (_complete % 10000 == 0)
+        if (_complete % 500 == 0)
         {
             OSG_NOTICE << "Finished " << _complete << " of " << _total << ". " << getPercentComplete()<< "% complete" << std::endl;
         }        
@@ -202,6 +202,7 @@ public:
     OctreeCellBuilder _builder;
 };
 
+
 OctreeCellBuilder::OctreeCellBuilder():
 _innerLevel(6),
     _targetNumPoints(100000),
@@ -272,6 +273,7 @@ void OctreeCellBuilder::setTargetNumPoints(unsigned int targetNumPoints)
     _targetNumPoints = targetNumPoints;
 }
 
+
 void OctreeCellBuilder::build()
 {        
     while (true)
@@ -320,7 +322,7 @@ void OctreeCellBuilder::build()
             // If the total number of incoming points is less than the target just take them all.
             while (_reader->read_point())
             {
-                *point = _reader->point;   
+                *point = _reader->point;                   
                 _writer->write_point(point);
                 _writer->update_inventory(point);
                 s_progress.incrementComplete(1);
@@ -334,9 +336,7 @@ void OctreeCellBuilder::build()
             while (_reader->read_point())
             {
                 *point = _reader->point;    
-                osg::Vec3d location((point->X * _reader->header.x_scale_factor) + _reader->header.x_offset,
-                    (point->Y * _reader->header.y_scale_factor) + _reader->header.y_offset,
-                    (point->Z * _reader->header.z_scale_factor) + _reader->header.z_offset);
+                osg::Vec3d location(point->get_x(), point->get_y(), point->get_z());
 
                 // Figure out what cell this point should go in.
                 OctreeId id = _node->getID(location, _innerLevel);
@@ -734,6 +734,8 @@ int main(int argc, char** argv)
     }
 
     osg::Timer_t endTime = osg::Timer::instance()->tick();
+  
+    
 
     OSG_NOTICE << "Completed " << s_progress.getTotal() << " in " << osgEarth::prettyPrintTime(osg::Timer::instance()->delta_s(startTime, endTime)) << std::endl;
 }
