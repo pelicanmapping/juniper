@@ -40,7 +40,9 @@ static const char *vertSource = {
     "#version 110\n"
     "attribute vec4 data;\n"
     "uniform float maxReturn;\n"
-    "uniform bool colorByClassification;\n"
+    "uniform int colorMode;\n"
+    "uniform float minIntensity;\n"
+    "uniform float maxIntensity;\n"
 
     "vec4 classificationToColor(in float classification)\n"
     "{\n"
@@ -55,6 +57,12 @@ static const char *vertSource = {
     "    return vec4(0,0,0,1);"
     "}\n"
 
+    "vec4 intensityToColor(in float intensity, in float min, in float max)\n"
+    "{\n"
+    "    float relIntensity = (intensity-min) / (max - min);\n"
+    "    return vec4(relIntensity, relIntensity, relIntensity, 1.0);\n"
+    "}\n"
+
     "void main(void)\n"
     "{\n"    
     "    float classification = data.x;\n"
@@ -67,12 +75,18 @@ static const char *vertSource = {
     "        gl_FrontColor = vec4(0,0,0,0);\n"
     "    }\n"
     "    else \n"
-    "    {\n"
-    "        if (colorByClassification) {"
+    "    {\n"    
+    "        if (colorMode == 1)\n"
+    "        {\n"
+    "            gl_FrontColor = intensityToColor(intensity, minIntensity, maxIntensity);\n"    
+    "        }\n"
+    "        else if (colorMode == 2)\n"
+    "        {\n"
     "            gl_FrontColor = classificationToColor(classification);\n"
     "        }\n"
-    "        else {\n"
-    "            gl_FrontColor = gl_Color;\n"
+    "        else\n"
+    "        {\n"
+    "            gl_FrontColor = vec4(gl_Color.rgb, 1.0);\n"
     "        }\n"
     "    }\n"
     "}\n"
@@ -90,8 +104,10 @@ static const char *fragSource = {
 PointCloudDecorator::PointCloudDecorator():
 _pointSize(1.0f),
 _point(0),
-_colorByClassification(false),
-_maxReturn(10)
+_maxReturn(5),
+_minIntensity(0.0f),
+_maxIntensity(255.0f),
+_colorMode(ColorMode::RGB)
 {
     _point = new osg::Point(_pointSize);
     getOrCreateStateSet()->setAttributeAndModes(_point, osg::StateAttribute::ON);
@@ -102,8 +118,14 @@ _maxReturn(10)
     program->addBindAttribLocation("data", osg::Drawable::ATTRIBUTE_6);
     getOrCreateStateSet()->setAttributeAndModes(program, osg::StateAttribute::ON);
 
-    getOrCreateStateSet()->getOrCreateUniform("colorByClassification", osg::Uniform::BOOL)->set(_colorByClassification);
     getOrCreateStateSet()->getOrCreateUniform("maxReturn", osg::Uniform::FLOAT)->set((float)_maxReturn);
+
+    getOrCreateStateSet()->getOrCreateUniform("minIntensity", osg::Uniform::FLOAT)->set(_minIntensity);
+    getOrCreateStateSet()->getOrCreateUniform("maxIntensity", osg::Uniform::FLOAT)->set(_maxIntensity);
+
+    getOrCreateStateSet()->getOrCreateUniform("colorMode", osg::Uniform::INT)->set((int)_colorMode);
+
+    getOrCreateStateSet()->setMode(GL_BLEND, osg::StateAttribute::ON);
 }
 
 float PointCloudDecorator::getPointSize() const
@@ -117,17 +139,6 @@ void PointCloudDecorator::setPointSize(float pointSize)
     _point->setSize(_pointSize);
 }
 
-bool PointCloudDecorator::getColorByClassification() const
-{
-    return _colorByClassification;
-}
-
-void PointCloudDecorator::setColorByClassification(bool colorByClassification)
-{
-    _colorByClassification = colorByClassification;
-    getOrCreateStateSet()->getOrCreateUniform("colorByClassification", osg::Uniform::BOOL)->set(_colorByClassification);
-}
-
 unsigned int PointCloudDecorator::getMaxReturn() const
 {
     return _maxReturn;
@@ -137,4 +148,37 @@ void PointCloudDecorator::setMaxReturn(unsigned int maxReturn)
 {
     _maxReturn = osg::maximum(1u, maxReturn);
     getOrCreateStateSet()->getOrCreateUniform("maxReturn", osg::Uniform::FLOAT)->set((float)_maxReturn);
+}
+
+float PointCloudDecorator::getMaxIntensity() const
+{
+    return _maxIntensity;
+}
+
+void PointCloudDecorator::setMaxIntensity(float maxIntensity)
+{
+    _maxIntensity = maxIntensity;    
+    getOrCreateStateSet()->getOrCreateUniform("maxIntensity", osg::Uniform::FLOAT)->set(_maxIntensity);
+}
+
+float PointCloudDecorator::getMinIntensity() const
+{
+    return _minIntensity;
+}
+
+void PointCloudDecorator::setMinIntensity(float minIntensity)
+{
+    _minIntensity = minIntensity;    
+    getOrCreateStateSet()->getOrCreateUniform("minIntensity", osg::Uniform::FLOAT)->set(_minIntensity);
+}
+
+PointCloudDecorator::ColorMode PointCloudDecorator::getColorMode() const
+{
+    return _colorMode;
+}
+
+void PointCloudDecorator::setColorMode(PointCloudDecorator::ColorMode colorMode)
+{
+    _colorMode = colorMode;
+    getOrCreateStateSet()->getOrCreateUniform("colorMode", osg::Uniform::INT)->set((int)_colorMode);
 }

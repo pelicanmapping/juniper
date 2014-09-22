@@ -54,15 +54,35 @@ namespace osgJuniper
         unsigned int getMaxReturn() const;
         void setMaxReturn(unsigned int maxReturn);
 
+        float getMinIntensity() const;
+        void setMinIntensity(float minIntensity);
+        
+        float getMaxIntensity() const;
+        void setMaxIntensity(float maxIntensity);
+
+        enum ColorMode
+        {
+            RGB = 0,
+            Intensity = 1,
+            Classification = 2
+        };
+
+        ColorMode getColorMode() const;
+        void setColorMode(ColorMode colorMode);
+
     private:
 
         float _pointSize;
 
         osg::Point* _point;
 
-        bool _colorByClassification;
-
         unsigned int _maxReturn;
+
+        float _minIntensity;
+        float _maxIntensity;
+
+        ColorMode _colorMode;
+
     };
 
 } // namespace osgJuniper

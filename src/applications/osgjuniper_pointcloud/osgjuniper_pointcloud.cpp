@@ -79,8 +79,7 @@ public:
     {
         if ( !acceptsExtension( osgDB::getLowerCaseFileExtension( location ) ) )
             return ReadResult::FILE_NOT_HANDLED;
-
-        OSG_NOTICE << "Point tile reader " << location << std::endl;
+        
         std::string file = osgDB::getNameLessExtension( location );
         osg::Node* node = osgDB::readNodeFile( file );
         if (!node) return ReadResult::FILE_NOT_FOUND;
@@ -121,7 +120,7 @@ public:
             }
             else
             {
-                OSG_NOTICE << "Child " << childFilename << " doesn't exist" << std::endl;
+                //OSG_NOTICE << "Child " << childFilename << " doesn't exist" << std::endl;
             }
         }        
 
@@ -166,7 +165,12 @@ struct PointCloudHandler : public osgGA::GUIEventHandler
                 OSG_NOTICE << "Point size " << _pointCloud->getPointSize() << std::endl;
                 break;
             case 'c':
-                _pointCloud->setColorByClassification(!_pointCloud->getColorByClassification());
+                {
+                    int colorMode = _pointCloud->getColorMode();
+                    colorMode++;
+                    if (colorMode >=3) colorMode = 0;
+                    _pointCloud->setColorMode((PointCloudDecorator::ColorMode)colorMode);
+                }
                 break;
             case 'r':
                 _pointCloud->setMaxReturn(_pointCloud->getMaxReturn() + 1);
@@ -175,6 +179,22 @@ struct PointCloudHandler : public osgGA::GUIEventHandler
             case 'R':
                 _pointCloud->setMaxReturn(_pointCloud->getMaxReturn() -1);
                 OSG_NOTICE << "Max return " << _pointCloud->getMaxReturn() << std::endl;
+                break;
+            case 'n':
+                _pointCloud->setMinIntensity(_pointCloud->getMinIntensity()-1);
+                OSG_NOTICE << "Intensity range " << _pointCloud->getMinIntensity() << " to " << _pointCloud->getMaxIntensity() << std::endl;                
+                break;
+            case 'N':
+                _pointCloud->setMinIntensity(_pointCloud->getMinIntensity()+1);
+                OSG_NOTICE << "Intensity range " << _pointCloud->getMinIntensity() << " to " << _pointCloud->getMaxIntensity() << std::endl;                
+                break;
+            case 'm':
+                _pointCloud->setMaxIntensity(_pointCloud->getMaxIntensity()+1);
+                OSG_NOTICE << "Intensity range " << _pointCloud->getMinIntensity() << " to " << _pointCloud->getMaxIntensity() << std::endl;                
+                break;
+            case 'M':
+                _pointCloud->setMaxIntensity(_pointCloud->getMaxIntensity()-1);
+                OSG_NOTICE << "Intensity range " << _pointCloud->getMinIntensity() << " to " << _pointCloud->getMaxIntensity() << std::endl;                
                 break;
             default:
                 break;
