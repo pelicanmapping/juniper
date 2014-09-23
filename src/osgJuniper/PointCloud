@@ -54,11 +54,11 @@ namespace osgJuniper
         unsigned int getMaxReturn() const;
         void setMaxReturn(unsigned int maxReturn);
 
-        float getMinIntensity() const;
-        void setMinIntensity(float minIntensity);
+        unsigned short getMinIntensity() const;
+        void setMinIntensity(unsigned short minIntensity);
         
-        float getMaxIntensity() const;
-        void setMaxIntensity(float maxIntensity);
+        unsigned short getMaxIntensity() const;
+        void setMaxIntensity(unsigned short maxIntensity);
 
         enum ColorMode
         {
@@ -78,8 +78,8 @@ namespace osgJuniper
 
         unsigned int _maxReturn;
 
-        float _minIntensity;
-        float _maxIntensity;
+        unsigned short _minIntensity;
+        unsigned short _maxIntensity;
 
         ColorMode _colorMode;
 

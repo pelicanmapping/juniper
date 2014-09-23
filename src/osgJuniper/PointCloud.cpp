@@ -68,11 +68,15 @@ static const char *vertSource = {
     "    float classification = data.x;\n"
     "    float returnNumber = data.y;\n"
     "    float intensity = data.z;\n"
-    "    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\n"
+    "    vec4 position = gl_ModelViewProjectionMatrix * gl_Vertex;\n"
+    "    float distToCamera = clamp(500.0 / length(position), 0.0, 1.0);\n"
+    "    gl_Position = position;\n"
+    //"    gl_PointSize = clamp(distToCamera / 100.0, 1.0, 10.0);\n"
+    //"    gl_PointSize = mix(1.0, 10.0, distToCamera);\n"
     // Transparent if we are outside of the max return.
     "    if (returnNumber > maxReturn)\n"
     "    {\n"
-    "        gl_FrontColor = vec4(0,0,0,0);\n"
+    "        gl_Position = vec4(10000, 10000, 0, 1);\n"
     "    }\n"
     "    else \n"
     "    {\n"    
@@ -105,11 +109,15 @@ PointCloudDecorator::PointCloudDecorator():
 _pointSize(1.0f),
 _point(0),
 _maxReturn(5),
-_minIntensity(0.0f),
-_maxIntensity(255.0f),
+_minIntensity(0),
+_maxIntensity(255),
 _colorMode(ColorMode::RGB)
 {
-    _point = new osg::Point(_pointSize);
+    _point = new osg::Point();
+    _point->setMinSize(1.0);
+    _point->setMaxSize(10.0);
+    _point->setDistanceAttenuation(osg::Vec3(1,10,50));
+    _point->setFadeThresholdSize(50.0f);
     getOrCreateStateSet()->setAttributeAndModes(_point, osg::StateAttribute::ON);
 
     osg::Program* program =new osg::Program;
@@ -120,12 +128,14 @@ _colorMode(ColorMode::RGB)
 
     getOrCreateStateSet()->getOrCreateUniform("maxReturn", osg::Uniform::FLOAT)->set((float)_maxReturn);
 
-    getOrCreateStateSet()->getOrCreateUniform("minIntensity", osg::Uniform::FLOAT)->set(_minIntensity);
-    getOrCreateStateSet()->getOrCreateUniform("maxIntensity", osg::Uniform::FLOAT)->set(_maxIntensity);
+    getOrCreateStateSet()->getOrCreateUniform("minIntensity", osg::Uniform::FLOAT)->set((float)(_minIntensity));
+    getOrCreateStateSet()->getOrCreateUniform("maxIntensity", osg::Uniform::FLOAT)->set((float)(_maxIntensity));
 
     getOrCreateStateSet()->getOrCreateUniform("colorMode", osg::Uniform::INT)->set((int)_colorMode);
 
     getOrCreateStateSet()->setMode(GL_BLEND, osg::StateAttribute::ON);
+
+    //getOrCreateStateSet()->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
 }
 
 float PointCloudDecorator::getPointSize() const
@@ -150,26 +160,26 @@ void PointCloudDecorator::setMaxReturn(unsigned int maxReturn)
     getOrCreateStateSet()->getOrCreateUniform("maxReturn", osg::Uniform::FLOAT)->set((float)_maxReturn);
 }
 
-float PointCloudDecorator::getMaxIntensity() const
+unsigned short PointCloudDecorator::getMaxIntensity() const
 {
     return _maxIntensity;
 }
 
-void PointCloudDecorator::setMaxIntensity(float maxIntensity)
+void PointCloudDecorator::setMaxIntensity(unsigned short maxIntensity)
 {
     _maxIntensity = maxIntensity;    
-    getOrCreateStateSet()->getOrCreateUniform("maxIntensity", osg::Uniform::FLOAT)->set(_maxIntensity);
+    getOrCreateStateSet()->getOrCreateUniform("maxIntensity", osg::Uniform::FLOAT)->set((float)(_maxIntensity));
 }
 
-float PointCloudDecorator::getMinIntensity() const
+unsigned short PointCloudDecorator::getMinIntensity() const
 {
     return _minIntensity;
 }
 
-void PointCloudDecorator::setMinIntensity(float minIntensity)
+void PointCloudDecorator::setMinIntensity(unsigned short minIntensity)
 {
     _minIntensity = minIntensity;    
-    getOrCreateStateSet()->getOrCreateUniform("minIntensity", osg::Uniform::FLOAT)->set(_minIntensity);
+    getOrCreateStateSet()->getOrCreateUniform("minIntensity", osg::Uniform::FLOAT)->set((float)(_minIntensity));
 }
 
 PointCloudDecorator::ColorMode PointCloudDecorator::getColorMode() const
