@@ -29,6 +29,7 @@
 #include <osg/ArgumentParser>
 #include <iostream>
 #include <osgJuniper/Utils>
+#include <osgEarth/Random>
 
 using namespace osgEarth;
 using namespace osgJuniper;
@@ -138,6 +139,15 @@ public:
 
     void setTargetNumPoints(unsigned int targetNumPoints);
 
+    osgEarth::SpatialReference* getSourceSRS() const;
+    void setSourceSRS( osgEarth::SpatialReference* srs);
+
+    osgEarth::SpatialReference* getDestSRS() const;
+    void setDestSRS( osgEarth::SpatialReference* srs);
+
+    bool getGeocentric() const;
+    void setGeocentric(bool geocentric);
+
     void build();
     
 
@@ -150,6 +160,11 @@ public:
     void closeReader();
 
     LASwriter* getOrCreateWriter(const osg::Vec3d& location);
+
+    float getFraction() const;
+    void setFraction(float fraction);
+
+    bool keep();
 
 
     void closeChildWriters();
@@ -182,6 +197,12 @@ private:
     std::vector<osg::ref_ptr<OctreeNode>> _children;
 
     bool _deleteInputs;
+
+    float _fraction;
+
+    osg::ref_ptr< osgEarth::SpatialReference > _srcSRS;
+    osg::ref_ptr< osgEarth::SpatialReference > _destSRS;
+    bool _geocentric;
 };
 /**************************************************/
 
@@ -210,7 +231,9 @@ _innerLevel(6),
     _reader(0),
     _numPoints(0),
     _limit(1),
-    _deleteInputs(false)
+    _deleteInputs(false),
+    _fraction(1.0),
+    _geocentric(false)
 {
 }
 
@@ -273,10 +296,66 @@ void OctreeCellBuilder::setTargetNumPoints(unsigned int targetNumPoints)
     _targetNumPoints = targetNumPoints;
 }
 
+float OctreeCellBuilder::getFraction() const
+{
+    return _fraction;
+}
+
+void OctreeCellBuilder::setFraction(float fraction)
+{
+    _fraction = osg::clampBetween(fraction, 0.0f, 1.0f);
+}
+
+static osgEarth::Random random;
+
+bool OctreeCellBuilder::keep()
+{
+    if (_numPoints >= _targetNumPoints) return false;
+
+    if (_fraction >= 1.0) return true;
+    if (_fraction <= 0.0) return false;
+
+    //double f = random.next();
+
+    float f = (float)rand()/(float)RAND_MAX;
+    //OSG_NOTICE << "f=" << f << " fraction=" << _fraction << std::endl;
+    return f <= _fraction;
+}
+
+osgEarth::SpatialReference* OctreeCellBuilder::getSourceSRS() const
+{
+    return _srcSRS.get();
+}
+
+void OctreeCellBuilder::setSourceSRS( osgEarth::SpatialReference* srs)
+{
+    _srcSRS = srs;
+}
+
+osgEarth::SpatialReference* OctreeCellBuilder::getDestSRS() const
+{
+    return _destSRS;
+}
+
+void OctreeCellBuilder::setDestSRS( osgEarth::SpatialReference* srs)
+{
+    _destSRS = srs;
+}    
+
+bool OctreeCellBuilder::getGeocentric() const
+{
+    return _geocentric;
+}
+
+void OctreeCellBuilder::setGeocentric(bool geocentric)
+{
+    _geocentric = geocentric;
+}
+
 
 void OctreeCellBuilder::build()
 {        
-    while (true)
+    //while (true)
     {
         initReader();
 
@@ -315,6 +394,10 @@ void OctreeCellBuilder::build()
         unsigned int total = _reader->header.number_of_point_records;            
         unsigned int numRejected = 0;
 
+        float fraction = (float)_targetNumPoints/(float)total;
+        setFraction(fraction);
+        OSG_NOTICE << "Keeping " << fraction << " of " << total << " points for an output of " << (int)(fraction * (float)total) << " points " << std::endl;
+
 
         if (_numPoints + total < _targetNumPoints)            
         {
@@ -327,11 +410,11 @@ void OctreeCellBuilder::build()
                 _writer->update_inventory(point);
                 s_progress.incrementComplete(1);
                 _numPoints += 1;
+                numAdded++;
             }                
         }
         else
         {            
-
             // Read all the points
             while (_reader->read_point())
             {
@@ -339,37 +422,42 @@ void OctreeCellBuilder::build()
                 osg::Vec3d location(point->get_x(), point->get_y(), point->get_z());
 
                 // Figure out what cell this point should go in.
-                OctreeId id = _node->getID(location, _innerLevel);
+                //OctreeId id = _node->getID(location, _innerLevel);
 
                 // See how many points are currently in this cell
-                int count = getPointsInCell(id);
+                //int count = getPointsInCell(id);
 
-                /*
-                bool finished = _numPoints >= _targetNumPoints;
-                if (_node->getID().level == 0 && _limit == 1)
+                unsigned int numProcessed = (numAdded + numRejected);
+                if (numProcessed % 100000 == 0)
                 {
-                finished = false;
+                    OSG_NOTICE << "Processed " << (numAdded + numRejected) << " of " << total << " points. " << (int)(100.0f * (float)numProcessed/(float)total) << "%" << std::endl;
                 }
-                */
 
-                if (/*!finished && */ count < _limit)
+
+
+                //if (count < _limit)
+                if (keep())
                 {
+                    //OSG_NOTICE << "keeping point" << std::endl;
                     // The point passed, so write it to the output file.
                     _writer->write_point(point);
                     _writer->update_inventory(point);
                     s_progress.incrementComplete(1);
-                    incrementPointsInCell(id, 1);
+                    //incrementPointsInCell(id, 1);
+                    _numPoints++;
                     numAdded++;
                 }
                 else
                 {
+                    //OSG_NOTICE << "rejecting point" << std::endl;
                     // The point didn't pass, so write it to one of the output files.                
                     LASwriter* writer = getOrCreateWriter(location);
                     if (!writer)
                     {
                         _writer->write_point(point);
                         _writer->update_inventory(point);                            
-                        incrementPointsInCell(id, 1);        
+                        //incrementPointsInCell(id, 1);        
+                        _numPoints++;
                         s_progress.incrementComplete(1);
                     }
                     else
@@ -385,46 +473,9 @@ void OctreeCellBuilder::build()
         closeChildWriters();
         closeReader();
 
-        OSG_INFO << "Points added in pass = " << numAdded << std::endl;
+        OSG_NOTICE << "Points added in pass = " << numAdded << std::endl;
         OSG_INFO << "Total number of points " << _numPoints << std::endl;
-        OSG_INFO << "Remaining points " << numRejected << std::endl;
-
-        if (numRejected == 0 || _numPoints >= _targetNumPoints || _limit > 1)
-        {
-            //OSG_NOTICE << "Quitting" << std::endl;
-            break;
-        }
-        else
-        {
-            if (_limit == 1)
-            {
-                unsigned int numCellsWithData = _cellCount.size();
-                // For the second pass, do at least a minimum of 2
-                _limit = osg::maximum((int)((float)_targetNumPoints / (float)numCellsWithData), 2);
-                //OSG_NOTICE << "NumcellsWithData=" << numCellsWithData << " Target=" << _targetNumPoints << " New Limit=" << _limit << std::endl;
-            }
-            else
-            {
-                _limit++;
-            }
-            //OSG_NOTICE << "Doing another pass with limit of " << _limit << std::endl;
-
-            // Delete any old inputs if needed.
-            deleteInputs();
-
-            // These new files for this pass will be temporary and should be deleted.
-            setDeleteInputs(true);
-
-            // Replace the input files with the output files.                
-            _inputFiles.clear();
-            for (unsigned int i = 0; i < _outputFiles.size(); i++)
-            {
-                if (!_outputFiles[i].empty())
-                {
-                    _inputFiles.push_back(_outputFiles[i]);
-                }
-            }
-        }
+        OSG_INFO << "Remaining points " << numRejected << std::endl;      
     }
 
     // We keep the main writer open until the bitter end.
@@ -451,6 +502,9 @@ void OctreeCellBuilder::buildChildren()
             builder.setNode(node.get());         
             builder.getInputFiles().push_back(_outputFiles[i]);
             builder.setDeleteInputs(true);
+            builder.setSourceSRS(_srcSRS.get());
+            builder.setDestSRS(_destSRS.get());
+            builder.setGeocentric(_geocentric);
             /*
             builder.build();
             builder.buildChildren();                
@@ -631,58 +685,42 @@ int main(int argc, char** argv)
     unsigned int innerLevel = 6;
     arguments.read("--innerLevel", innerLevel);
 
-
-    
-    /*
-    osgDB::DirectoryContents contents = osgDB::getDirectoryContents("C:/geodata/aam/PointClouds/HongKong2/HongKong_ALS");
-    for (unsigned int i = 0; i < contents.size(); i++)
+    std::string srcSRSString;
+    if (!arguments.read("--src", srcSRSString))
     {
-        std::string filename = contents[i];
-        if (osgEarth::endsWith(osgDB::getSimpleFileName(filename), "_ALL.laz"))
-        {
-            filenames.push_back(filename);
-            OSG_NOTICE << "Adding " << filename << std::endl;
-        }        
-
-        if (filenames.size() == 3)
-        {
-            break;
-        }
+        OSG_NOTICE << "Please provide a source srs" << std::endl;
+        return 1;
     }
-    */
-    
-    /*
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000001.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000002.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000003.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000004.laz");    
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000005.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000006.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000007.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000008.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000009.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000010.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000011.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000012.laz");    
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000013.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000014.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000015.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000016.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000017.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000018.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000019.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000020.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000021.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000022.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000023.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000024.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000025.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000026.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000027.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000028.laz");
-    filenames.push_back("C:/geodata/aam/PointClouds/Yarra/pt000029.laz"); 
-    */
 
+    osg::ref_ptr< osgEarth::SpatialReference > srcSRS = osgEarth::SpatialReference::create(srcSRSString);
+    if (!srcSRS.valid())
+    {
+        OSG_NOTICE << srcSRSString << " is not a valid SRS" << std::endl;
+    }
+
+    std::string destSRSString;
+    arguments.read("--dest", destSRSString);
+
+    bool geocentric = false;
+    arguments.read("--geocentric", geocentric);
+
+    if (geocentric)
+    {
+        destSRSString = "epsg:4326";
+    }
+
+    if (destSRSString.empty())
+    {
+        OSG_NOTICE << "Please provide a destintation srs" << std::endl;
+        return 1;
+    }
+
+    osg::ref_ptr< osgEarth::SpatialReference > destSRS = osgEarth::SpatialReference::create(destSRSString);
+    if (!destSRS.valid())
+    {
+        OSG_NOTICE << destSRSString << " is not a valid SRS" << std::endl;
+    }
+     
 
     // Open up all the files to get the total number of points
     // Open up the reader for the input files
@@ -724,6 +762,9 @@ int main(int argc, char** argv)
     }
     builder.setInnerLevel(innerLevel);
     builder.setTargetNumPoints(targetNumPoints);
+    builder.setSourceSRS(srcSRS.get());
+    builder.setDestSRS(destSRS.get());
+    builder.setGeocentric(geocentric);
     builder.build();
     builder.buildChildren();    
 
