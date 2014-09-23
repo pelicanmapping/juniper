@@ -199,35 +199,34 @@ osg::Node* makeNode(const std::string& filename)
 
     geometry->setUseVertexBufferObjects( true );
     geometry->setUseDisplayList( false );
-
+    
     osg::Vec3Array* verts = new osg::Vec3Array();
     geometry->setVertexArray( verts );    
 
-
     osg::Vec4ubArray* colors =new osg::Vec4ubArray();    
-    geometry->setColorArray( colors );
-    geometry->setColorBinding( osg::Geometry::BIND_PER_VERTEX);
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
 
-    osg::Vec4Array* dataArray = new osg::Vec4Array();    
+    osg::Vec4Array* dataArray = new osg::Vec4Array();
     geometry->setVertexAttribArray(osg::Drawable::ATTRIBUTE_6, dataArray);
     geometry->setVertexAttribBinding(osg::Drawable::ATTRIBUTE_6, osg::Geometry::BIND_PER_VERTEX);
-    geometry->setVertexAttribNormalize(osg::Drawable::ATTRIBUTE_6, false);
-
-
+    geometry->setVertexAttribNormalize(osg::Drawable::ATTRIBUTE_6, false);    
+    
     // Read all the points
     LASreadOpener lasreadopener;        
     lasreadopener.set_file_name(filename.c_str());
     LASreader* reader = lasreadopener.open();              
 
-        
+    OSG_NOTICE << "Reading " << reader->header.number_of_point_records << " point records from " << filename << std::endl;
+     
     while(reader->read_point())
     {                 
         osg::Vec3d point = osg::Vec3d(reader->point.get_x(), reader->point.get_y(), reader->point.get_z());        
 
-        osg::Vec4f data;
-        data.x() = reader->point.classification;
-        data.y() = reader->point.return_number;
-        data.z() = reader->point.intensity;
+        osg::Vec4 data;
+        data.x() = (int)reader->point.classification;
+        data.y() = (int)reader->point.return_number;
+        data.z() = (int)(reader->point.intensity);
         dataArray->push_back(data);
 
         if (first)
