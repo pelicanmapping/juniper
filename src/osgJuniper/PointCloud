@@ -70,6 +70,9 @@ namespace osgJuniper
         ColorMode getColorMode() const;
         void setColorMode(ColorMode colorMode);
 
+        bool getClassificationVisible(unsigned int classification) const;
+        void setClassificationVisible(unsigned int classification, bool enabled);
+
     private:
 
         float _pointSize;
@@ -82,6 +85,9 @@ namespace osgJuniper
         unsigned short _maxIntensity;
 
         ColorMode _colorMode;
+
+        // Uniforms
+        osg::Uniform* _classificationFilter;
 
     };
 

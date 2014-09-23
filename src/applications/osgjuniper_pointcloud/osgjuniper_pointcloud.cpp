@@ -196,6 +196,10 @@ struct PointCloudHandler : public osgGA::GUIEventHandler
                 _pointCloud->setMaxIntensity(_pointCloud->getMaxIntensity()-1);
                 OSG_NOTICE << "Intensity range " << _pointCloud->getMinIntensity() << " to " << _pointCloud->getMaxIntensity() << std::endl;                
                 break;
+            case 'v':
+                _pointCloud->setClassificationVisible(3, !_pointCloud->getClassificationVisible(3));
+                _pointCloud->setClassificationVisible(4, !_pointCloud->getClassificationVisible(4));
+                _pointCloud->setClassificationVisible(5, !_pointCloud->getClassificationVisible(5));
             default:
                 break;
             }

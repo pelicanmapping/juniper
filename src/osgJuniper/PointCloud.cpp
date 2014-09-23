@@ -43,17 +43,18 @@ static const char *vertSource = {
     "uniform int colorMode;\n"
     "uniform float minIntensity;\n"
     "uniform float maxIntensity;\n"
+    "uniform bool classificationFilter[32];\n"
 
-    "vec4 classificationToColor(in float classification)\n"
+    "vec4 classificationToColor(in int classification)\n"
     "{\n"
     // Ground
-    "    if (classification == 2.0) return vec4(1,0,0,1);\n"    
+    "    if (classification == 2) return vec4(1,0,0,1);\n"    
     // Veg
-    "    if (classification == 3.0 || classification == 4.0 || classification == 5.0) return vec4(0,1,0,1);\n"
+    "    if (classification == 3 || classification == 4 || classification == 5) return vec4(0,1,0,1);\n"
     // Building
-    "    if (classification == 6.0) return vec4(0.5,0.5,0.5,1);\n"
+    "    if (classification == 6) return vec4(0.5,0.5,0.5,1.0);\n"
     // Water
-    "    if (classification == 9.0) return vec4(0,0,1,1);\n"
+    "    if (classification == 9) return vec4(0,0,1,1);\n"
     "    return vec4(0,0,0,1);"
     "}\n"
 
@@ -65,16 +66,12 @@ static const char *vertSource = {
 
     "void main(void)\n"
     "{\n"    
-    "    float classification = data.x;\n"
+    "    int classification = int(data.x);\n"
     "    float returnNumber = data.y;\n"
     "    float intensity = data.z;\n"
-    "    vec4 position = gl_ModelViewProjectionMatrix * gl_Vertex;\n"
-    "    float distToCamera = clamp(500.0 / length(position), 0.0, 1.0);\n"
-    "    gl_Position = position;\n"
-    //"    gl_PointSize = clamp(distToCamera / 100.0, 1.0, 10.0);\n"
-    //"    gl_PointSize = mix(1.0, 10.0, distToCamera);\n"
-    // Transparent if we are outside of the max return.
-    "    if (returnNumber > maxReturn)\n"
+    "    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\n"
+    // Hide the vert if it's been filtered out.
+    "    if (returnNumber > maxReturn || !classificationFilter[classification])\n"
     "    {\n"
     "        gl_Position = vec4(10000, 10000, 0, 1);\n"
     "    }\n"
@@ -135,7 +132,11 @@ _colorMode(ColorMode::RGB)
 
     getOrCreateStateSet()->setMode(GL_BLEND, osg::StateAttribute::ON);
 
-    //getOrCreateStateSet()->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
+    _classificationFilter = getOrCreateStateSet()->getOrCreateUniform("classificationFilter", osg::Uniform::BOOL, 32);
+    for (unsigned int i = 0; i < 32; i++)
+    {
+        _classificationFilter->setElement(i, true);
+    }    
 }
 
 float PointCloudDecorator::getPointSize() const
@@ -148,6 +149,19 @@ void PointCloudDecorator::setPointSize(float pointSize)
     _pointSize = osg::maximum(pointSize, 0.0f);
     _point->setSize(_pointSize);
 }
+
+bool PointCloudDecorator::getClassificationVisible(unsigned int classification) const
+{
+      bool result;
+      _classificationFilter->getElement(classification, result);
+      return result;
+}
+
+void PointCloudDecorator::setClassificationVisible(unsigned int classification, bool enabled)
+{
+    _classificationFilter->setElement(classification, enabled);
+}
+
 
 unsigned int PointCloudDecorator::getMaxReturn() const
 {
