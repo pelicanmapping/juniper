@@ -70,8 +70,7 @@ int main(int argc, char** argv)
     std::string destSRSString;
     arguments.read("--dest", destSRSString);
 
-    bool geocentric = false;
-    arguments.read("--geocentric", geocentric);
+    bool geocentric = arguments.read("--geocentric");
 
     if (geocentric)
     {
@@ -142,11 +141,11 @@ int main(int argc, char** argv)
                         (reader->header.min_z+reader->header.max_z)/2.0);
 
     double precision = 0.1;
-    if (destSRS->isGeodetic() || destSRS->isGeographic())
+    if ((destSRS->isGeodetic() || destSRS->isGeographic()) && !geocentric)
     {
         precision = 1e-7;
     }
-   
+       
     osg::Vec3d center = reprojectPoint(midPoint, srcSRS.get(), destSRS.get(), geocentric);    
     quantizer->x_scale_factor = precision;
     quantizer->y_scale_factor = precision;
@@ -154,6 +153,21 @@ int main(int argc, char** argv)
     quantizer->x_offset = ((I64)((center.x()/quantizer->x_scale_factor)/10000000))*10000000*quantizer->x_scale_factor;
     quantizer->y_offset = ((I64)((center.y()/quantizer->y_scale_factor)/10000000))*10000000*quantizer->y_scale_factor;
     quantizer->z_offset = ((I64)((center.z()/quantizer->z_scale_factor)/10000000))*10000000*quantizer->z_scale_factor;
+  
+
+  
+    /*
+    osg::Vec3d center = reprojectPoint(midPoint, srcSRS.get(), destSRS.get(), geocentric);    
+    OSG_NOTICE << "Midpoint is " << midPoint.x() << ", " << midPoint.y() << ", " << midPoint.z() << std::endl;
+    OSG_NOTICE << "Geocentric is " << center.x() << ", " << center.y() << ", " << center.z() << std::endl;
+    OSG_NOTICE << "Precision " << precision << std::endl;
+    quantizer->x_scale_factor = precision;
+    quantizer->y_scale_factor = precision;
+    quantizer->z_scale_factor = precision;
+    quantizer->x_offset = 0.0;//((I64)((center.x()/quantizer->x_scale_factor)/10000000))*10000000*quantizer->x_scale_factor;
+    quantizer->y_offset = 0.0;//((I64)((center.y()/quantizer->y_scale_factor)/10000000))*10000000*quantizer->y_scale_factor;
+    quantizer->z_offset = 0.0;//((I64)((center.z()/quantizer->z_scale_factor)/10000000))*10000000*quantizer->z_scale_factor;
+    */
 
 
     LASheader* writeHeader = new LASheader;
