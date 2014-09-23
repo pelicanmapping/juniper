@@ -55,97 +55,6 @@
 
 using namespace osgJuniper;
 
-std::string getFilename(OctreeId id)
-{
-    std::stringstream buf;
-    buf << "tile_" << id.level << "_" << id.z << "_" << id.x << "_" << id.y << ".laz";    
-    return buf.str();
-}
-
-class PointTileReader : public osgDB::ReaderWriter
-{
-public:
-    PointTileReader()
-    {
-        supportsExtension( "point_tile", className() );
-    }
-
-    virtual const char* className()
-    {
-        return "Point tile reader";
-    }    
-
-    virtual ReadResult readNode( const std::string& location, const osgDB::ReaderWriter::Options* options ) const
-    {
-        if ( !acceptsExtension( osgDB::getLowerCaseFileExtension( location ) ) )
-            return ReadResult::FILE_NOT_HANDLED;
-        
-        std::string file = osgDB::getNameLessExtension( location );
-        osg::Node* node = osgDB::readNodeFile( file );
-        if (!node) return ReadResult::FILE_NOT_FOUND;
-
-        osg::PagedLOD* plod = new osg::PagedLOD;
-        osg::Vec3d center = node->getBound().center();
-        plod->setRadius(node->getBound().radius());
-        plod->setCenter(center);
-        plod->addChild(node);
-        plod->setRange(0,0,FLT_MAX);
-
-        std::string path = osgDB::getFilePath(file);
-
-        // Get the octree tile name.        
-        std::string tileID = osgDB::getNameLessExtension(osgDB::getSimpleFileName(file));
-        unsigned int level, x, y, z;
-        sscanf(tileID.c_str(), "tile_%d_%d_%d_%d", &level, &z, &x, &y);
-
-        double radiusFactor = 5;
-
-        OctreeId id(level, x, y, z);
-        osg::ref_ptr< OctreeNode > octree = new OctreeNode();
-        octree->setId(id);               
-        unsigned int childNum = 1;
-        
-        double childRadius = node->getBound().radius() / 2.0;        
-        for (unsigned int i = 0; i < 8; ++i)
-        {
-            osg::ref_ptr< OctreeNode > child = octree->createChild(i);
-            std::string childFilename = osgDB::concatPaths(path, getFilename(child->getID()));            
-
-            if (osgDB::fileExists(childFilename))
-            {
-                childFilename += ".point_tile";            
-                plod->setFileName(childNum, childFilename);
-                plod->setRange(childNum, 0, childRadius * radiusFactor);
-                childNum++;
-            }
-            else
-            {
-                //OSG_NOTICE << "Child " << childFilename << " doesn't exist" << std::endl;
-            }
-        }        
-
-        return plod;
-    }
-
-};
-
-REGISTER_OSGPLUGIN(point_tile, PointTileReader)
-
-
-
- bool startsWith( const std::string& ref, const std::string& pattern)
-{
-    if ( pattern.length() > ref.length() )
-        return false;
-
-    for( unsigned i=0; i<pattern.length(); ++i )
-    {
-        if ( ref[i] != pattern[i] )
-            return false;
-    }
-    return true;
-}
-
 struct PointCloudHandler : public osgGA::GUIEventHandler 
 {
     PointCloudHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
@@ -283,9 +192,7 @@ int main(int argc, char** argv)
 
     for (unsigned int i = 0; i < filenames.size(); i++)
     {
-        std::stringstream buf;
-        buf << filenames[i] << ".point_tile";
-        pointCloud->addChild(osgDB::readNodeFile(buf.str()));
+        pointCloud->addChild(osgDB::readNodeFile(filenames[i]));
     }
 
     viewer.addEventHandler(new PointCloudHandler(pointCloud));

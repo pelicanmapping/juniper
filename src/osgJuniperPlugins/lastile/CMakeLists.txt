@@ -1,0 +1,19 @@
+INCLUDE_DIRECTORIES( ${LASLIB_INCLUDE_DIR} ${LASZIP_INCLUDE_DIR} ${OSGEARTH_INCLUDE_DIR} )
+SET(TARGET_LIBRARIES_VARS
+    LASLIB_LIBRARY
+    OSGEARTH_LIBRARY
+    )
+
+SET(TARGET_H
+)
+
+SET(TARGET_SRC
+    ReaderWriter.cpp
+)
+SETUP_PLUGIN(lastile)
+
+# to install public driver includes:
+#SET(LIB_NAME xyz)
+#SET(LIB_PUBLIC_HEADERS OSGOptions)
+#INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)
+
