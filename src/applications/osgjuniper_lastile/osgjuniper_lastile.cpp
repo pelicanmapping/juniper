@@ -84,7 +84,7 @@ public:
           OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
           _complete += complete;
 
-          if (_complete % 500 == 0)
+          if (_complete % 5000 == 0)
           {
               OSG_NOTICE << "Finished " << _complete << " of " << _total << ". " << getPercentComplete()<< "% complete" << std::endl;
           }        
@@ -196,7 +196,6 @@ private:
     typedef std::map<OctreeId, unsigned int> CellCount;
     CellCount _cellCount;
     unsigned int _numPoints;
-    unsigned int _limit;
 
     std::vector<LASwriter*> _childWriters;
     std::vector<osg::ref_ptr<OctreeNode>> _children;
@@ -232,13 +231,12 @@ public:
 
 OctreeCellBuilder::OctreeCellBuilder():
 _innerLevel(6),
-    _targetNumPoints(100000),
+    _targetNumPoints(0),
     _writer(0),
     _reader(0),
     _writeHeader(0),
     _writeQuantizer(0),
     _numPoints(0),
-    _limit(1),
     _deleteInputs(false),
     _fraction(1.0),
     _geocentric(false)
@@ -327,7 +325,7 @@ bool OctreeCellBuilder::keep()
 
     float f = (float)rand()/(float)RAND_MAX;
     //OSG_NOTICE << "f=" << f << " fraction=" << _fraction << std::endl;
-    return f <= _fraction;
+    return f <= _fraction;    
 }
 
 osgEarth::SpatialReference* OctreeCellBuilder::getSourceSRS() const
@@ -397,12 +395,14 @@ void OctreeCellBuilder::build()
         bounds.zMax() = bounds.zMin() + max;
         _node = new OctreeNode();
         _node->setBoundingBox(bounds);
+        /*
         OSG_NOTICE << "BoundingBox " << bounds.xMin() << ", " << bounds.yMin() << ", " << bounds.zMin() << std::endl
                                      << bounds.xMax() << ", " << bounds.yMax() << ", " << bounds.zMax() << std::endl;
+                                     */
 
     }
 
-    OSG_NOTICE << "Building cell " << _node->getID().level << ": " << _node->getID().x << ", " << _node->getID().y << ", " << _node->getID().z << "  with " << _reader->header.number_of_point_records << " points limit=" << _limit << std::endl;
+    //OSG_NOTICE << "Building cell " << _node->getID().level << ": " << _node->getID().x << ", " << _node->getID().y << ", " << _node->getID().z << "  with " << _reader->header.number_of_point_records << std::endl;
 
     unsigned int numAdded = 0;
 
@@ -429,10 +429,11 @@ void OctreeCellBuilder::build()
     unsigned int total = _reader->header.number_of_point_records;            
     unsigned int numRejected = 0;
 
+    // Compute the ratio if we're targetting a certain number of points.
     float fraction = (float)_targetNumPoints/(float)total;
     setFraction(fraction);
-    OSG_NOTICE << "Keeping " << _fraction << " of " << total << " points for an output of " << (int)(fraction * (float)total) << " points " << std::endl;
-    OSG_NOTICE << "NumPoints=" << _numPoints << " total=" << total << " target=" << _targetNumPoints << " fraction=" << _fraction << std::endl;
+    //OSG_NOTICE << "Keeping " << _fraction << " of " << total << " points for an output of " << (int)(fraction * (float)total) << " points " << std::endl;
+    //OSG_NOTICE << "NumPoints=" << _numPoints << " total=" << total << " target=" << _targetNumPoints << " fraction=" << _fraction << std::endl;
 
     // Read all the points
     while (_reader->read_point())
@@ -444,19 +445,18 @@ void OctreeCellBuilder::build()
         *point = _reader->point;            
 
         // Figure out what cell this point should go in.
-        //OctreeId id = _node->getID(location, _innerLevel);
+        OctreeId id = _node->getID(location, _innerLevel);
 
         // See how many points are currently in this cell
-        //int count = getPointsInCell(id);
+        int count = getPointsInCell(id);
 
         unsigned int numProcessed = (numAdded + numRejected);
         if (numProcessed % 100000 == 0)
         {
-            OSG_NOTICE << "Processed " << (numAdded + numRejected) << " of " << total << " points. " << (int)(100.0f * (float)numProcessed/(float)total) << "%" << std::endl;
-        }
+            //OSG_NOTICE << "Processed " << (numAdded + numRejected) << " of " << total << " points. " << (int)(100.0f * (float)numProcessed/(float)total) << "%" << std::endl;
+        }        
 
-        //if (count < _limit)
-        if (keep())
+        if ((_targetNumPoints != 0 && keep()) || count == 0)
         {
             // The point passed, so write it to the output file.
             point->set_x(world.x());
@@ -465,7 +465,7 @@ void OctreeCellBuilder::build()
             _writer->write_point(point);
             _writer->update_inventory(point);
             s_progress.incrementComplete(1);
-            //incrementPointsInCell(id, 1);
+            incrementPointsInCell(id, 1);
             _numPoints++;
             numAdded++;
         }
@@ -480,7 +480,7 @@ void OctreeCellBuilder::build()
                 point->set_z(world.z());
                 _writer->write_point(point);
                 _writer->update_inventory(point);                            
-                //incrementPointsInCell(id, 1);        
+                incrementPointsInCell(id, 1);        
                 _numPoints++;
                 numAdded++;
                 s_progress.incrementComplete(1);
@@ -499,9 +499,11 @@ void OctreeCellBuilder::build()
     closeChildWriters();
     closeReader();
 
+    /*
     OSG_NOTICE << "Points added in pass = " << numAdded << std::endl;
     OSG_NOTICE << "Total number of points " << _numPoints << std::endl;
     OSG_NOTICE << "Remaining points " << numRejected << std::endl;      
+    */
 
 
     // We keep the main writer open until the bitter end.
@@ -510,7 +512,7 @@ void OctreeCellBuilder::build()
     // Delete any inputs
     deleteInputs();
 
-    OSG_NOTICE << _numPoints << " generated for node " << _node->getID().level << ": " << _node->getID().x << ", " << _node->getID().y << ", " << _node->getID().z << std::endl;
+    //OSG_NOTICE << _numPoints << " generated for node " << _node->getID().level << ": " << _node->getID().x << ", " << _node->getID().y << ", " << _node->getID().z << std::endl;
 }
 
 void OctreeCellBuilder::buildChildren()
@@ -737,10 +739,10 @@ int main(int argc, char** argv)
 
 
 
-    unsigned int targetNumPoints = 100000;
+    unsigned int targetNumPoints = 0;
     arguments.read("--target", targetNumPoints);
 
-    unsigned int innerLevel = 6;
+    unsigned int innerLevel = 8;
     arguments.read("--innerLevel", innerLevel);
 
 
