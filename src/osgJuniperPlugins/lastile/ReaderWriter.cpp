@@ -69,26 +69,24 @@ public:
         plod->setRange(0,0,FLT_MAX);
 
         double radiusFactor = 5;
-        std::string radiusFactorStr = options->getPluginStringData("radiusFactor");
-        if (!radiusFactorStr.empty())
-        {
-            std::istringstream iss(radiusFactorStr);
-            iss >> radiusFactor;
-        }
-
-        std::string ext = options->getPluginStringData("ext");
+        std::string ext = "laz";
         
-        if (ext.empty())
+        if (options && !options->getOptionString().empty())
         {
-            ext = "laz";
+            std::string radiusFactorStr = options->getPluginStringData("radiusFactor");        
+            if (!radiusFactorStr.empty())
+            {
+                std::istringstream iss(radiusFactorStr);
+                iss >> radiusFactor;
+            }
+
+            std::string outExt = options->getPluginStringData("ext");
+            if (!outExt.empty())
+            {
+                ext = outExt;
+            }
         }
-
-        /*
-        OSG_NOTICE << "radiusFactorStr=" << radiusFactorStr << std::endl;
-        OSG_NOTICE << "radius" << radiusFactor << std::endl;
-        OSG_NOTICE << "ext=" << ext << std::endl;
-        */
-
+               
 
         std::string path = osgDB::getFilePath(file);
 
