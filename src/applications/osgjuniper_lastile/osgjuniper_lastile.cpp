@@ -544,10 +544,12 @@ void OctreeCellBuilder::initWriter()
         _writeHeader = new LASheader();
         *_writeHeader = _reader->header;
 
+        _writeQuantizer = new LASquantizer();
+        *_writeQuantizer = *_writeHeader;
+
         // Generate a new quantizer for the output writer
         if (_srcSRS.valid() && _destSRS.valid())
-        {
-            _writeQuantizer = new LASquantizer();
+        {            
             osg::Vec3d midPoint((_reader->header.min_x+_reader->header.max_x)/2.0,
                 (_reader->header.min_y+_reader->header.max_y)/2.0,
                 (_reader->header.min_z+_reader->header.max_z)/2.0);
