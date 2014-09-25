@@ -1,21 +1,21 @@
 /* -*-c++-*- */
 /* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
- * Copyright 2010-2011 Pelican Ventures, Inc.
- * http://wush.net/trac/juniper
- *
- * osgEarth is free software; you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
- */
+* Copyright 2010-2011 Pelican Ventures, Inc.
+* http://wush.net/trac/juniper
+*
+* osgEarth is free software; you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>
+*/
 #include "lasreader.hpp"
 #include "laswriter.hpp"
 #include <osgJuniper/Octree>
@@ -51,49 +51,49 @@ class Progress
 public:
     Progress():
       _complete(0),
-      _total(0)
-    {
-    }
+          _total(0)
+      {
+      }
 
-    unsigned int getTotal()
-    {
-        OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
-        return _total;
-    }
+      unsigned int getTotal()
+      {
+          OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
+          return _total;
+      }
 
-    void setTotal(unsigned int total)
-    {
-        OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
-        _total = total;
-    }
+      void setTotal(unsigned int total)
+      {
+          OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
+          _total = total;
+      }
 
-    unsigned int getComplete()
-    {
-        OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
-        return _complete;
-    }
+      unsigned int getComplete()
+      {
+          OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
+          return _complete;
+      }
 
-    bool isComplete()
-    {
-        OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
-        return _complete == _total;
-    }
+      bool isComplete()
+      {
+          OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
+          return _complete == _total;
+      }
 
-    void incrementComplete(unsigned int complete)
-    {
-        OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
-        _complete += complete;
+      void incrementComplete(unsigned int complete)
+      {
+          OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
+          _complete += complete;
 
-        if (_complete % 500 == 0)
-        {
-            OSG_NOTICE << "Finished " << _complete << " of " << _total << ". " << getPercentComplete()<< "% complete" << std::endl;
-        }        
-    }
+          if (_complete % 500 == 0)
+          {
+              OSG_NOTICE << "Finished " << _complete << " of " << _total << ". " << getPercentComplete()<< "% complete" << std::endl;
+          }        
+      }
 
-    float getPercentComplete()
-    {        
-        return ((float)_complete / (float)_total) * 100.0;
-    }
+      float getPercentComplete()
+      {        
+          return ((float)_complete / (float)_total) * 100.0;
+      }
 
 
 
@@ -108,13 +108,13 @@ static Progress s_progress;
 
 /**************************************************/
 /**
- * Class used to build the output of an octree from a series of input files.
- */
+* Class used to build the output of an octree from a series of input files.
+*/
 class OctreeCellBuilder
 {
 public:
     OctreeCellBuilder();
-    
+
     ~OctreeCellBuilder();
 
     unsigned int getNumPoints() const;
@@ -128,7 +128,7 @@ public:
     void setInnerLevel(unsigned int innerLevel);
 
     std::vector<std::string>& getInputFiles();
-    
+
     std::vector<std::string>& getOutputFiles();
 
     bool getDeleteInputs() const;
@@ -149,10 +149,10 @@ public:
     void setGeocentric(bool geocentric);
 
     void build();
-    
+
 
     void buildChildren();
-    
+
     void initWriter();
 
     void initReader();
@@ -177,10 +177,15 @@ public:
 
     void deleteInputs();
 
+    osg::Vec3d reprojectPoint(const osg::Vec3d& input);
+
 private:
     LASreader* _reader;
 
     LASwriter* _writer;
+    LASheader* _writeHeader;
+    LASquantizer* _writeQuantizer;
+
 
     osg::ref_ptr< OctreeNode > _node;
     unsigned int _innerLevel;
@@ -192,7 +197,7 @@ private:
     CellCount _cellCount;
     unsigned int _numPoints;
     unsigned int _limit;
-    
+
     std::vector<LASwriter*> _childWriters;
     std::vector<osg::ref_ptr<OctreeNode>> _children;
 
@@ -203,6 +208,7 @@ private:
     osg::ref_ptr< osgEarth::SpatialReference > _srcSRS;
     osg::ref_ptr< osgEarth::SpatialReference > _destSRS;
     bool _geocentric;
+
 };
 /**************************************************/
 
@@ -211,16 +217,16 @@ class BuildCellOperator : public osg::Operation
 public:
     BuildCellOperator(const OctreeCellBuilder& builder):
       _builder(builder)
-    {
-    }
+      {
+      }
 
-    void operator()(osg::Object* object)
-    {
-        _builder.build();
-        _builder.buildChildren();
-    }
+      void operator()(osg::Object* object)
+      {
+          _builder.build();
+          _builder.buildChildren();
+      }
 
-    OctreeCellBuilder _builder;
+      OctreeCellBuilder _builder;
 };
 
 
@@ -229,6 +235,8 @@ _innerLevel(6),
     _targetNumPoints(100000),
     _writer(0),
     _reader(0),
+    _writeHeader(0),
+    _writeQuantizer(0),
     _numPoints(0),
     _limit(1),
     _deleteInputs(false),
@@ -352,131 +360,149 @@ void OctreeCellBuilder::setGeocentric(bool geocentric)
     _geocentric = geocentric;
 }
 
+osg::Vec3d OctreeCellBuilder::reprojectPoint(const osg::Vec3d& input)
+{
+    if (_srcSRS.valid() && _destSRS.valid())
+    {
+        osgEarth::GeoPoint geoPoint(_srcSRS, input);                  
+        osgEarth::GeoPoint mapPoint;
+        geoPoint.transform(_destSRS, mapPoint);     
+        if (!_geocentric)
+        {
+            return mapPoint.vec3d();
+        }    
+        osg::Vec3d world;
+        mapPoint.toWorld(world);
+        return world;              
+    }    
+    return input;
+}
+
 
 void OctreeCellBuilder::build()
 {        
-    //while (true)
+    initReader();
+
+    // If we aren't given a node, assume we are the root
+    if (!_node.valid())
     {
-        initReader();
+        osg::BoundingBoxd bounds(_reader->header.min_x, _reader->header.min_y,_reader->header.min_z,
+                                 _reader->header.max_x, _reader->header.max_y, _reader->header.max_z);
+        double width = bounds.xMax() - bounds.xMin();
+        double height = bounds.zMax() -bounds.zMin();
+        double depth = bounds.yMax() - bounds.yMin();
+        double max = osg::maximum(osg::maximum(width, height), depth);
+        bounds.xMax() = bounds.xMin() + max;
+        bounds.yMax() = bounds.yMin() + max;
+        bounds.zMax() = bounds.zMin() + max;
+        _node = new OctreeNode();
+        _node->setBoundingBox(bounds);
+        OSG_NOTICE << "BoundingBox " << bounds.xMin() << ", " << bounds.yMin() << ", " << bounds.zMin() << std::endl
+                                     << bounds.xMax() << ", " << bounds.yMax() << ", " << bounds.zMax() << std::endl;
 
-        // If we aren't given a node, assume we are the root
-        if (!_node.valid())
+    }
+
+    OSG_NOTICE << "Building cell " << _node->getID().level << ": " << _node->getID().x << ", " << _node->getID().y << ", " << _node->getID().z << "  with " << _reader->header.number_of_point_records << " points limit=" << _limit << std::endl;
+
+    unsigned int numAdded = 0;
+
+    // Initialize the main writer for this cell.
+    initWriter();            
+
+    // Initialize the child arrays.
+    _childWriters.clear();
+    _children.clear();
+    _outputFiles.clear();
+
+    // Initialize the octree children and set their writers to NULL
+    for (unsigned int i = 0; i < 8; i++)
+    {
+        _childWriters.push_back(0);
+        _children.push_back(_node->createChild(i));
+        _outputFiles.push_back("");
+    }
+
+    LASpoint* point = new LASpoint;
+    //point->init(&_reader->header, _reader->header.point_data_format, _reader->header.point_data_record_length);
+    point->init(_writeQuantizer, _reader->header.point_data_format, _reader->header.point_data_record_length);
+
+    unsigned int total = _reader->header.number_of_point_records;            
+    unsigned int numRejected = 0;
+
+    float fraction = (float)_targetNumPoints/(float)total;
+    setFraction(fraction);
+    OSG_NOTICE << "Keeping " << _fraction << " of " << total << " points for an output of " << (int)(fraction * (float)total) << " points " << std::endl;
+    OSG_NOTICE << "NumPoints=" << _numPoints << " total=" << total << " target=" << _targetNumPoints << " fraction=" << _fraction << std::endl;
+
+    // Read all the points
+    while (_reader->read_point())
+    {
+        // Reproject the point
+        osg::Vec3d location(_reader->point.get_x(), _reader->point.get_y(), _reader->point.get_z());
+        osg::Vec3d world = reprojectPoint(location);
+
+        *point = _reader->point;            
+
+        // Figure out what cell this point should go in.
+        //OctreeId id = _node->getID(location, _innerLevel);
+
+        // See how many points are currently in this cell
+        //int count = getPointsInCell(id);
+
+        unsigned int numProcessed = (numAdded + numRejected);
+        if (numProcessed % 100000 == 0)
         {
-            osg::BoundingBoxd bounds(_reader->header.min_x, _reader->header.min_y,_reader->header.min_z,
-                _reader->header.max_x, _reader->header.max_y, _reader->header.max_z);
-            _node = new OctreeNode();
-            _node->setBoundingBox(bounds);
+            OSG_NOTICE << "Processed " << (numAdded + numRejected) << " of " << total << " points. " << (int)(100.0f * (float)numProcessed/(float)total) << "%" << std::endl;
         }
 
-        OSG_NOTICE << "Building cell " << _node->getID().level << ": " << _node->getID().x << ", " << _node->getID().y << ", " << _node->getID().z << "  with " << _reader->header.number_of_point_records << " points limit=" << _limit << std::endl;
-
-        unsigned int numAdded = 0;
-
-        // Initialize the main writer for this cell.
-        initWriter();            
-
-        // Initialize the child arrays.
-        _childWriters.clear();
-        _children.clear();
-        _outputFiles.clear();
-
-        // Initialize the octree children and set their writers to NULL
-        for (unsigned int i = 0; i < 8; i++)
+        //if (count < _limit)
+        if (keep())
         {
-            _childWriters.push_back(0);
-            _children.push_back(_node->createChild(i));
-            _outputFiles.push_back("");
-        }
-
-        LASpoint* point = new LASpoint;
-        point->init(&_reader->header, _reader->header.point_data_format, _reader->header.point_data_record_length);
-
-        unsigned int total = _reader->header.number_of_point_records;            
-        unsigned int numRejected = 0;
-
-        float fraction = (float)_targetNumPoints/(float)total;
-        setFraction(fraction);
-        OSG_NOTICE << "Keeping " << fraction << " of " << total << " points for an output of " << (int)(fraction * (float)total) << " points " << std::endl;
-
-
-        if (_numPoints + total < _targetNumPoints)            
-        {
-            OSG_INFO << "Taking all points.  input=" << total << ", target=" << _targetNumPoints << std::endl;
-            // If the total number of incoming points is less than the target just take them all.
-            while (_reader->read_point())
-            {
-                *point = _reader->point;                   
-                _writer->write_point(point);
-                _writer->update_inventory(point);
-                s_progress.incrementComplete(1);
-                _numPoints += 1;
-                numAdded++;
-            }                
+            // The point passed, so write it to the output file.
+            point->set_x(world.x());
+            point->set_y(world.y());
+            point->set_z(world.z());
+            _writer->write_point(point);
+            _writer->update_inventory(point);
+            s_progress.incrementComplete(1);
+            //incrementPointsInCell(id, 1);
+            _numPoints++;
+            numAdded++;
         }
         else
-        {            
-            // Read all the points
-            while (_reader->read_point())
+        {
+            // The point didn't pass, so write it to one of the output files.                
+            LASwriter* writer = getOrCreateWriter(location);
+            if (!writer)
+            {             
+                point->set_x(world.x());
+                point->set_y(world.y());
+                point->set_z(world.z());
+                _writer->write_point(point);
+                _writer->update_inventory(point);                            
+                //incrementPointsInCell(id, 1);        
+                _numPoints++;
+                numAdded++;
+                s_progress.incrementComplete(1);
+            }
+            else
             {
-                *point = _reader->point;    
-                osg::Vec3d location(point->get_x(), point->get_y(), point->get_z());
-
-                // Figure out what cell this point should go in.
-                //OctreeId id = _node->getID(location, _innerLevel);
-
-                // See how many points are currently in this cell
-                //int count = getPointsInCell(id);
-
-                unsigned int numProcessed = (numAdded + numRejected);
-                if (numProcessed % 100000 == 0)
-                {
-                    OSG_NOTICE << "Processed " << (numAdded + numRejected) << " of " << total << " points. " << (int)(100.0f * (float)numProcessed/(float)total) << "%" << std::endl;
-                }
-
-
-
-                //if (count < _limit)
-                if (keep())
-                {
-                    //OSG_NOTICE << "keeping point" << std::endl;
-                    // The point passed, so write it to the output file.
-                    _writer->write_point(point);
-                    _writer->update_inventory(point);
-                    s_progress.incrementComplete(1);
-                    //incrementPointsInCell(id, 1);
-                    _numPoints++;
-                    numAdded++;
-                }
-                else
-                {
-                    //OSG_NOTICE << "rejecting point" << std::endl;
-                    // The point didn't pass, so write it to one of the output files.                
-                    LASwriter* writer = getOrCreateWriter(location);
-                    if (!writer)
-                    {
-                        _writer->write_point(point);
-                        _writer->update_inventory(point);                            
-                        //incrementPointsInCell(id, 1);        
-                        _numPoints++;
-                        s_progress.incrementComplete(1);
-                    }
-                    else
-                    {
-                        writer->write_point(point);
-                        writer->update_inventory(point);                            
-                        numRejected++;
-                    }                                                
-                }
-            }        
+                writer->write_point(point);
+                writer->update_inventory(point);                            
+                numRejected++;
+            }                                                
         }
+    }        
 
-        closeChildWriters();
-        closeReader();
+    delete point;
 
-        OSG_NOTICE << "Points added in pass = " << numAdded << std::endl;
-        OSG_INFO << "Total number of points " << _numPoints << std::endl;
-        OSG_INFO << "Remaining points " << numRejected << std::endl;      
-    }
+    closeChildWriters();
+    closeReader();
+
+    OSG_NOTICE << "Points added in pass = " << numAdded << std::endl;
+    OSG_NOTICE << "Total number of points " << _numPoints << std::endl;
+    OSG_NOTICE << "Remaining points " << numRejected << std::endl;      
+
 
     // We keep the main writer open until the bitter end.
     closeWriter();
@@ -505,10 +531,6 @@ void OctreeCellBuilder::buildChildren()
             builder.setSourceSRS(_srcSRS.get());
             builder.setDestSRS(_destSRS.get());
             builder.setGeocentric(_geocentric);
-            /*
-            builder.build();
-            builder.buildChildren();                
-            */
             queue->add(new BuildCellOperator(builder));
         }
     }        
@@ -519,11 +541,40 @@ void OctreeCellBuilder::initWriter()
     // Only open the writer once.
     if (!_writer)
     {
+        _writeHeader = new LASheader();
+        *_writeHeader = _reader->header;
+
+        // Generate a new quantizer for the output writer
+        if (_srcSRS.valid() && _destSRS.valid())
+        {
+            _writeQuantizer = new LASquantizer();
+            osg::Vec3d midPoint((_reader->header.min_x+_reader->header.max_x)/2.0,
+                (_reader->header.min_y+_reader->header.max_y)/2.0,
+                (_reader->header.min_z+_reader->header.max_z)/2.0);
+
+            double precision = 0.1;
+            if ((_destSRS->isGeodetic() || _destSRS->isGeographic()) && !_geocentric)
+            {
+                precision = 1e-7;
+            }
+
+            osg::Vec3d center = reprojectPoint(midPoint);    
+            _writeQuantizer->x_scale_factor = precision;
+            _writeQuantizer->y_scale_factor = precision;
+            _writeQuantizer->z_scale_factor = precision;
+            _writeQuantizer->x_offset = ((I64)((center.x()/_writeQuantizer->x_scale_factor)/10000000))*10000000*_writeQuantizer->x_scale_factor;
+            _writeQuantizer->y_offset = ((I64)((center.y()/_writeQuantizer->y_scale_factor)/10000000))*10000000*_writeQuantizer->y_scale_factor;
+            _writeQuantizer->z_offset = ((I64)((center.z()/_writeQuantizer->z_scale_factor)/10000000))*10000000*_writeQuantizer->z_scale_factor;
+
+            *_writeHeader = *_writeQuantizer;
+        }
+
         LASwriteOpener opener;
         std::string filename = getFilename(_node->getID());            
         opener.set_file_name(filename.c_str());            
         osgDB::makeDirectoryForFile(filename);
-        _writer = opener.open(&_reader->header);
+        //_writer = opener.open(&_reader->header);
+        _writer = opener.open(_writeHeader);
     }
 }
 
@@ -599,10 +650,15 @@ void OctreeCellBuilder::closeWriter()
 {
     if (_writer)
     {
-        _writer->update_header(&_reader->header, TRUE);
+        //_writer->update_header(&_reader->header, TRUE);
+        _writer->update_header(_writeHeader, TRUE);
         _writer->close();
         delete _writer;
         _writer = 0;
+        /*
+        if (_writeHeader) delete _writeHeader;
+        if (_writeQuantizer) delete _writeQuantizer;
+        */
     }
 }
 
@@ -685,42 +741,47 @@ int main(int argc, char** argv)
     unsigned int innerLevel = 6;
     arguments.read("--innerLevel", innerLevel);
 
-    std::string srcSRSString;
-    if (!arguments.read("--src", srcSRSString))
-    {
-        OSG_NOTICE << "Please provide a source srs" << std::endl;
-        return 1;
-    }
 
-    osg::ref_ptr< osgEarth::SpatialReference > srcSRS = osgEarth::SpatialReference::create(srcSRSString);
-    if (!srcSRS.valid())
-    {
-        OSG_NOTICE << srcSRSString << " is not a valid SRS" << std::endl;
-    }
+    std::string srcSRSString;
+    arguments.read("--src", srcSRSString);
 
     std::string destSRSString;
     arguments.read("--dest", destSRSString);
 
-    bool geocentric = false;
-    arguments.read("--geocentric", geocentric);
+    bool geocentric = arguments.read("--geocentric");
 
     if (geocentric)
     {
         destSRSString = "epsg:4326";
     }
 
-    if (destSRSString.empty())
+    if (destSRSString.empty() && !srcSRSString.empty() ||
+        !destSRSString.empty() && srcSRSString.empty())
     {
-        OSG_NOTICE << "Please provide a destintation srs" << std::endl;
+        OSG_NOTICE << "Please provide both source and destination srs if you want to reproject" << std::endl;
         return 1;
     }
 
-    osg::ref_ptr< osgEarth::SpatialReference > destSRS = osgEarth::SpatialReference::create(destSRSString);
-    if (!destSRS.valid())
+    osg::ref_ptr< osgEarth::SpatialReference > srcSRS;
+    osg::ref_ptr< osgEarth::SpatialReference > destSRS;
+
+    if (!srcSRSString.empty() && !destSRSString.empty())
     {
-        OSG_NOTICE << destSRSString << " is not a valid SRS" << std::endl;
+        srcSRS = osgEarth::SpatialReference::create(srcSRSString);
+        if (!srcSRS.valid())
+        {
+            OSG_NOTICE << srcSRSString << " is not a valid SRS" << std::endl;
+            return 1;
+        }
+
+        destSRS = osgEarth::SpatialReference::create(destSRSString);
+        if (!destSRS.valid())
+        {
+            OSG_NOTICE << destSRSString << " is not a valid SRS" << std::endl;
+            return 1;
+        }
     }
-     
+
 
     // Open up all the files to get the total number of points
     // Open up the reader for the input files
@@ -775,8 +836,8 @@ int main(int argc, char** argv)
     }
 
     osg::Timer_t endTime = osg::Timer::instance()->tick();
-  
-    
+
+
 
     OSG_NOTICE << "Completed " << s_progress.getTotal() << " in " << osgEarth::prettyPrintTime(osg::Timer::instance()->delta_s(startTime, endTime)) << std::endl;
 }
