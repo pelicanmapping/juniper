@@ -112,7 +112,7 @@ public:
                 std::string outFilename = osgDB::concatPaths(path, getFilename(child->getID(), ext));
                 if (ext == "las" || ext == "laz")
                 {
-                    childFilename += ".lastile";            
+                    outFilename += ".lastile";            
                 }                
                 plod->setFileName(childNum, outFilename);
                 plod->setRange(childNum, 0, childRadius * radiusFactor);
