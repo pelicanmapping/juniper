@@ -52,6 +52,7 @@
 #include <string>
 
 #include <osgJuniper/PointCloud>
+#include <osgEarth/NodeUtils>
 
 using namespace osgJuniper;
 
@@ -174,25 +175,14 @@ int main(int argc, char** argv)
 
     // add the record camera path handler
     viewer.addEventHandler(new osgViewer::RecordCameraPathHandler);
-
-    // load the data
-    PointCloudDecorator* pointCloud = new PointCloudDecorator();
-
-    std::vector< std::string > filenames;
-    //Read in the filenames to process
-    for(int pos=1;pos<arguments.argc();++pos)
+        
+    // Load all the models
+    osg::Node* loaded = osgDB::readNodeFiles(arguments);
+    PointCloudDecorator* pointCloud = osgEarth::findTopMostNodeOfType<PointCloudDecorator>(loaded);
+    if (!pointCloud)
     {
-        if (!arguments.isOption(pos))
-        {
-            filenames.push_back( arguments[pos]);
-        }
-    }
-
-    pointCloud->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-
-    for (unsigned int i = 0; i < filenames.size(); i++)
-    {
-        pointCloud->addChild(osgDB::readNodeFile(filenames[i]));
+        PointCloudDecorator* pointCloud = new PointCloudDecorator();
+        pointCloud->addChild(loaded);
     }
 
     viewer.addEventHandler(new PointCloudHandler(pointCloud));
