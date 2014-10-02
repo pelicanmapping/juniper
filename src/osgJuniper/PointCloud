@@ -47,10 +47,7 @@ namespace osgJuniper
 
         float getPointSize() const;
         void setPointSize(float pointSize);       
-
-        bool getColorByClassification() const;
-        void setColorByClassification(bool colorByClassification);
-
+        
         unsigned int getMaxReturn() const;
         void setMaxReturn(unsigned int maxReturn);
 

@@ -19,9 +19,7 @@
 #include <osgDB/ReadFile>
 #include <osgUtil/Optimizer>
 #include <osgUtil/PolytopeIntersector>
-#include <osg/CoordinateSystemNode>
-#include <osg/Point>
-#include <osg/LineWidth>
+
 
 #include <osgViewer/Viewer>
 #include <osgViewer/ViewerEventHandlers>
@@ -33,6 +31,7 @@
 #include <osgEarthUtil/ExampleResources>
 #include <osgEarthSymbology/Color>
 
+#include <osgJuniper/PointCloud>
 #include <osgJuniper/PointCloudTools>
 
 #include <iostream>
@@ -41,7 +40,7 @@ using namespace osgJuniper;
 using namespace osgEarth;
 using namespace osgEarth::Util;
 
-static osg::Point* s_point;
+static PointCloudDecorator* s_pointCloud;
 
 static LabelControl* s_status;
 
@@ -50,13 +49,13 @@ osg::Node::NodeMask MaskPointCloud = 0x02;
 
 struct PointSizeHandler : public ControlEventHandler
 {
-    PointSizeHandler( osg::Point* point ) : _point(point) { }
+    PointSizeHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
     void onValueChanged( Control* control, float value )
     {        
-        _point->setSize( value );        
+        _pointCloud->setPointSize(value);
         OSG_NOTICE << "Point size " << value << std::endl;
     }
-    osg::ref_ptr< osg::Point > _point;
+    osg::ref_ptr< PointCloudDecorator > _pointCloud;
 };
 
 // http://resources.arcgis.com/en/help/main/10.1/index.html#//015w0000005q000000
@@ -143,7 +142,22 @@ struct P2PMeasureCallback : public P2PMeasureHandler::Callback
     }
 };
 
-void buildControls(osgViewer::Viewer& viewer)
+struct ChangeColorModeHandler : public ControlEventHandler
+{
+    ChangeColorModeHandler(PointCloudDecorator::ColorMode colorMode):
+_colorMode(colorMode)
+    {
+    }
+
+    void onClick(Control* control, int mouseButtonMask)
+    {
+        s_pointCloud->setColorMode(_colorMode);
+    }
+
+    PointCloudDecorator::ColorMode _colorMode;
+};
+
+void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
 {
     ControlCanvas* canvas = ControlCanvas::getOrCreate( &viewer );
     VBox* container = canvas->addControl(new VBox());
@@ -160,10 +174,30 @@ void buildControls(osgViewer::Viewer& viewer)
     pointSlider->setBackColor( Color::Gray );
     pointSlider->setHeight( 12 );
     pointSlider->setHorizFill( true, 200 );
-    pointSlider->addEventHandler( new PointSizeHandler(s_point));   
+    pointSlider->addEventHandler( new PointSizeHandler(s_pointCloud));   
 
+    // Color mode
+    Grid* toolbar = new Grid();    
+    toolbar->setAbsorbEvents( true );    
+
+    LabelControl* rgb = new LabelControl("RGB");
+    rgb->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::RGB));
+    toolbar->setControl(0, 0, rgb);
+
+    LabelControl* intensity = new LabelControl("Intensity");
+    intensity->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Intensity));
+    toolbar->setControl(1, 0, intensity);
+
+    LabelControl* classifiction = new LabelControl("Classification");
+    classifiction->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Classification));
+    toolbar->setControl(2, 0, classifiction);   
+
+    container->addChild(toolbar);
+        
     // Add a status label
     s_status = container->addControl(new LabelControl());
+
+    root->addChild(canvas);
 }
 
 int main(int argc, char** argv)
@@ -174,38 +208,26 @@ int main(int argc, char** argv)
 
     viewer.setCameraManipulator( new EarthManipulator());
 
-    osg::Group* root = MapNodeHelper().load(arguments, &viewer);
+    osg::Group* root = new osg::Group;
 
-    osg::ref_ptr< MapNode > mapNode = MapNode::findMapNode(root);
+    osg::Node* loaded = osgDB::readNodeFiles(arguments);
+    root->addChild(loaded);
+
+    osg::ref_ptr< MapNode > mapNode = MapNode::findMapNode(loaded);
     mapNode->getTerrainEngine()->setNodeMask(MaskMapNode);
     mapNode->getModelLayerGroup()->setNodeMask(MaskPointCloud);
 
-    osg::ref_ptr< osg::Group > pointClouds = new osg::Group;
-    pointClouds->setNodeMask(MaskPointCloud);
-
-    for (unsigned int pos = 1; pos < arguments.argc(); pos++)
+    s_pointCloud = osgEarth::findTopMostNodeOfType<PointCloudDecorator>(loaded);
+    if (!s_pointCloud)
     {
-        if (!arguments.isOption(pos))
-        {
-            osg::Node* pc = osgDB::readNodeFile(arguments[pos]);
-            if (pc)
-            {
-                pointClouds->addChild(pc);
-                OSG_NOTICE << "Loaded point cloud from " << arguments[pos] << std::endl;
-            }
-        }
+        OSG_NOTICE << "Cannot find point cloud" << std::endl;
+        return 1;
     }
 
-    pointClouds->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
-    s_point = new osg::Point(1.0);
-    root->getOrCreateStateSet()->setAttributeAndModes(s_point);
-
-    root->addChild( pointClouds );
-                 
     // any option left unread are converted into errors to write out later.
     arguments.reportRemainingOptionsAsUnrecognized();
 
-    buildControls(viewer);
+    buildControls(viewer, root);
 
     bool measure = arguments.read("--measure");    
 
@@ -218,11 +240,11 @@ int main(int argc, char** argv)
         OSG_NOTICE << "identifying" << std::endl;
     }
     if (!measure)
-    {
+    {        
         IdentifyPointHandler* identify = new IdentifyPointHandler();
         identify->addCallback( new IdentifyCallback(s_status));
         identify->setNodeMask(MaskPointCloud);
-        viewer.addEventHandler(identify);
+        viewer.addEventHandler(identify);          
     }
     else
     {

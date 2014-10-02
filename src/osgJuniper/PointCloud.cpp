@@ -108,7 +108,7 @@ _point(0),
 _maxReturn(5),
 _minIntensity(0),
 _maxIntensity(255),
-_colorMode(ColorMode::RGB)
+_colorMode(RGB)
 {
     _point = new osg::Point();
     _point->setMinSize(1.0);
