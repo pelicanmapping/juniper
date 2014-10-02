@@ -217,6 +217,20 @@ void P2PMeasureHandler::pick(float x, float y, osgViewer::View* view)
     {
         // Get the point that was clicked.
         osgUtil::PolytopeIntersector::Intersection hit = picker->getFirstIntersection();
+        
+        PointCloudDecorator* decorator = 0;
+        // Make sure we are selecting a PointCloudDecorator
+        for (unsigned int i = 0; i < hit.nodePath.size(); i++)
+        {
+            decorator = dynamic_cast<PointCloudDecorator*>(hit.nodePath[i]);
+            if (decorator)
+            {
+                break;
+            }
+        }        
+        // We didn't pick a point cloud.
+        if (!decorator) return;
+
         osg::Geometry* geometry = hit.drawable->asGeometry();
 
         osg::Vec3Array* verts = static_cast<osg::Vec3Array*>(geometry->getVertexArray());

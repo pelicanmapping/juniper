@@ -58,6 +58,18 @@ struct PointSizeHandler : public ControlEventHandler
     osg::ref_ptr< PointCloudDecorator > _pointCloud;
 };
 
+struct MaxIntensityHandler : public ControlEventHandler
+{
+    MaxIntensityHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
+    void onValueChanged( Control* control, float value )
+    {        
+        _pointCloud->setMaxIntensity(value);
+        OSG_NOTICE << "Max Intensity " << value << std::endl;
+    }
+
+    osg::ref_ptr< PointCloudDecorator > _pointCloud;
+};
+
 // http://resources.arcgis.com/en/help/main/10.1/index.html#//015w0000005q000000
 std::string classificationToString(unsigned short classification)
 {
@@ -157,6 +169,22 @@ _colorMode(colorMode)
     PointCloudDecorator::ColorMode _colorMode;
 };
 
+struct ToggleClassificationHandler : public ControlEventHandler
+{
+    ToggleClassificationHandler(unsigned char classification):
+_classification(classification)
+{
+}
+
+void onValueChanged(Control* control, bool value)
+{
+    s_pointCloud->setClassificationVisible(_classification, value);
+}
+
+unsigned char _classification;
+};
+
+
 void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
 {
     ControlCanvas* canvas = ControlCanvas::getOrCreate( &viewer );
@@ -176,6 +204,20 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
     pointSlider->setHorizFill( true, 200 );
     pointSlider->addEventHandler( new PointSizeHandler(s_pointCloud));   
 
+    // Max Intensity
+    HBox* maxIntensityBox = container->addControl(new HBox());
+    maxIntensityBox->setChildVertAlign( Control::ALIGN_CENTER );
+    maxIntensityBox->setChildSpacing( 10 );
+    maxIntensityBox->setHorizFill( true );
+    maxIntensityBox->addControl( new LabelControl("Max Intensity:", 16) );
+
+    HSliderControl* intensitySlider = maxIntensityBox->addControl(new HSliderControl(0.0f, USHRT_MAX, s_pointCloud->getMaxIntensity()));
+    intensitySlider->setBackColor( Color::Gray );
+    intensitySlider->setHeight( 12 );
+    intensitySlider->setHorizFill( true, 200 );
+    intensitySlider->addEventHandler( new MaxIntensityHandler(s_pointCloud));   
+
+
     // Color mode
     Grid* toolbar = new Grid();    
     toolbar->setAbsorbEvents( true );    
@@ -193,6 +235,23 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
     toolbar->setControl(2, 0, classifiction);   
 
     container->addChild(toolbar);
+    
+    HBox* box = container->addControl(new HBox());
+    CheckBoxControl* vegToggle = box->addControl(new CheckBoxControl(true));
+    vegToggle->addEventHandler(new ToggleClassificationHandler(3));
+    vegToggle->addEventHandler(new ToggleClassificationHandler(4));
+    vegToggle->addEventHandler(new ToggleClassificationHandler(5));
+    box->addControl(new LabelControl("Vegetation"));
+
+    box = container->addControl(new HBox());
+    CheckBoxControl* buildingToggle = box->addControl(new CheckBoxControl(true));
+    buildingToggle->addEventHandler(new ToggleClassificationHandler(6));
+    box->addControl(new LabelControl("Buildings"));
+
+    box = container->addControl(new HBox());
+    CheckBoxControl* groundToggle = box->addControl(new CheckBoxControl(true));
+    groundToggle->addEventHandler(new ToggleClassificationHandler(2));
+    box->addControl(new LabelControl("Ground"));
         
     // Add a status label
     s_status = container->addControl(new LabelControl());
@@ -214,7 +273,7 @@ int main(int argc, char** argv)
     root->addChild(loaded);
 
     osg::ref_ptr< MapNode > mapNode = MapNode::findMapNode(loaded);
-    mapNode->getTerrainEngine()->setNodeMask(MaskMapNode);
+    //mapNode->getTerrainEngine()->setNodeMask(MaskMapNode);
     mapNode->getModelLayerGroup()->setNodeMask(MaskPointCloud);
 
     s_pointCloud = osgEarth::findTopMostNodeOfType<PointCloudDecorator>(loaded);
@@ -253,6 +312,14 @@ int main(int argc, char** argv)
         measure->setNodeMask(MaskPointCloud);
         viewer.addEventHandler(measure);
     }
+
+
+    viewer.addEventHandler(new osgViewer::StatsHandler());
+    viewer.addEventHandler(new osgViewer::WindowSizeHandler());
+    viewer.addEventHandler(new osgViewer::ThreadingHandler());
+    viewer.addEventHandler(new osgViewer::LODScaleHandler());
+    viewer.addEventHandler(new osgGA::StateSetManipulator(viewer.getCamera()->getOrCreateStateSet()));
+    viewer.addEventHandler(new osgViewer::RecordCameraPathHandler());
 
     viewer.getCamera()->setNearFarRatio(0.00002);
   
