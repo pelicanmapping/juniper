@@ -30,6 +30,7 @@ SET(LIB_PUBLIC_HEADERS
     PCap
     Point
     PointCloud
+    PointCloudTools
     SPTNode
     StreamingNode
     Velodyne
@@ -48,6 +49,7 @@ ADD_LIBRARY(${LIB_NAME} SHARED
     PCap.cpp
     Point.cpp
     PointCloud.cpp
+    PointCloudTools.cpp
     SPTNode.cpp
     StreamingNode.cpp
     Velodyne.cpp
