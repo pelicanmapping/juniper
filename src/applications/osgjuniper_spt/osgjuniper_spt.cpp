@@ -51,7 +51,7 @@ SPTNode* makeSceneFromPointSource(PointSource *source, unsigned int maxVerts = U
     Point p;
     while (cursor->nextPoint(p) && numRead < maxVerts)
     {
-        bb.expandBy( p._position );
+        bb.expandBy( p.position );
         numRead++;
         if (numRead%1000 == 0) 
             osg::notify(osg::NOTICE) << "Expanded by " << numRead+1 << " points " << std::endl;

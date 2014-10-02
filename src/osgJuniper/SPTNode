@@ -52,7 +52,7 @@ namespace osgJuniper
         float _radiusFactor;
         osg::Geometry *_geometry;
         osg::Vec3Array* _verts;
-        osg::Vec4Array* _colors;
+        osg::Vec4ubArray* _colors;
         osg::Vec3Array* _normals;
         typedef std::map< float, int> RangeMap;
         RangeMap _rangeMap;

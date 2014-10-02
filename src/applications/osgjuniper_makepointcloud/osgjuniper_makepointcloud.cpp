@@ -195,12 +195,12 @@ protected:
             _out.open( _filename.c_str(), std::ios::out | std::ios::binary);
         }
 
-        osg::Vec3 color(point._color.r(), point._color.g(), point._color.b());
+        osg::Vec3 color((float)point.color.r()/255.0f, (float)point.color.g()/255.0f, (float)point.color.b()/255.0f);
         color *= 255.0f;        
-        _out.write((char*)point._position._v, sizeof(double) * 3);
-        _out.write((char*)point._normal._v, sizeof(float) * 3);
+        _out.write((char*)point.position._v, sizeof(double) * 3);
+        _out.write((char*)point.normal._v, sizeof(float) * 3);
         _out.write((char*)color._v, sizeof(float) * 3);
-        _out.write((char*)&point._size, sizeof(float));
+        _out.write((char*)&point.size, sizeof(float));
     }
 
     osg::ref_ptr< OctreeNode > _node;
@@ -377,7 +377,7 @@ MakeSceneVisitor::apply(OctreeNode& node)
             //Choose which rejection file to use and write the point to it
             for (unsigned int i = 0; i < 8; ++i)
             {
-                if (rejectionFiles[i]->contains(p._position))
+                if (rejectionFiles[i]->contains(p.position))
                 {
                     rejectionFiles[i]->addPoint( p );
                     addedPointToRejectionFile = true;
@@ -390,7 +390,7 @@ MakeSceneVisitor::apply(OctreeNode& node)
                 apv.setStrategy(AddPointVisitor::ACCEPT);
                 innerOctree.accept(apv);
                 numPointsAdded++;
-                osg::notify(osg::WARN) << "ERROR:  Could not add point " << p._position << " to rejection file" << std::endl;
+                osg::notify(osg::WARN) << "ERROR:  Could not add point " << p.position << " to rejection file" << std::endl;
             }
         }
         else
@@ -521,7 +521,7 @@ MakeSceneVisitor::makeNode(PointList& points)
         s_numNodes++;
     }
 
-    osg::Vec3d anchor = points.front()._position;
+    osg::Vec3d anchor = points.front().position;
 
     osg::Geometry* geometry = new osg::Geometry;
 
@@ -543,12 +543,9 @@ MakeSceneVisitor::makeNode(PointList& points)
 
     while (points.size() > 0)
     {                 
-        osg::Vec3 position = points.front()._position - anchor;
+        osg::Vec3 position = points.front().position - anchor;
         verts->push_back(position);
-        osg::Vec4ub color = osg::Vec4ub(points.front()._color.r() * 255,
-                                        points.front()._color.g() * 255,
-                                        points.front()._color.b() * 255,
-                                        points.front()._color.a() * 255);
+        osg::Vec4ub color = points.front().color;
         colors->push_back(color);
         //Remove the point from the list to reduce memory usage
         points.pop_front();
@@ -742,7 +739,7 @@ int main(int argc, char** argv)
         Point p;
         while (cursor->nextPoint(p))
         {
-            bb.expandBy( p._position );
+            bb.expandBy( p.position );
             numPoints++;
         }        
 

@@ -313,7 +313,7 @@ void
 AddPointVisitor::apply(OctreeNode& node)
 {
     //Only process if the point is in the nodes bounding box
-    if (!_pointAdded && node.getBoundingBox().contains(_point._position))
+    if (!_pointAdded && node.getBoundingBox().contains(_point.position))
     {
         //If the child has no points, just add the point to it.
         if (node.getPoints().empty() && !node.isSplit() )
@@ -394,7 +394,7 @@ void CollectPointsVisitor::apply(OctreeNode& node)
     for (PointList::iterator itr = node.getPoints().begin(); itr != node.getPoints().end(); ++itr)
     {
         //Set the min range based on the radius of this OctreeNode's bounding box
-        (*itr)._minRange = node.getBoundingBox().radius();
+        (*itr).minRange = node.getBoundingBox().radius();
         _points.push_back( *itr );
     }
 

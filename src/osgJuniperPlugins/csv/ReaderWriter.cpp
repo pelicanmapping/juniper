@@ -78,8 +78,8 @@ public:
             }
             if (gotPoint)
             {
-                point._color    = osg::Vec4(1,1,0,1);
-                point._position = position;
+                point.color    = osg::Vec4ub(255,255,255,255);
+                point.position = position;
                 return true;
             }
             return false;

@@ -24,15 +24,22 @@
 using namespace osgJuniper;
 
 /****************************************************************************/
-Point::Point()
+Point::Point():
+size(1.0),
+classification(0),
+intensity(0),
+returnNumber(0)
 {
 }
 
-Point::Point(const osg::Vec3d& position, const osg::Vec3& normal, const osg::Vec4 &color):
-_position(position),
-_normal(normal),
-_color(color),
-_size(1.0)
+Point::Point(const osg::Vec3d& position, const osg::Vec3& normal, const osg::Vec4ub &color):
+position(position),
+normal(normal),
+color(color),
+size(1.0),
+classification(0),
+intensity(0),
+returnNumber(0)
 {
 }
 

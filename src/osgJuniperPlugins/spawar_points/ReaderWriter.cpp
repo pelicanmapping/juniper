@@ -61,10 +61,10 @@ public:
                     col *= 1.0f/255.0f;
                     col[3] = 1.0;
 
-                    point._position = vert;
-                    point._color = col;
-                    point._normal = norm;
-                    point._size = size;
+                    point.position = vert;
+                    point.color = osg::Vec4ub(col.r() * 255, col.g() * 255, col.b() * 255, col.a() * 255);
+                    point.normal = norm;
+                    point.size = size;
                     _numRead++;
                     return true;
                 }

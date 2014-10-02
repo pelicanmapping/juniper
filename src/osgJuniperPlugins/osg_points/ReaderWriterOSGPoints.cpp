@@ -96,7 +96,7 @@ public:
                               color = (*colors)[i];
                           }
                       }
-                      _points.push_back(Point(vert, osg::Vec3(1,0,0), color));
+                      _points.push_back(Point(vert, osg::Vec3(1,0,0), osg::Vec4ub(color.r() * 255.0, color.g() * 255.0, color.b() * 255.0, color.a() * 255.0)));
                   }
               }        
           }

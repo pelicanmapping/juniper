@@ -56,8 +56,8 @@ public:
                 osg::Vec3 vert;
                 if (_in.read((char*)(&vert[0]), sizeof(float) * 3))
                 {
-                    point._position = vert;
-                    point._color = osg::Vec4(0.5,1,1,1);
+                    point.position = vert;
+                    point.color = osg::Vec4ub(255,255,255,255);
                     return true;
                 }
             }

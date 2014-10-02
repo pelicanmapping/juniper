@@ -25,7 +25,7 @@ struct SortPointsByRangeFunctor
 {
     bool operator() (const Point& lhs,const Point& rhs) const
     {
-        if (lhs._minRange > rhs._minRange) return true;
+        if (lhs.minRange > rhs.minRange) return true;
         else return false;
     }
 };
@@ -86,7 +86,7 @@ void SPTNode::setPoints(PointList &points)
     osg::BoundingSphere bounds;
     for (PointList::iterator itr = points.begin(); itr != points.end(); ++itr)
     {
-        bounds.expandBy( (*itr)._position );
+        bounds.expandBy( (*itr).position );
     }
 
     setInitialBound( bounds );
@@ -103,7 +103,7 @@ void SPTNode::setPoints(PointList &points)
     _verts->reserve( points.size() );
     _geometry->setVertexArray( _verts );    
 
-    _colors = new osg::Vec4Array();
+    _colors = new osg::Vec4ubArray();
     _colors->reserve( points.size() );
     _geometry->setColorArray( _colors );
     _geometry->setColorBinding( osg::Geometry::BIND_PER_VERTEX);
@@ -118,19 +118,19 @@ void SPTNode::setPoints(PointList &points)
 
     while (points.size() > 0)
     {         
-        _verts->push_back( points.front()._position );
-        _colors->push_back( points.front()._color );
-        _normals->push_back( points.front()._normal );
-        scales->push_back( osg::Vec4(0,0,0, points.front()._size ));
+        _verts->push_back( points.front().position );
+        _colors->push_back( points.front().color );
+        _normals->push_back( points.front().normal );
+        scales->push_back( osg::Vec4(0,0,0, points.front().size ));
 
         //Inititalize the count to 0 if this is the first time we've encountered this range
-        if (_rangeMap.find(points.front()._minRange) == _rangeMap.end())
+        if (_rangeMap.find(points.front().minRange) == _rangeMap.end())
         {
-            _rangeMap[points.front()._minRange] = 0;
+            _rangeMap[points.front().minRange] = 0;
         }
 
         //Increment the count for this range
-        _rangeMap[points.front()._minRange] += 1;
+        _rangeMap[points.front().minRange] += 1;
 
         //Remove the point from the list to reduce memory usage
         points.pop_front();

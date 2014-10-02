@@ -105,7 +105,6 @@ public:
           {
               if (_reader)
               {
-                  OSG_NOTICE << "~LASPointCursor" << std::endl;
                   _reader->close();
                   delete _reader;
               }
@@ -118,46 +117,22 @@ public:
               {   
                   _numRead++;           
 
-                  osg::Vec4 color = osg::Vec4(0.0, 0.0f, 0.0f, 1.0f);
+                  osg::Vec4ub color = osg::Vec4ub(0,0,0,255);
                   // Color by RGB if we have it.
                   if (_reader->point.have_rgb)                  
-                  {                   
-                      float colorScale = (float)USHRT_MAX;
-                      color.set((float)_reader->point.rgb[0] / colorScale,
-                                (float)_reader->point.rgb[1] / colorScale,
-                                (float)_reader->point.rgb[2] / colorScale,
-                                1.0f);
+                  {                          
+                      color.set(U8_CLAMP(_reader->point.rgb[0]/256),
+                                U8_CLAMP(_reader->point.rgb[1]/256),
+                                U8_CLAMP(_reader->point.rgb[2]/256),
+                                U8_CLAMP(_reader->point.rgb[3]/256));
                   }
-                  else
-                  {
-                      // Otherwise color by classification
-                      int classification = (int)_reader->point.classification;                      
-                      // Ground
-                      if (classification == 2)
-                      {
-                          color = osg::Vec4(1.0f, 0.0f, 0.0f, 1.0f);
-                      }
-                      // Veg
-                      else if (classification == 3 || classification == 4 || classification == 5)
-                      {
-                          color = osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f);
-                      }
-                      // Building
-                      else if (classification == 6)
-                      {
-                          color = osg::Vec4(0.5, 0.5, 0.5, 1.0f);
-                      }
-                      // Water
-                      else if (classification == 9)
-                      {
-                          color = osg::Vec4(0.0, 0.0, 1.0, 1.0);
-                      }
 
-                  }                  
-                  
                   osg::Vec3d position = osg::Vec3d(_reader->point.get_x(), _reader->point.get_y(), _reader->point.get_z());
-                  point._position = position;                        
-                  point._color = color;                  
+                  point.position = position;                        
+                  point.color = color;    
+                  point.classification = _reader->point.classification;
+                  point.returnNumber = _reader->point.return_number;
+                  point.intensity = _reader->point.intensity;
                   return true;                
               }              
               return false;                                                
@@ -217,7 +192,7 @@ osg::Node* makeNode(const std::string& filename)
     lasreadopener.set_file_name(filename.c_str());
     LASreader* reader = lasreadopener.open();              
 
-    OSG_NOTICE << "Reading " << reader->header.number_of_point_records << " point records from " << filename << std::endl;
+    //OSG_NOTICE << "Reading " << reader->header.number_of_point_records << " point records from " << filename << std::endl;
      
     while(reader->read_point())
     {                 
