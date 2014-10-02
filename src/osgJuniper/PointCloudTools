@@ -1,0 +1,123 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2011 Pelican Ventures, Inc.
+* http://wush.net/trac/juniper
+*
+* osgEarth is free software; you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>
+*/
+
+#ifndef OSGJUNIPER_POINTCLOUD_TOOLS
+#define OSGJUNIPER_POINTCLOUD_TOOLS 1
+
+#include <osgJuniper/Common>
+#include <osgJuniper/Point>
+#include <osgViewer/View>
+#include <osgEarth/SpatialReference>
+#include <osgEarthUtil/LatLongFormatter>
+
+namespace osgJuniper
+{
+    /**
+    * Handler to identify a point
+    */
+    class OSGJUNIPER_EXPORT IdentifyPointHandler : public osgGA::GUIEventHandler
+    {
+    public:
+        struct Callback : public osg::Referenced
+        {
+            /**
+             * Called when a point is selected.
+             */
+            virtual void selected(const Point& point) = 0;
+
+            /**
+             * Called when a click even occurs but no point was selected.
+             */
+            virtual void reset() = 0;
+
+            virtual ~Callback() { }
+        };
+
+        IdentifyPointHandler();
+
+        void addCallback( Callback* callback );
+
+        bool handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa);
+
+        osg::Node::NodeMask getNodeMask() const;
+        void setNodeMask(osg::Node::NodeMask mask);
+
+        const osg::Vec4ub& getSelectedColor() const;
+        void setSelectedColor(const osg::Vec4ub& color);
+
+    protected:
+        void pick(float x, float y, osgViewer::View* viewer);
+
+        osg::Node::NodeMask _mask;
+
+        osg::ref_ptr< osgEarth::SpatialReference > _wgs84;
+        osg::ref_ptr< osg::Vec4ubArray > _prevColorArray;
+        osg::Vec4ub _prevSelectedColor;
+        int _prevSelectedIndex;
+        osg::Vec4ub _selectedColor;    
+
+        typedef std::vector< osg::ref_ptr<Callback> > Callbacks;
+        Callbacks _callbacks;
+    };
+
+    /**
+     * Handler to do point to point measurement.
+     */
+    class OSGJUNIPER_EXPORT P2PMeasureHandler : public osgGA::GUIEventHandler
+    {
+    public:
+         struct Callback : public osg::Referenced
+        {
+            /**
+             * Called when the distance has changed.
+             */
+            virtual void distanceChanged(double distanceChanged) = 0;
+
+            virtual ~Callback() { }
+        };
+
+        P2PMeasureHandler(osg::Group* root);     
+
+        void addCallback( Callback* callback );
+
+        bool handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa);
+
+        void clear();
+
+        osg::Node::NodeMask getNodeMask() const;
+        void setNodeMask(osg::Node::NodeMask mask);
+
+
+    protected:
+        void pick(float x, float y, osgViewer::View* viewer);
+        void updateMeasurement();
+
+        osg::ref_ptr< osgEarth::SpatialReference > _wgs84;
+        std::vector< osg::Vec3d > _points;
+        osg::ref_ptr< osg::Node > _line;
+        osg::ref_ptr< osg::Group > _root;
+
+        osg::Node::NodeMask _mask;
+
+        typedef std::vector< osg::ref_ptr<Callback> > Callbacks;
+        Callbacks _callbacks;
+    };
+}
+
+#endif
