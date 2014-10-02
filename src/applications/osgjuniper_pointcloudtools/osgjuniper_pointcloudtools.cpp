@@ -133,6 +133,16 @@ _label(label)
     LabelControl* _label;
 };
 
+struct P2PMeasureCallback : public P2PMeasureHandler::Callback
+{
+    virtual void distanceChanged(double distance)
+    {
+        std::stringstream buf;
+        buf << "Distance: " << distance << "m";
+        s_status->setText(buf.str());
+    }
+};
+
 void buildControls(osgViewer::Viewer& viewer)
 {
     ControlCanvas* canvas = ControlCanvas::getOrCreate( &viewer );
@@ -217,6 +227,7 @@ int main(int argc, char** argv)
     else
     {
         P2PMeasureHandler* measure = new P2PMeasureHandler(root);
+        measure->addCallback(new P2PMeasureCallback());
         measure->setNodeMask(MaskPointCloud);
         viewer.addEventHandler(measure);
     }
