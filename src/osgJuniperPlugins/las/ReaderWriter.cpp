@@ -182,7 +182,7 @@ osg::Node* makeNode(const std::string& filename, const osgDB::ReaderWriter::Opti
     geometry->setColorArray(colors);
     geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
 
-    osg::Vec4Array* dataArray = new osg::Vec4Array();
+    osg::Vec3usArray* dataArray = new osg::Vec3usArray();
     geometry->setVertexAttribArray(osg::Drawable::ATTRIBUTE_6, dataArray);
     geometry->setVertexAttribBinding(osg::Drawable::ATTRIBUTE_6, osg::Geometry::BIND_PER_VERTEX);
     geometry->setVertexAttribNormalize(osg::Drawable::ATTRIBUTE_6, false);    
@@ -216,7 +216,7 @@ osg::Node* makeNode(const std::string& filename, const osgDB::ReaderWriter::Opti
 
         osg::Vec3d point = osg::Vec3d(reader->point.get_x(), reader->point.get_y(), reader->point.get_z());        
 
-        osg::Vec4 data;
+        osg::Vec3us data;
         data.x() = (int)reader->point.classification;
         data.y() = (int)reader->point.return_number;
         data.z() = (int)(reader->point.intensity);

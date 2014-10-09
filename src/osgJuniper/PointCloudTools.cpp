@@ -133,8 +133,8 @@ void IdentifyPointHandler::pick(float x, float y, osgViewer::View* viewer)
         osg::Vec3d world = vert * localToWorld; 
 
         // Get the data from the vertex attributes.
-        osg::Vec4Array* dataArray = static_cast<osg::Vec4Array*>(geometry->getVertexAttribArray(osg::Drawable::ATTRIBUTE_6));
-        osg::Vec4f data = (*dataArray)[hit.primitiveIndex];
+        osg::Vec3usArray* dataArray = static_cast<osg::Vec3usArray*>(geometry->getVertexAttribArray(osg::Drawable::ATTRIBUTE_6));
+        osg::Vec3us data = (*dataArray)[hit.primitiveIndex];
 
         // Notify any callbacks of the point selection.
         Point point;
