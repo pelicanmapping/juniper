@@ -29,7 +29,6 @@
 #include <osg/Vec4>
 #include <osg/BoundingBox>
 
-
 #include <vector>
 #include <list>
 
@@ -101,8 +100,8 @@ namespace osgJuniper
         /**
          * Gets the BoundingBox for this OctreeNode
          */
-        const osg::BoundingBoxd& getBoundingBox() const { return _boundingBox;}
-        osg::BoundingBoxd& getBoundingBox() { return _boundingBox;}
+        const osg::BoundingBoxd& getBoundingBox() const;
+        osg::BoundingBoxd& getBoundingBox();
 
         /**
          *Sets the BoundingBox for this OctreeNode

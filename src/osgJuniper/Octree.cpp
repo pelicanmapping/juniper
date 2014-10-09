@@ -235,6 +235,16 @@ OctreeNode::split()
     }
 }
 
+const osg::BoundingBoxd& OctreeNode::getBoundingBox() const
+{
+    return _boundingBox;
+}
+
+osg::BoundingBoxd& OctreeNode::getBoundingBox()
+{
+    return _boundingBox;
+}
+
 void
 OctreeNode::setBoundingBox(const osg::BoundingBoxd& boundingBox)
 {

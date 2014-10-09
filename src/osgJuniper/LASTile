@@ -1,0 +1,180 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2011 Pelican Ventures, Inc.
+* http://wush.net/trac/juniper
+*
+* osgEarth is free software; you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>
+*/
+
+#ifndef OSGJUNIPER_LASTILE
+#define OSGJUNIPER_LASTILE 1
+
+#include <osgJuniper/Common>
+#include <osgJuniper/Octree>
+#include <osg/Referenced>
+#include <osg/OperationThread>
+#include <osgEarth/SpatialReference>
+
+class LASreader;
+class LASwriter;
+class LASheader;
+class LASquantizer;
+
+namespace osgJuniper
+{
+    class OSGJUNIPER_EXPORT Progress : public osg::Referenced
+    {
+    public:
+        Progress();
+
+        unsigned int getTotal();
+
+        void setTotal(unsigned int total);
+
+        unsigned int getComplete();
+
+        bool isComplete();
+
+        void incrementComplete(unsigned int complete);
+
+        float getPercentComplete();
+
+    private:
+        unsigned int _total;
+        unsigned int _complete;
+        OpenThreads::Mutex _mutex;
+    };
+
+
+
+    /**
+    * Class used to build the output of an octree from a series of input files.
+    */
+    class OSGJUNIPER_EXPORT OctreeCellBuilder
+    {
+    public:
+        OctreeCellBuilder();
+
+        ~OctreeCellBuilder();
+
+        unsigned int getNumPoints() const;
+
+        OctreeNode* getNode() const;
+
+        void setNode( OctreeNode *node );
+
+        unsigned int getInnerLevel() const;
+
+        void setInnerLevel(unsigned int innerLevel);
+
+        std::vector<std::string>& getInputFiles();
+
+        std::vector<std::string>& getOutputFiles();
+
+        bool getDeleteInputs() const;
+
+        void setDeleteInputs(bool deleteInputs);
+
+        unsigned int getTargetNumPoints() const;
+
+        void setTargetNumPoints(unsigned int targetNumPoints);
+
+        osgEarth::SpatialReference* getSourceSRS() const;
+        void setSourceSRS( osgEarth::SpatialReference* srs);
+
+        osgEarth::SpatialReference* getDestSRS() const;
+        void setDestSRS( osgEarth::SpatialReference* srs);
+
+        bool getGeocentric() const;
+        void setGeocentric(bool geocentric);
+
+        void buildRoot(unsigned int numThreads);
+
+        void build();
+        void buildChildren();
+
+        void initWriter();
+
+        void initReader();
+
+        void closeReader();
+
+        LASwriter* getOrCreateWriter(const osg::Vec3d& location);
+
+        float getFraction() const;
+        void setFraction(float fraction);
+
+        bool keep();
+
+        void closeChildWriters();
+
+        void closeWriter();
+
+        unsigned int getPointsInCell(const OctreeId& id);
+
+        void incrementPointsInCell(const OctreeId& id, unsigned int count=1);
+
+        void deleteInputs();
+
+        osg::Vec3d reprojectPoint(const osg::Vec3d& input);
+
+        std::string getFilename(OctreeId id) const;
+
+        osg::OperationQueue* getOperationQueue() const;
+        void setOperationQueue(osg::OperationQueue* queue);
+
+        void initThreads(unsigned int count);
+
+        Progress* getProgress() const;
+        void setProgress(Progress* progress);
+
+    private:
+        LASreader* _reader;
+
+        LASwriter* _writer;
+        LASheader* _writeHeader;
+        LASquantizer* _writeQuantizer;
+
+
+        osg::ref_ptr< OctreeNode > _node;
+        unsigned int _innerLevel;
+        unsigned int _targetNumPoints;
+        std::vector<std::string> _inputFiles;
+        std::vector<std::string> _outputFiles;
+
+        typedef std::map<OctreeId, unsigned int> CellCount;
+        CellCount _cellCount;
+        unsigned int _numPoints;
+
+        std::vector<LASwriter*> _childWriters;
+        std::vector<osg::ref_ptr<OctreeNode>> _children;
+
+        bool _deleteInputs;
+
+        float _fraction;
+
+        osg::ref_ptr< osgEarth::SpatialReference > _srcSRS;
+        osg::ref_ptr< osgEarth::SpatialReference > _destSRS;
+        bool _geocentric;
+
+        osg::ref_ptr< osg::OperationQueue > _queue;
+        std::vector< osg::ref_ptr< osg::OperationsThread > > _threads;
+
+        osg::ref_ptr< Progress > _progress;
+    };
+}
+
+
+#endif
+
