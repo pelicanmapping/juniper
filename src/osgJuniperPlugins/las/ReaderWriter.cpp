@@ -165,7 +165,7 @@ protected:
     std::string _filename;
 };
 
-osg::Node* makeNode(const std::string& filename)
+osg::Node* makeNode(const std::string& filename, const osgDB::ReaderWriter::Options* options)
 {    
     osg::Vec3d anchor;
     bool first = true;
@@ -190,12 +190,30 @@ osg::Node* makeNode(const std::string& filename)
     // Read all the points
     LASreadOpener lasreadopener;        
     lasreadopener.set_file_name(filename.c_str());
-    LASreader* reader = lasreadopener.open();              
+    LASreader* reader = lasreadopener.open();  
+
+    unsigned int keepEvery = 1;
+    if (options && !options->getOptionString().empty())
+    {
+        std::string keepEveryStr = options->getPluginStringData("keepEvery");        
+        if (!keepEveryStr.empty())
+        {
+            std::istringstream iss(keepEveryStr);
+            iss >> keepEvery;
+        }
+    }
+
 
     //OSG_NOTICE << "Reading " << reader->header.number_of_point_records << " point records from " << filename << std::endl;
+    unsigned int numPoints = 0;
+    unsigned int numRead = 0;
      
     while(reader->read_point())
     {                 
+        numPoints++;
+        if (numPoints % keepEvery != 0) continue;
+        numRead++;
+
         osg::Vec3d point = osg::Vec3d(reader->point.get_x(), reader->point.get_y(), reader->point.get_z());        
 
         osg::Vec4 data;
@@ -264,7 +282,7 @@ public:
         if ( !acceptsExtension( osgDB::getLowerCaseFileExtension( location ) ) )
             return ReadResult::FILE_NOT_HANDLED;
 
-        return makeNode(location);       
+        return makeNode(location, options);       
     }
 };
 
