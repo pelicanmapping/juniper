@@ -483,8 +483,6 @@ void OctreeCellBuilder::buildChildren()
     }        
 }
 
-
-#if 1
 void OctreeCellBuilder::initWriter()
 {
     // Only open the writer once.
@@ -643,5 +641,3 @@ void OctreeCellBuilder::deleteInputs()
         }
     }
 }
-
-#endif

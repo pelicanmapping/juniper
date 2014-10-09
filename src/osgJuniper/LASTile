@@ -21,10 +21,10 @@
 #define OSGJUNIPER_LASTILE 1
 
 #include <osgJuniper/Common>
+#include <osgEarth/SpatialReference>
 #include <osgJuniper/Octree>
 #include <osg/Referenced>
 #include <osg/OperationThread>
-#include <osgEarth/SpatialReference>
 
 class LASreader;
 class LASwriter;

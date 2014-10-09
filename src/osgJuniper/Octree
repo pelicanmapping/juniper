@@ -29,6 +29,10 @@
 #include <osg/Vec4>
 #include <osg/BoundingBox>
 
+// You have to include osgEarth/Bounds here or otherwise you get a multiply defined symbols for BoundingBoxImpl<osg::Vec3d>
+// My best theory as to why this happens are that templates are evil.
+#include <osgEarth/Bounds>
+
 #include <vector>
 #include <list>
 
