@@ -44,6 +44,11 @@ static const char *vertSource = {
     "uniform float minIntensity;\n"
     "uniform float maxIntensity;\n"
     "uniform bool classificationFilter[32];\n"
+    "uniform float minPointSize;\n"
+    "uniform float maxPointSize;\n"
+    "uniform float maxPointDistance;\n"
+    "uniform float pointSize;\n"
+    "uniform bool autoPointSize;\n"
 
     "vec4 classificationToColor(in int classification)\n"
     "{\n"
@@ -69,7 +74,9 @@ static const char *vertSource = {
     "    int classification = int(data.x);\n"
     "    float returnNumber = data.y;\n"
     "    float intensity = data.z;\n"
-    "    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\n"
+    "    vec4 vertexView = gl_ModelViewMatrix * gl_Vertex;\n"    
+    "    gl_Position = gl_ProjectionMatrix * vertexView ;\n"
+    "    float distance = -vertexView.z;\n"
     // Hide the vert if it's been filtered out.
     "    if (returnNumber > maxReturn || !classificationFilter[classification])\n"
     "    {\n"
@@ -88,6 +95,13 @@ static const char *vertSource = {
     "        else\n"
     "        {\n"
     "            gl_FrontColor = vec4(gl_Color.rgb, 1.0);\n"
+    "        }\n"    
+    "        if (autoPointSize) {\n"
+    "            float factor = 1.0 - smoothstep(0.0, maxPointDistance, distance);\n"
+    "            gl_PointSize = pointSize * mix(minPointSize, maxPointSize, factor);\n"
+    "        }\n"
+    "        else {\n"
+    "            gl_PointSize = pointSize;\n"    
     "        }\n"
     "    }\n"
     "}\n"
@@ -104,18 +118,16 @@ static const char *fragSource = {
 /********************************************************************/
 PointCloudDecorator::PointCloudDecorator():
 _pointSize(1.0f),
-_point(0),
 _maxReturn(5),
 _minIntensity(0),
 _maxIntensity(255),
-_colorMode(RGB)
-{
-    _point = new osg::Point();
-    _point->setMinSize(1.0);
-    _point->setMaxSize(10.0);
-    _point->setDistanceAttenuation(osg::Vec3(1,10,50));
-    _point->setFadeThresholdSize(50.0f);
-    getOrCreateStateSet()->setAttributeAndModes(_point, osg::StateAttribute::ON);
+_colorMode(RGB),
+_minPointSize(1.0),
+_maxPointSize(4.0),
+_maxPointDistance(5000.0),
+_autoPointSize(true)
+{    
+    getOrCreateStateSet()->setMode(GL_POINT_SMOOTH, osg::StateAttribute::ON);
 
     osg::Program* program =new osg::Program;
     program->addShader(new osg::Shader(osg::Shader::VERTEX, vertSource));
@@ -124,19 +136,26 @@ _colorMode(RGB)
     getOrCreateStateSet()->setAttributeAndModes(program, osg::StateAttribute::ON);
 
     getOrCreateStateSet()->getOrCreateUniform("maxReturn", osg::Uniform::FLOAT)->set((float)_maxReturn);
-
     getOrCreateStateSet()->getOrCreateUniform("minIntensity", osg::Uniform::FLOAT)->set((float)(_minIntensity));
     getOrCreateStateSet()->getOrCreateUniform("maxIntensity", osg::Uniform::FLOAT)->set((float)(_maxIntensity));
+    getOrCreateStateSet()->getOrCreateUniform("minPointSize", osg::Uniform::FLOAT)->set(_minPointSize);
+    getOrCreateStateSet()->getOrCreateUniform("maxPointSize", osg::Uniform::FLOAT)->set(_maxPointSize);
+    getOrCreateStateSet()->getOrCreateUniform("maxPointDistance", osg::Uniform::FLOAT)->set(_maxPointDistance);
+    getOrCreateStateSet()->getOrCreateUniform("pointSize", osg::Uniform::FLOAT)->set(_pointSize);
+    getOrCreateStateSet()->getOrCreateUniform("autoPointSize", osg::Uniform::BOOL)->set(_autoPointSize);
 
     getOrCreateStateSet()->getOrCreateUniform("colorMode", osg::Uniform::INT)->set((int)_colorMode);
 
     getOrCreateStateSet()->setMode(GL_BLEND, osg::StateAttribute::ON);
 
+    // To enable setting the point size in the vertex program.
+    getOrCreateStateSet()->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, true);
+
     _classificationFilter = getOrCreateStateSet()->getOrCreateUniform("classificationFilter", osg::Uniform::BOOL, 32);
     for (unsigned int i = 0; i < 32; i++)
     {
         _classificationFilter->setElement(i, true);
-    }    
+    }   
 }
 
 float PointCloudDecorator::getPointSize() const
@@ -147,7 +166,7 @@ float PointCloudDecorator::getPointSize() const
 void PointCloudDecorator::setPointSize(float pointSize)
 {
     _pointSize = osg::maximum(pointSize, 0.0f);
-    _point->setSize(_pointSize);
+    getOrCreateStateSet()->getOrCreateUniform("pointSize", osg::Uniform::FLOAT)->set(_pointSize);
 }
 
 bool PointCloudDecorator::getClassificationVisible(unsigned int classification) const
@@ -205,4 +224,49 @@ void PointCloudDecorator::setColorMode(PointCloudDecorator::ColorMode colorMode)
 {
     _colorMode = colorMode;
     getOrCreateStateSet()->getOrCreateUniform("colorMode", osg::Uniform::INT)->set((int)_colorMode);
+}
+
+float PointCloudDecorator::getMinPointSize() const
+{
+    return _minPointSize;
+}
+
+void PointCloudDecorator::setMinPointSize(float minPointSize)
+{
+    _minPointSize = minPointSize;
+    getOrCreateStateSet()->getOrCreateUniform("minPointSize", osg::Uniform::FLOAT)->set(_minPointSize);
+}
+
+float PointCloudDecorator::getMaxPointSize() const
+{
+    return _maxPointSize;
+}
+
+void PointCloudDecorator::setMaxPointSize(float maxPointSize)
+{
+    _maxPointSize = maxPointSize;
+    getOrCreateStateSet()->getOrCreateUniform("maxPointSize", osg::Uniform::FLOAT)->set(_maxPointSize);
+}
+
+
+float PointCloudDecorator::getMaxPointDistance() const
+{
+    return _maxPointDistance;
+}
+
+void PointCloudDecorator::setMaxPointDistance(float distance)
+{
+    _maxPointDistance = distance;
+    getOrCreateStateSet()->getOrCreateUniform("maxPointDistance", osg::Uniform::FLOAT)->set(_maxPointDistance);
+}
+
+bool PointCloudDecorator::getAutoPointSize() const
+{
+    return _autoPointSize;
+}
+
+void PointCloudDecorator::setAutoPointSize(bool autoPointSize)
+{
+    _autoPointSize = autoPointSize;
+    getOrCreateStateSet()->getOrCreateUniform("autoPointSize", osg::Uniform::BOOL)->set(_autoPointSize);
 }

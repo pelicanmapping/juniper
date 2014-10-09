@@ -47,6 +47,17 @@ namespace osgJuniper
 
         float getPointSize() const;
         void setPointSize(float pointSize);       
+
+        float getMinPointSize() const;
+        void setMinPointSize(float minPointSize);
+
+        float getMaxPointSize() const;
+        void setMaxPointSize(float maxPointSize);
+
+        float getMaxPointDistance() const;
+        void setMaxPointDistance(float distance);
+
+
         
         unsigned int getMaxReturn() const;
         void setMaxReturn(unsigned int maxReturn);
@@ -70,16 +81,23 @@ namespace osgJuniper
         bool getClassificationVisible(unsigned int classification) const;
         void setClassificationVisible(unsigned int classification, bool enabled);
 
+        bool getAutoPointSize() const;
+        void setAutoPointSize(bool autoPointSize);
+
     private:
 
         float _pointSize;
-
-        osg::Point* _point;
+        float _minPointSize;
+        float _maxPointSize;
+        float _maxPointDistance;        
 
         unsigned int _maxReturn;
 
         unsigned short _minIntensity;
         unsigned short _maxIntensity;
+        bool _autoPointSize;
+        
+
 
         ColorMode _colorMode;
 

@@ -184,6 +184,14 @@ void onValueChanged(Control* control, bool value)
 unsigned char _classification;
 };
 
+struct AutoPointSizeHandler : public ControlEventHandler
+{
+    void onValueChanged(Control* control, bool value)
+    {
+        s_pointCloud->setAutoPointSize(!s_pointCloud->getAutoPointSize());
+    }
+};
+
 
 void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
 {
@@ -252,6 +260,11 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
     CheckBoxControl* groundToggle = box->addControl(new CheckBoxControl(true));
     groundToggle->addEventHandler(new ToggleClassificationHandler(2));
     box->addControl(new LabelControl("Ground"));
+
+    box = container->addControl(new HBox());
+    CheckBoxControl* autoPointSizeToggle = box->addControl(new CheckBoxControl(s_pointCloud->getAutoPointSize()));
+    autoPointSizeToggle->addEventHandler(new AutoPointSizeHandler());
+    box->addControl(new LabelControl("Auto Point Size"));
         
     // Add a status label
     s_status = container->addControl(new LabelControl());
