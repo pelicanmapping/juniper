@@ -437,7 +437,7 @@ TextPrimitive::updateTransform(osg::Node* terrain)
 		{
 			//NOTE:  Must set the cull callback on the group and not the autotransform as getEyePoint will be in a funky coordinate system if you stick it on the autotransform.
 			osg::Vec3d normal = em->computeLocalUpVector(position.x(), position.y(), position.z());
-			_ccc = static_cast<osg::ClusterCullingCallback*>(getCullCallback());
+			_ccc = dynamic_cast<osg::ClusterCullingCallback*>(getCullCallback());
 			if (!_ccc)
 			{
 				_ccc = new osg::ClusterCullingCallback();

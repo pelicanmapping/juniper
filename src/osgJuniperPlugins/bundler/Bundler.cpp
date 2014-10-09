@@ -499,12 +499,10 @@ public:
         GLushort i[6] = { 0, 1, 0, 2, 0, 3 };
         geom->addPrimitiveSet( new osg::DrawElementsUShort(GL_LINES, 6, i) );
 
-        osg::Vec4Array* c = new osg::Vec4Array(3);
+        osg::Vec4Array* c = new osg::Vec4Array(1);
         (*c)[0].set( 1, 0, 0, 1 );
-        (*c)[1].set( 0, 1, 0, 1 );
-        (*c)[2].set( 0, 0, 1, 1 );
         geom->setColorArray( c );
-        geom->setColorBinding( osg::Geometry::BIND_PER_PRIMITIVE );
+        geom->setColorBinding( osg::Geometry::BIND_OVERALL );
 
         geom->getOrCreateStateSet()->setMode( GL_LIGHTING, 0 );
 

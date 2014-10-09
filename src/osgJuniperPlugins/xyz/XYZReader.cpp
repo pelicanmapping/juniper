@@ -21,6 +21,7 @@
 #include <osg/Point>
 #include <osg/LOD>
 #include <osg/ShapeDrawable>
+#include <osg/Version>
 #include <osgDB/Registry>
 #include <osgDB/FileNameUtils>
 #include <osgDB/ReaderWriter>
@@ -45,7 +46,11 @@ public:
 
     void addNormals( osg::Geometry* geom ) const
     {
+#if OSG_VERSION_GREATER_THAN(3,3,1)
+        const osg::BoundingBox& bbox = geom->getBoundingBox();
+#else
         const osg::BoundingBox& bbox = geom->getBound();
+#endif
 
         osg::Vec3Array* verts = static_cast<osg::Vec3Array*>( geom->getVertexArray() );
 

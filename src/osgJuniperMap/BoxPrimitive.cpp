@@ -88,7 +88,8 @@ _showOutline(true)
                           0, 4, 5, 1
                           };        
     _fillGeometry->addPrimitiveSet( new osg::DrawElementsUInt( GL_QUADS, 24, faces_i ) );
-    _fillGeometry->setNormalBinding( osg::Geometry::BIND_PER_PRIMITIVE );
+    //TODO:  Fix
+    //_fillGeometry->setNormalBinding( osg::Geometry::BIND_PER_PRIMITIVE );
     _fillGeometry->setNormalArray( normals );
 
     osg::Vec4Array* fillColors = new osg::Vec4Array(1);

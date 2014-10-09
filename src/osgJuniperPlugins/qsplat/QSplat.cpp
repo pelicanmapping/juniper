@@ -584,7 +584,9 @@ void GeometryGraph::setupGeometry()
     _drawarray->setDataVariance(osg::Object::DYNAMIC);
     _geometry = new osg::Geometry;
     _geometry->setVertexArray(_vertexes.get());
-    _geometry->setVertexAttribData(_attributeBinding, osg::Geometry::ArrayData(_attributes.get(),osg::Geometry::BIND_PER_VERTEX));
+    _geometry->setVertexAttribArray(_attributeBinding, _attributes.get());
+    _geometry->setVertexAttribBinding(_attributeBinding, osg::Geometry::BIND_PER_VERTEX);
+    _geometry->setVertexAttribNormalize(_attributeBinding, false);
 
     _geometry->setNormalArray(_normals.get());
     _geometry->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);

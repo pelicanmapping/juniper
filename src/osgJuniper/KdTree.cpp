@@ -26,6 +26,7 @@
 #include <osgJuniper/KdTree>
 #include <osg/Geode>
 #include <osg/io_utils>
+#include <osg/Version>
 
 using namespace osgJuniper;
 
@@ -69,7 +70,11 @@ bool BuildKdTree::build(KdTree::BuildOptions& options, osg::Geometry* geometry)
     if (vertices->size() <= options._targetNumVertsPerLeaf)
         return false;
 
+#if OSG_VERSION_GREATER_THAN(3,3,1)
+    _bb = geometry->getBoundingBox();
+#else
     _bb = geometry->getBound();
+#endif
     _kdTree.setVertices(vertices);
     
     unsigned int estimatedSize = (unsigned int)(2.0*float(vertices->size())/float(options._targetNumVertsPerLeaf));

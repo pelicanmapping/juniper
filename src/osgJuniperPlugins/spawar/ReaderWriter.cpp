@@ -91,7 +91,9 @@ public:
         geom->setVertexArray(verts.get());
         geom->setNormalArray(normals.get());
         geom->setColorArray(colors.get());
-        geom->setVertexAttribData(11, osg::Geometry::ArrayData(scales.get(), osg::Geometry::BIND_PER_VERTEX));
+        geom->setVertexAttribArray(11, scales.get());
+        geom->setVertexAttribBinding(11, osg::Geometry::BIND_PER_VERTEX);
+        geom->setVertexAttribNormalize(11, false);        
         geom->getPrimitiveSetList().push_back(new osg::DrawArrays(GL_POINTS, 0, verts->size()));
         geode->addDrawable(geom.get());
 

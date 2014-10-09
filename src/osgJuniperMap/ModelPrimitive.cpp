@@ -303,7 +303,7 @@ ModelPrimitive::updateTransform(osg::Node* terrain)
         if (_locationSet && _enableClusterCulling)
         {
             osg::Vec3d localNormal = em->computeLocalUpVector(position.x(), position.y(), position.z());
-            _ccc = static_cast<osg::ClusterCullingCallback*>(getCullCallback());
+            _ccc = dynamic_cast<osg::ClusterCullingCallback*>(getCullCallback());
             if (!_ccc)
             {
                 _ccc = new osg::ClusterCullingCallback();

@@ -114,7 +114,9 @@ void SPTNode::setPoints(PointList &points)
     _geometry->setNormalBinding( osg::Geometry::BIND_PER_VERTEX );
 
     osg::ref_ptr<osg::Vec4Array> scales = new osg::Vec4Array;
-    _geometry->setVertexAttribData(11, osg::Geometry::ArrayData(scales.get(), osg::Geometry::BIND_PER_VERTEX));
+    _geometry->setVertexAttribArray(11, scales.get());
+    _geometry->setVertexAttribBinding(11, osg::Geometry::BIND_PER_VERTEX);
+    _geometry->setVertexAttribNormalize(11, false);        
 
     while (points.size() > 0)
     {         

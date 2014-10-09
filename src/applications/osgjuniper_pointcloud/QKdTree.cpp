@@ -28,6 +28,7 @@
 #include <osg/Geode>
 #include <osg/Point>
 #include <osg/io_utils>
+#include <osg/Version>
 
 
 struct QBuildKdTree
@@ -70,7 +71,11 @@ bool QBuildKdTree::build(QKdTree::BuildOptions& options, osg::Geometry* geometry
     if (vertices->size() <= options._targetNumVertsPerLeaf)
         return false;
 
+#if OSG_VERSION_GREATER_THAN(3,3,1)
+    _bb = geometry->getBoundingBox();
+#else
     _bb = geometry->getBound();
+#endif
     _kdTree.setVertices(vertices);
     _kdTree.setNormals(dynamic_cast<osg::Vec3Array*>(geometry->getNormalArray()));
     _kdTree.setColors(dynamic_cast<osg::Vec4Array*>(geometry->getColorArray()));
