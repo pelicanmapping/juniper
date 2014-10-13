@@ -17,6 +17,7 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
 */
 #include <osgDB/FileNameUtils>
+#include <osgDB/FileUtils>
 #include <osgDB/Registry>
 #include <osgDB/ReaderWriter>
 #include <osgEarth/GeoData>
@@ -25,6 +26,7 @@
 #include <osg/MatrixTransform>
 
 #include "lasreader.hpp"
+#include "lasreader_las.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -165,7 +167,7 @@ protected:
     std::string _filename;
 };
 
-osg::Node* makeNode(const std::string& filename, const osgDB::ReaderWriter::Options* options)
+osg::Node* makeNode(LASreader* reader, const osgDB::ReaderWriter::Options* options)
 {    
     osg::Vec3d anchor;
     bool first = true;
@@ -186,11 +188,6 @@ osg::Node* makeNode(const std::string& filename, const osgDB::ReaderWriter::Opti
     geometry->setVertexAttribArray(osg::Drawable::ATTRIBUTE_6, dataArray);
     geometry->setVertexAttribBinding(osg::Drawable::ATTRIBUTE_6, osg::Geometry::BIND_PER_VERTEX);
     geometry->setVertexAttribNormalize(osg::Drawable::ATTRIBUTE_6, false);    
-    
-    // Read all the points
-    LASreadOpener lasreadopener;        
-    lasreadopener.set_file_name(filename.c_str());
-    LASreader* reader = lasreadopener.open();  
 
     unsigned int keepEvery = 1;
     if (options && !options->getOptionString().empty())
@@ -242,9 +239,6 @@ osg::Node* makeNode(const std::string& filename, const osgDB::ReaderWriter::Opti
         colors->push_back(color);        
     }
 
-    reader->close();
-    delete reader;
-
     osg::Geode* geode = new osg::Geode;
     geode->addDrawable( geometry );
     geometry->addPrimitiveSet( new osg::DrawArrays(GL_POINTS, 0, verts->size()) );
@@ -279,11 +273,46 @@ public:
 
     virtual ReadResult readNode( const std::string& location, const osgDB::ReaderWriter::Options* options ) const
     {
+        if (osgDB::containsServerAddress( location ))
+        {
+            return ReadResult::FILE_NOT_HANDLED;
+        }
+
         if ( !acceptsExtension( osgDB::getLowerCaseFileExtension( location ) ) )
             return ReadResult::FILE_NOT_HANDLED;
 
-        return makeNode(location, options);       
+        if (!osgDB::fileExists(location))
+        {
+            return ReadResult::FILE_NOT_FOUND;
+        }
+
+        // Read all the points
+        LASreadOpener lasreadopener;        
+        lasreadopener.set_file_name(location.c_str());
+        LASreader* reader = lasreadopener.open();  
+        
+        osg::Node* node = makeNode(reader, options);       
+
+        reader->close();
+        delete reader;
+        return node;
     }
+
+    virtual ReadResult readNode(std::istream& in, const osgDB::Options* options) const
+    {     
+        LASreaderLAS* reader = new LASreaderLAS();
+        osg::Node* node = 0;
+        if (reader->open(in))
+        {
+            node = makeNode(reader, options);       
+            reader->close();           
+        }
+        delete reader;
+        if (node) return node;
+        return ReadResult::FILE_NOT_HANDLED;       
+        
+    }
+
 };
 
 REGISTER_OSGPLUGIN(las, LASPointsReaderWriter)
