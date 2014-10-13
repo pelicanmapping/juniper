@@ -55,9 +55,12 @@ public:
         if ( !acceptsExtension( osgDB::getLowerCaseFileExtension( location ) ) )
             return ReadResult::FILE_NOT_HANDLED;
 
-        std::string file = osgDB::getNameLessExtension( location );
+        std::string file = osgDB::getNameLessExtension( location );        
         osg::Node* node = osgDB::readNodeFile( file );
-        if (!node) return ReadResult::FILE_NOT_FOUND;
+        if (!node)
+        {
+            return ReadResult::FILE_NOT_FOUND;
+        }
 
         std::string inExt = osgDB::getFileExtension(file);
 
@@ -107,16 +110,24 @@ public:
             osg::ref_ptr< OctreeNode > child = octree->createChild(i);
             std::string childFilename = osgDB::concatPaths(path, getFilename(child->getID(), inExt));            
 
-            if (osgDB::fileExists(childFilename))
+            if (osgDB::fileExists(childFilename) || osgDB::containsServerAddress(childFilename))
             {
-                std::string outFilename = osgDB::concatPaths(path, getFilename(child->getID(), ext));
+                //std::string outFilename = osgDB::concatPaths(path, getFilename(child->getID(), ext));
+                std::stringstream buf;
+                buf << path;
+                if (!path.empty())
+                {
+                    buf << "/";
+                }
+                buf << getFilename(child->getID(), ext);
+                std::string outFilename = buf.str();                
                 if (ext == "las" || ext == "laz")
                 {
                     outFilename += ".lastile";            
                 }                
                 plod->setFileName(childNum, outFilename);
                 plod->setRange(childNum, 0, childRadius * radiusFactor);
-                childNum++;
+                childNum++;                
             }            
         }        
 

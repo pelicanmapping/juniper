@@ -273,13 +273,28 @@ public:
 
     virtual ReadResult readNode( const std::string& location, const osgDB::ReaderWriter::Options* options ) const
     {
-        if (osgDB::containsServerAddress( location ))
-        {
-            return ReadResult::FILE_NOT_HANDLED;
-        }
-
         if ( !acceptsExtension( osgDB::getLowerCaseFileExtension( location ) ) )
             return ReadResult::FILE_NOT_HANDLED;
+
+
+        // Handle the server case explicitly, don't let it fall through to the curl plugin.
+        if (osgDB::containsServerAddress( location ))
+        {
+            osg::Timer_t start = osg::Timer::instance()->tick();
+            osgEarth::ReadResult r = osgEarth::URI(location).readString(options);
+            osg::Timer_t end = osg::Timer::instance()->tick();
+            OSG_NOTICE << "download of " << location << " took " << osg::Timer::instance()->delta_m(start, end) << "ms" << std::endl;
+            if (r.failed())
+            {
+                // If we couldn't get the file just return an empty group so the pager keeps paging.
+                return new osg::Group;
+            }
+            else
+            {
+                std::stringstream in(r.getString());
+                return readNode(in, options);
+            }
+        }
 
         if (!osgDB::fileExists(location))
         {
@@ -300,6 +315,7 @@ public:
 
     virtual ReadResult readNode(std::istream& in, const osgDB::Options* options) const
     {     
+        osg::Timer_t start = osg::Timer::instance()->tick();
         LASreaderLAS* reader = new LASreaderLAS();
         osg::Node* node = 0;
         if (reader->open(in))
@@ -308,6 +324,8 @@ public:
             reader->close();           
         }
         delete reader;
+        osg::Timer_t end = osg::Timer::instance()->tick();
+        OSG_NOTICE << "readNode took " << osg::Timer::instance()->delta_m(start, end) << "ms" << std::endl;
         if (node) return node;
         return ReadResult::FILE_NOT_HANDLED;       
         
