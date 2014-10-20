@@ -172,23 +172,15 @@ osg::Node* makeNode(LASreader* reader, const osgDB::ReaderWriter::Options* optio
     osg::Vec3d anchor;
     bool first = true;
 
-    osg::Geometry* geometry = new osg::Geometry;
+    unsigned int NUM_POINTS_PER_GEOMETRY = 10000;
 
-    geometry->setUseVertexBufferObjects( true );
-    geometry->setUseDisplayList( false );
+    osg::Geode* geode = new osg::Geode;
+
+    osg::Geometry* geometry = 0;
+    osg::Vec3Array* verts = 0;
+    osg::Vec4ubArray* colors = 0;
+    osg::Vec3usArray* dataArray = 0;
     
-    osg::Vec3Array* verts = new osg::Vec3Array();
-    geometry->setVertexArray( verts );    
-
-    osg::Vec4ubArray* colors =new osg::Vec4ubArray();    
-    geometry->setColorArray(colors);
-    geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
-
-    osg::Vec3usArray* dataArray = new osg::Vec3usArray();
-    geometry->setVertexAttribArray(osg::Drawable::ATTRIBUTE_6, dataArray);
-    geometry->setVertexAttribBinding(osg::Drawable::ATTRIBUTE_6, osg::Geometry::BIND_PER_VERTEX);
-    geometry->setVertexAttribNormalize(osg::Drawable::ATTRIBUTE_6, false);    
-
     unsigned int keepEvery = 1;
     if (options && !options->getOptionString().empty())
     {
@@ -207,6 +199,26 @@ osg::Node* makeNode(LASreader* reader, const osgDB::ReaderWriter::Options* optio
      
     while(reader->read_point())
     {                 
+        // Initialize the geometry if needed.
+        if (!geometry)
+        {
+            geometry = new osg::Geometry;
+            geometry->setUseVertexBufferObjects( true );
+            geometry->setUseDisplayList( false );
+
+            verts = new osg::Vec3Array();
+            geometry->setVertexArray( verts );    
+
+            colors =new osg::Vec4ubArray();    
+            geometry->setColorArray(colors);
+            geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+
+            dataArray = new osg::Vec3usArray();
+            geometry->setVertexAttribArray(osg::Drawable::ATTRIBUTE_6, dataArray);
+            geometry->setVertexAttribBinding(osg::Drawable::ATTRIBUTE_6, osg::Geometry::BIND_PER_VERTEX);
+            geometry->setVertexAttribNormalize(osg::Drawable::ATTRIBUTE_6, false);    
+
+        }
         numPoints++;
         if (numPoints % keepEvery != 0) continue;
         numRead++;
@@ -237,11 +249,22 @@ osg::Node* makeNode(LASreader* reader, const osgDB::ReaderWriter::Options* optio
                       U8_CLAMP(reader->point.rgb[3]/256));
         }
         colors->push_back(color);        
-    }
 
-    osg::Geode* geode = new osg::Geode;
-    geode->addDrawable( geometry );
-    geometry->addPrimitiveSet( new osg::DrawArrays(GL_POINTS, 0, verts->size()) );
+        if (verts->size() == NUM_POINTS_PER_GEOMETRY)
+        {
+            geode->addDrawable( geometry );
+            geometry->addPrimitiveSet( new osg::DrawArrays(GL_POINTS, 0, verts->size()) );
+            geometry = 0;
+        }
+    }        
+
+    // Add a final geometry if necessary
+    if (geometry)
+    {
+        geode->addDrawable( geometry );
+        geometry->addPrimitiveSet( new osg::DrawArrays(GL_POINTS, 0, verts->size()) );
+        geometry = 0;
+    }
 
     osg::MatrixTransform* mt = new osg::MatrixTransform;
     mt->setMatrix(osg::Matrixd::translate(anchor));

@@ -127,6 +127,7 @@ void IdentifyPointHandler::hover(float x, float y, osgViewer::View* viewer)
     unhover();
 
     osgUtil::PolytopeIntersector *picker = new osgUtil::PolytopeIntersector(osgUtil::Intersector::WINDOW, x - _selectionRadius, y- _selectionRadius, x + _selectionRadius, y + _selectionRadius);
+    picker->setIntersectionLimit(osgUtil::Intersector::LIMIT_ONE);
     osgUtil::IntersectionVisitor iv(picker);
     iv.setTraversalMask(_mask);
     viewer->getCamera()->accept(iv);
@@ -168,6 +169,7 @@ void IdentifyPointHandler::select(float x, float y, osgViewer::View* viewer)
     deselect();
 
     osgUtil::PolytopeIntersector *picker = new osgUtil::PolytopeIntersector(osgUtil::Intersector::WINDOW, x - _selectionRadius, y- _selectionRadius, x + _selectionRadius, y + _selectionRadius);
+    picker->setIntersectionLimit(osgUtil::Intersector::LIMIT_ONE);
     osgUtil::IntersectionVisitor iv(picker);
     iv.setTraversalMask(_mask);
     viewer->getCamera()->accept(iv);
