@@ -269,7 +269,7 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
     // Add a status label
     s_status = container->addControl(new LabelControl());
 
-    root->addChild(canvas);
+    //root->addChild(canvas);
 }
 
 int main(int argc, char** argv)
@@ -282,11 +282,11 @@ int main(int argc, char** argv)
 
     osg::Group* root = new osg::Group;
 
-    osg::Node* loaded = osgDB::readNodeFiles(arguments);
+    osg::Node* loaded = osgEarth::Util::MapNodeHelper().load(arguments, &viewer);//osgDB::readNodeFiles(arguments);
     root->addChild(loaded);
 
     osg::ref_ptr< MapNode > mapNode = MapNode::findMapNode(loaded);
-    //mapNode->getTerrainEngine()->setNodeMask(MaskMapNode);
+    mapNode->getTerrainEngine()->setNodeMask(MaskMapNode);
     mapNode->getModelLayerGroup()->setNodeMask(MaskPointCloud);
 
     s_pointCloud = osgEarth::findTopMostNodeOfType<PointCloudDecorator>(loaded);
