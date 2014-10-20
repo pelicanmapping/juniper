@@ -240,7 +240,8 @@ void IdentifyPointHandler::select(float x, float y, osgViewer::View* viewer)
 */
 P2PMeasureHandler::P2PMeasureHandler(osg::Group* root):
     _root(root),
-    _mask(0xffffffff)
+    _mask(0xffffffff),
+    _selectionRadius(5.0f)
 {
 }
 
@@ -252,6 +253,16 @@ osg::Node::NodeMask P2PMeasureHandler::getNodeMask() const
 void P2PMeasureHandler::setNodeMask(osg::Node::NodeMask mask)
 {
     _mask = mask;
+}
+
+float P2PMeasureHandler::getSelectionRadius() const
+{
+    return _selectionRadius;
+}
+
+void P2PMeasureHandler::setSelectionRadius(float selectionRadius)
+{
+    _selectionRadius = selectionRadius;
 }
 
 bool P2PMeasureHandler::handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa)
@@ -288,9 +299,8 @@ void P2PMeasureHandler::addCallback(P2PMeasureHandler::Callback* callback)
 
 void P2PMeasureHandler::pick(float x, float y, osgViewer::View* view)
 {        
-    double w = 5.0;
-    double h = 5.0;
-    osgUtil::PolytopeIntersector *picker = new osgUtil::PolytopeIntersector(osgUtil::Intersector::WINDOW, x - w, y- h, x + w, y + h);
+    osgUtil::PolytopeIntersector *picker = new osgUtil::PolytopeIntersector(osgUtil::Intersector::WINDOW, x - _selectionRadius, y- _selectionRadius, x + _selectionRadius, y + _selectionRadius);
+    picker->setIntersectionLimit(osgUtil::Intersector::LIMIT_ONE);
     osgUtil::IntersectionVisitor iv(picker);
     iv.setTraversalMask(_mask);
     view->getCamera()->accept(iv);

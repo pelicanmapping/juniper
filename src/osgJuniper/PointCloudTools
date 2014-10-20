@@ -74,9 +74,6 @@ namespace osgJuniper
         void deselect();
         void unhover();
 
-
-
-
         osg::Node::NodeMask _mask;
 
         osg::ref_ptr< osgEarth::SpatialReference > _wgs84;
@@ -143,6 +140,9 @@ namespace osgJuniper
         osg::Node::NodeMask getNodeMask() const;
         void setNodeMask(osg::Node::NodeMask mask);
 
+        float getSelectionRadius() const;
+        void setSelectionRadius(float selectionRadius);
+
 
     protected:
         void pick(float x, float y, osgViewer::View* viewer);
@@ -151,13 +151,15 @@ namespace osgJuniper
 
         osg::ref_ptr< osgEarth::SpatialReference > _wgs84;
         std::vector< osg::Vec3d > _points;
-        osg::ref_ptr< osg::Node > _line;
+        osg::observer_ptr< osg::Node > _line;
         osg::ref_ptr< osg::Group > _root;
 
         osg::Node::NodeMask _mask;
 
         typedef std::vector< osg::ref_ptr<Callback> > Callbacks;
         Callbacks _callbacks;
+
+        float _selectionRadius;
     };
 }
 
