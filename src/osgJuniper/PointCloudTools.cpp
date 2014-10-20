@@ -30,8 +30,9 @@ using namespace osgJuniper;
 /****************************************************************************/
 IdentifyPointHandler::IdentifyPointHandler():
     _selectedColor(255, 0, 0, 255),
-    _prevSelectedIndex(0),
-    _mask(0xffffffff)
+    _hoverColor(255,255, 0, 255),
+    _mask(0xffffffff),
+    _selectionRadius(5.0f)
 {
 }
 
@@ -45,6 +46,16 @@ void IdentifyPointHandler::setSelectedColor(const osg::Vec4ub& color)
     _selectedColor = color;
 }
 
+const osg::Vec4ub& IdentifyPointHandler::getHoverColor() const
+{
+    return _hoverColor;
+}
+
+void IdentifyPointHandler::setHoverColor(const osg::Vec4ub& color)
+{
+    _hoverColor = color;
+}
+
 osg::Node::NodeMask IdentifyPointHandler::getNodeMask() const
 {
     return _mask;
@@ -53,6 +64,16 @@ osg::Node::NodeMask IdentifyPointHandler::getNodeMask() const
 void IdentifyPointHandler::setNodeMask(osg::Node::NodeMask mask)
 {
     _mask = mask;
+}
+
+float IdentifyPointHandler::getSelectionRadius() const
+{
+    return _selectionRadius;
+}
+
+void IdentifyPointHandler::setSelectionRadius(float selectionRadius)
+{
+    _selectionRadius = selectionRadius;
 }
 
 void IdentifyPointHandler::addCallback(IdentifyPointHandler::Callback* callback)
@@ -68,25 +89,44 @@ bool IdentifyPointHandler::handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIAc
     switch (ea.getEventType())
     {
     case osgGA::GUIEventAdapter::PUSH:
-        pick(ea.getX(), ea.getY(), viewer);
-        break;            
+        select(ea.getX(), ea.getY(), viewer);
+        break;   
+    case osgGA::GUIEventAdapter::MOVE:
+        hover(ea.getX(), ea.getY(), viewer);
+        break;
     }
     return false;
 }
 
-void IdentifyPointHandler::pick(float x, float y, osgViewer::View* viewer)
+void IdentifyPointHandler::deselect()
 {
-    // Unset the previous selected point if we have one.
-    if (_prevColorArray.valid())
+    if (!_selectedPoints.empty())
     {
-        (*_prevColorArray.get())[_prevSelectedIndex] = _prevSelectedColor;
-        _prevColorArray->dirty();
-        _prevColorArray = 0;
+        for (SelectionList::iterator itr = _selectedPoints.begin(); itr != _selectedPoints.end(); itr++)
+        {
+            itr->reset();
+        }
+        _selectedPoints.clear();
     }
+}
 
-    double w = 5.0;
-    double h = 5.0;
-    osgUtil::PolytopeIntersector *picker = new osgUtil::PolytopeIntersector(osgUtil::Intersector::WINDOW, x - w, y- h, x + w, y + h);
+void IdentifyPointHandler::unhover()
+{
+    if (!_hoveredPoints.empty())
+    {
+        for (SelectionList::iterator itr = _hoveredPoints.begin(); itr != _hoveredPoints.end(); itr++)
+        {
+            itr->reset();
+        }
+        _hoveredPoints.clear();
+    }
+}
+
+void IdentifyPointHandler::hover(float x, float y, osgViewer::View* viewer)
+{
+    unhover();
+
+    osgUtil::PolytopeIntersector *picker = new osgUtil::PolytopeIntersector(osgUtil::Intersector::WINDOW, x - _selectionRadius, y- _selectionRadius, x + _selectionRadius, y + _selectionRadius);
     osgUtil::IntersectionVisitor iv(picker);
     iv.setTraversalMask(_mask);
     viewer->getCamera()->accept(iv);
@@ -107,8 +147,47 @@ void IdentifyPointHandler::pick(float x, float y, osgViewer::View* viewer)
         }        
         // We didn't pick a point cloud.
         if (!decorator) return;
-        
+        osg::Geometry* geometry = hit.drawable->asGeometry();
 
+        // Highlight the selected point
+        osg::Vec4ubArray* colors = static_cast<osg::Vec4ubArray*>(geometry->getColorArray());
+
+        osg::Vec4ub prevColor = (*colors)[hit.primitiveIndex];
+        // Store the current values.
+        _hoveredPoints.push_back(SelectionInfo(colors, prevColor, hit.primitiveIndex));
+
+        // Changed the color
+        (*colors)[hit.primitiveIndex] = _hoverColor;
+        colors->dirty();
+    }
+}
+
+void IdentifyPointHandler::select(float x, float y, osgViewer::View* viewer)
+{
+    unhover();
+    deselect();
+
+    osgUtil::PolytopeIntersector *picker = new osgUtil::PolytopeIntersector(osgUtil::Intersector::WINDOW, x - _selectionRadius, y- _selectionRadius, x + _selectionRadius, y + _selectionRadius);
+    osgUtil::IntersectionVisitor iv(picker);
+    iv.setTraversalMask(_mask);
+    viewer->getCamera()->accept(iv);
+    if (picker->containsIntersections())
+    {
+        // Get the point that was clicked.
+        osgUtil::PolytopeIntersector::Intersection hit = picker->getFirstIntersection();
+        
+        PointCloudDecorator* decorator = 0;
+        // Make sure we are selecting a PointCloudDecorator
+        for (unsigned int i = 0; i < hit.nodePath.size(); i++)
+        {
+            decorator = dynamic_cast<PointCloudDecorator*>(hit.nodePath[i]);
+            if (decorator)
+            {
+                break;
+            }
+        }        
+        // We didn't pick a point cloud.
+        if (!decorator) return;       
 
         osg::Geometry* geometry = hit.drawable->asGeometry();
 
@@ -119,11 +198,11 @@ void IdentifyPointHandler::pick(float x, float y, osgViewer::View* viewer)
         // Highlight the selected point
         osg::Vec4ubArray* colors = static_cast<osg::Vec4ubArray*>(geometry->getColorArray());
 
+        osg::Vec4ub prevColor = (*colors)[hit.primitiveIndex];
         // Store the current values.
-        _prevColorArray = colors;
-        _prevSelectedColor = (*colors)[hit.primitiveIndex];
-        _prevSelectedIndex = hit.primitiveIndex;            
+        _selectedPoints.push_back(SelectionInfo(colors, prevColor, hit.primitiveIndex));
 
+        // Changed the color
         (*colors)[hit.primitiveIndex] = _selectedColor;
         colors->dirty();
 
@@ -139,7 +218,7 @@ void IdentifyPointHandler::pick(float x, float y, osgViewer::View* viewer)
         // Notify any callbacks of the point selection.
         Point point;
         point.position = world;
-        point.color = _prevSelectedColor;
+        point.color = prevColor;
         point.classification = data.x();
         point.returnNumber = data.y();
         point.intensity = data.z();

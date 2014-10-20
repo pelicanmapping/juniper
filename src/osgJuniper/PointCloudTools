@@ -61,19 +61,59 @@ namespace osgJuniper
         const osg::Vec4ub& getSelectedColor() const;
         void setSelectedColor(const osg::Vec4ub& color);
 
+        const osg::Vec4ub& getHoverColor() const;
+        void setHoverColor(const osg::Vec4ub& color);
+
+        float getSelectionRadius() const;
+        void setSelectionRadius(float selectionRadius);
+
     protected:
-        void pick(float x, float y, osgViewer::View* viewer);
+        void select(float x, float y, osgViewer::View* viewer);
+        void hover(float x, float y, osgViewer::View* viewer);
+        
+        void deselect();
+        void unhover();
+
+
+
 
         osg::Node::NodeMask _mask;
 
         osg::ref_ptr< osgEarth::SpatialReference > _wgs84;
-        osg::ref_ptr< osg::Vec4ubArray > _prevColorArray;
-        osg::Vec4ub _prevSelectedColor;
-        int _prevSelectedIndex;
+        
+        // Keeps track of previously modified points.
+        struct SelectionInfo
+        {
+            SelectionInfo(osg::Vec4ubArray* colorArray, const osg::Vec4ub& color, int index)
+            {
+                this->colorArray = colorArray;
+                this->color = color;
+                this->index = index;
+            }
+
+            void reset()
+            {
+                (*colorArray.get())[index] = color;
+                colorArray->dirty();
+            }
+
+            osg::ref_ptr< osg::Vec4ubArray > colorArray;
+            osg::Vec4ub color;
+            int index;
+        };
+
+        typedef std::vector< SelectionInfo > SelectionList;
+
+        SelectionList _selectedPoints;
+        SelectionList _hoveredPoints;        
+
         osg::Vec4ub _selectedColor;    
+        osg::Vec4ub _hoverColor;
 
         typedef std::vector< osg::ref_ptr<Callback> > Callbacks;
         Callbacks _callbacks;
+
+        float _selectionRadius;
     };
 
     /**
@@ -106,6 +146,7 @@ namespace osgJuniper
 
     protected:
         void pick(float x, float y, osgViewer::View* viewer);
+
         void updateMeasurement();
 
         osg::ref_ptr< osgEarth::SpatialReference > _wgs84;
