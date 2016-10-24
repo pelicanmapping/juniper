@@ -319,7 +319,7 @@ int main( int argc, char **argv )
     viewer.setSceneData(root);
 
     osgEarth::Util::EarthManipulator* manip = new osgEarth::Util::EarthManipulator();
-    manip->setHomeViewpoint(Viewpoint( "San Diego", osg::Vec3d(    startLon,   startLat, 0.0 ), 0.0, -90, 45000 ));
+    manip->setHomeViewpoint(Viewpoint( "San Diego", startLon, startLat, 0.0, 0.0, -90, 45000));
 
     viewer.setCameraManipulator( manip );
 

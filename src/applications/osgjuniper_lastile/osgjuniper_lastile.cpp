@@ -54,22 +54,6 @@ int main(int argc, char** argv)
         }
     }
 
-    //Read in the filenames to process
-    for(int pos=1;pos<arguments.argc();++pos)
-    {
-        if (!arguments.isOption(pos))
-        {
-            filenames.push_back( arguments[pos]);
-        }
-    }
-
-    if (filenames.size() == 0)
-    {
-        OSG_NOTICE << "Please specify a filename" << std::endl;
-        return 1;
-    }
-
-
 
     unsigned int targetNumPoints = 0;
     arguments.read("--target", targetNumPoints);
@@ -80,6 +64,7 @@ int main(int argc, char** argv)
 
     std::string srcSRSString;
     arguments.read("--src", srcSRSString);
+    OSG_NOTICE << "Read src " << srcSRSString << std::endl;
 
     std::string destSRSString;
     arguments.read("--dest", destSRSString);
@@ -97,6 +82,23 @@ int main(int argc, char** argv)
         OSG_NOTICE << "Please provide both source and destination srs if you want to reproject" << std::endl;
         return 1;
     }
+
+        //Read in the filenames to process
+    for(int pos=1;pos<arguments.argc();++pos)
+    {
+        if (!arguments.isOption(pos))
+        {
+            filenames.push_back( arguments[pos]);
+            OSG_NOTICE << "filename " << arguments[pos] << std::endl;
+        }
+    }
+
+    if (filenames.size() == 0)
+    {
+        OSG_NOTICE << "Please specify a filename" << std::endl;
+        return 1;
+    }
+
 
     osg::ref_ptr< osgEarth::SpatialReference > srcSRS;
     osg::ref_ptr< osgEarth::SpatialReference > destSRS;

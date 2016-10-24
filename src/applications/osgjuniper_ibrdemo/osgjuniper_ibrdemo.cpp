@@ -62,7 +62,7 @@ struct GoToTheBeachHandler : public osgGA::GUIEventHandler
     {
         if ( ea.getEventType() == ea.KEYDOWN && ea.getKey() == 'y' )
         {
-            _manip->setViewpoint( Viewpoint( "Ocean Beach",   osg::Vec3d(  -117.248881, 32.745299, 0.0), 0.0, -90.0, 500.0), 5.0 );
+            _manip->setViewpoint( Viewpoint( "Ocean Beach",   -117.248881, 32.745299, 0.0, 0.0, -90.0, 500.0), 5.0 );
         }
         return false;
     }

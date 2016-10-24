@@ -135,7 +135,6 @@ public:
         if (id.level == 0 && id.x == 0 && id.y == 0 && id.z == 0)
         {
             PointCloudDecorator *decorator = new PointCloudDecorator();
-            decorator->setPointSize(2.0);
             decorator->addChild(plod);
             return decorator;
         }

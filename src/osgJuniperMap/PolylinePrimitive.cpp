@@ -145,7 +145,7 @@ void PolylinePrimitive::init()
 
         _feature = new Feature( _geometry.get(), osgEarth::SpatialReference::create( "epsg:4326"));
 
-        _featureNode = new FeatureNode( _mapNode.get(), _feature.get(), false );
+        _featureNode = new FeatureNode( _mapNode.get(), _feature.get());
 
         _featureNode->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 		_featureNode->getOrCreateStateSet()->setMode(GL_LINE_SMOOTH, osg::StateAttribute::ON);

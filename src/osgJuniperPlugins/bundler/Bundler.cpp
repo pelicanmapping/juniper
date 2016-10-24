@@ -379,7 +379,7 @@ public:
         {
             LOG << "Creating camera Nodes..." << std::endl;
             // limit the number of cameras to render, just to save time while testing
-            int camerasToDraw = osg::minimum(_cameras.size(), _options._maxCameras);
+            int camerasToDraw = osg::minimum((unsigned int)_cameras.size(), _options._maxCameras);
             for( int i=0; i<camerasToDraw; ++i )
             {
                 LOG << "Creating camera " << i << std::endl;

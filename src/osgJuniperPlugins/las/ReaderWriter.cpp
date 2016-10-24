@@ -172,7 +172,7 @@ osg::Node* makeNode(LASreader* reader, const osgDB::ReaderWriter::Options* optio
     osg::Vec3d anchor;
     bool first = true;
 
-    unsigned int NUM_POINTS_PER_GEOMETRY = 10000;
+    unsigned int NUM_POINTS_PER_GEOMETRY = 50000;
 
     osg::Geode* geode = new osg::Geode;
 

@@ -27,6 +27,7 @@
 #include <osgGA/StateSetManipulator>
 
 #include <osgEarth/MapNode>
+#include <osgEarth/TerrainEngineNode>
 #include <osgEarthUtil/LatLongFormatter>
 #include <osgEarthUtil/ExampleResources>
 #include <osgEarthSymbology/Color>
@@ -219,7 +220,8 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
     maxIntensityBox->setHorizFill( true );
     maxIntensityBox->addControl( new LabelControl("Max Intensity:", 16) );
 
-    HSliderControl* intensitySlider = maxIntensityBox->addControl(new HSliderControl(0.0f, USHRT_MAX, s_pointCloud->getMaxIntensity()));
+    //HSliderControl* intensitySlider = maxIntensityBox->addControl(new HSliderControl(0.0f, USHRT_MAX, s_pointCloud->getMaxIntensity()));
+    HSliderControl* intensitySlider = maxIntensityBox->addControl(new HSliderControl(0.0f, 255.0, 255.0));
     intensitySlider->setBackColor( Color::Gray );
     intensitySlider->setHeight( 12 );
     intensitySlider->setHorizFill( true, 200 );
