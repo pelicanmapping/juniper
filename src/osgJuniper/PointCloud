@@ -57,7 +57,8 @@ namespace osgJuniper
         float getMaxPointDistance() const;
         void setMaxPointDistance(float distance);
 
-
+        float getMinHeight() const;
+        void setMinHeight(float minHeight);
         
         unsigned int getMaxReturn() const;
         void setMaxReturn(unsigned int maxReturn);
@@ -72,7 +73,8 @@ namespace osgJuniper
         {
             RGB = 0,
             Intensity = 1,
-            Classification = 2
+            Classification = 2,
+            Height = 3
         };
 
         ColorMode getColorMode() const;
@@ -89,7 +91,8 @@ namespace osgJuniper
         float _pointSize;
         float _minPointSize;
         float _maxPointSize;
-        float _maxPointDistance;        
+        float _maxPointDistance;      
+        float _minHeight;
 
         unsigned int _maxReturn;
 

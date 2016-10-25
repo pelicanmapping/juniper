@@ -179,7 +179,7 @@ osg::Node* makeNode(LASreader* reader, const osgDB::ReaderWriter::Options* optio
     osg::Geometry* geometry = 0;
     osg::Vec3Array* verts = 0;
     osg::Vec4ubArray* colors = 0;
-    osg::Vec3usArray* dataArray = 0;
+    osg::Vec4Array* dataArray = 0;
     
     unsigned int keepEvery = 1;
     if (options && !options->getOptionString().empty())
@@ -213,7 +213,7 @@ osg::Node* makeNode(LASreader* reader, const osgDB::ReaderWriter::Options* optio
             geometry->setColorArray(colors);
             geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
 
-            dataArray = new osg::Vec3usArray();
+            dataArray = new osg::Vec4Array();
             geometry->setVertexAttribArray(osg::Drawable::ATTRIBUTE_6, dataArray);
             geometry->setVertexAttribBinding(osg::Drawable::ATTRIBUTE_6, osg::Geometry::BIND_PER_VERTEX);
             geometry->setVertexAttribNormalize(osg::Drawable::ATTRIBUTE_6, false);    
@@ -225,10 +225,17 @@ osg::Node* makeNode(LASreader* reader, const osgDB::ReaderWriter::Options* optio
 
         osg::Vec3d point = osg::Vec3d(reader->point.get_x(), reader->point.get_y(), reader->point.get_z());        
 
-        osg::Vec3us data;
+        osg::Vec4 data;
         data.x() = (int)reader->point.classification;
         data.y() = (int)reader->point.return_number;
         data.z() = (int)(reader->point.intensity);
+
+        // TODO:  This assumes the point is in geocentric
+        // Get the height above ellipsoid for the point.
+        osgEarth::GeoPoint pt;
+        pt.fromWorld(osgEarth::SpatialReference::create("wgs84"), point);
+        data.w() = pt.alt();
+        
         dataArray->push_back(data);
 
         if (first)

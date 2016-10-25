@@ -49,6 +49,7 @@ static const char *vertSource = {
     "uniform float maxPointDistance;\n"
     "uniform float pointSize;\n"
     "uniform bool autoPointSize;\n"
+    "uniform float minHeight;\n"
 
     "vec4 classificationToColor(in int classification)\n"
     "{\n"
@@ -74,6 +75,7 @@ static const char *vertSource = {
     "    int classification = int(data.x);\n"
     "    float returnNumber = data.y;\n"
     "    float intensity = data.z;\n"
+    "    float height = data.w;\n"
     "    vec4 vertexView = gl_ModelViewMatrix * gl_Vertex;\n"    
     "    gl_Position = gl_ProjectionMatrix * vertexView ;\n"
     "    float distance = -vertexView.z;\n"
@@ -91,6 +93,17 @@ static const char *vertSource = {
     "        else if (colorMode == 2)\n"
     "        {\n"
     "            gl_FrontColor = classificationToColor(classification);\n"
+    "        }\n"
+    "        else if (colorMode == 3)\n"
+    "        {\n"
+    "            if (height < minHeight) \n"
+    "            {\n"
+    "                gl_FrontColor = vec4(0.0, 1.0, 0.0, 1.0);\n"
+    "            }\n"
+    "            else\n"
+    "            {\n"
+    "                gl_FrontColor = vec4(1.0, 0.0, 0.0, 1.0);\n"
+    "            }\n"
     "        }\n"
     "        else\n"
     "        {\n"
@@ -124,6 +137,7 @@ _maxIntensity(255),
 _colorMode(RGB),
 _minPointSize(1.0),
 _maxPointSize(4.0),
+_minHeight(2.0),
 _maxPointDistance(5000.0),
 _autoPointSize(true)
 {    
@@ -143,6 +157,7 @@ _autoPointSize(true)
     getOrCreateStateSet()->getOrCreateUniform("maxPointDistance", osg::Uniform::FLOAT)->set(_maxPointDistance);
     getOrCreateStateSet()->getOrCreateUniform("pointSize", osg::Uniform::FLOAT)->set(_pointSize);
     getOrCreateStateSet()->getOrCreateUniform("autoPointSize", osg::Uniform::BOOL)->set(_autoPointSize);
+    getOrCreateStateSet()->getOrCreateUniform("minHeight", osg::Uniform::FLOAT)->set(_minHeight);
 
     getOrCreateStateSet()->getOrCreateUniform("colorMode", osg::Uniform::INT)->set((int)_colorMode);
 
@@ -168,6 +183,18 @@ void PointCloudDecorator::setPointSize(float pointSize)
     _pointSize = osg::maximum(pointSize, 0.0f);
     getOrCreateStateSet()->getOrCreateUniform("pointSize", osg::Uniform::FLOAT)->set(_pointSize);
 }
+
+float PointCloudDecorator::getMinHeight() const
+{
+    return _minHeight;
+}
+
+void PointCloudDecorator::setMinHeight(float minHeight)
+{
+    _minHeight = minHeight;
+    getOrCreateStateSet()->getOrCreateUniform("minHeight", osg::Uniform::FLOAT)->set(_minHeight);
+}
+
 
 bool PointCloudDecorator::getClassificationVisible(unsigned int classification) const
 {

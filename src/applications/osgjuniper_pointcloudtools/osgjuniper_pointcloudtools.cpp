@@ -71,6 +71,18 @@ struct MaxIntensityHandler : public ControlEventHandler
     osg::ref_ptr< PointCloudDecorator > _pointCloud;
 };
 
+struct MinHeightHandler : public ControlEventHandler
+{
+    MinHeightHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
+    void onValueChanged( Control* control, float value )
+    {        
+        _pointCloud->setMinHeight(value);
+        OSG_NOTICE << "Min Height " << value << std::endl;
+    }
+
+    osg::ref_ptr< PointCloudDecorator > _pointCloud;
+};
+
 // http://resources.arcgis.com/en/help/main/10.1/index.html#//015w0000005q000000
 std::string classificationToString(unsigned short classification)
 {
@@ -227,6 +239,19 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
     intensitySlider->setHorizFill( true, 200 );
     intensitySlider->addEventHandler( new MaxIntensityHandler(s_pointCloud));   
 
+    // Min Height
+    HBox* minHeightBox = container->addControl(new HBox());
+    minHeightBox->setChildVertAlign( Control::ALIGN_CENTER );
+    minHeightBox->setChildSpacing( 10 );
+    minHeightBox->setHorizFill( true );
+    minHeightBox->addControl( new LabelControl("Min Height:", 16) );
+
+    HSliderControl* minHeightSlider = minHeightBox->addControl(new HSliderControl(0.0f, 400.0, s_pointCloud->getMinHeight()));
+    minHeightSlider->setBackColor( Color::Gray );
+    minHeightSlider->setHeight( 12 );
+    minHeightSlider->setHorizFill( true, 200 );
+    minHeightSlider->addEventHandler( new MinHeightHandler(s_pointCloud));   
+    
 
     // Color mode
     Grid* toolbar = new Grid();    
@@ -243,6 +268,10 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
     LabelControl* classifiction = new LabelControl("Classification");
     classifiction->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Classification));
     toolbar->setControl(2, 0, classifiction);   
+
+    LabelControl* height = new LabelControl("Height");
+    height->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Height));
+    toolbar->setControl(3, 0, height);   
 
     container->addChild(toolbar);
     
