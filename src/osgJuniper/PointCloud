@@ -24,6 +24,7 @@
 #include <osg/OperationThread>
 
 #include <osg/Point>
+#include <osg/Texture2D>
 
 namespace osgJuniper
 {
@@ -59,6 +60,9 @@ namespace osgJuniper
 
         float getMinHeight() const;
         void setMinHeight(float minHeight);
+
+        float getMaxHeight() const;
+        void setMaxHeight(float maxHeight);
         
         unsigned int getMaxReturn() const;
         void setMaxReturn(unsigned int maxReturn);
@@ -74,7 +78,8 @@ namespace osgJuniper
             RGB = 0,
             Intensity = 1,
             Classification = 2,
-            Height = 3
+            Height = 3,
+            Ramp = 4
         };
 
         ColorMode getColorMode() const;
@@ -86,6 +91,9 @@ namespace osgJuniper
         bool getAutoPointSize() const;
         void setAutoPointSize(bool autoPointSize);
 
+        osg::Texture2D* getColorRamp();
+        void setColorRamp( osg::Texture2D* colorRamp );
+
     private:
 
         float _pointSize;
@@ -93,14 +101,13 @@ namespace osgJuniper
         float _maxPointSize;
         float _maxPointDistance;      
         float _minHeight;
+        float _maxHeight;
 
         unsigned int _maxReturn;
 
         unsigned short _minIntensity;
         unsigned short _maxIntensity;
         bool _autoPointSize;
-        
-
 
         ColorMode _colorMode;
 

@@ -50,6 +50,8 @@ static const char *vertSource = {
     "uniform float pointSize;\n"
     "uniform bool autoPointSize;\n"
     "uniform float minHeight;\n"
+    "uniform float maxHeight;\n"
+    "uniform sampler2D colorRamp;\n"
 
     "vec4 classificationToColor(in int classification)\n"
     "{\n"
@@ -105,6 +107,11 @@ static const char *vertSource = {
     "                gl_FrontColor = vec4(1.0, 0.0, 0.0, 1.0);\n"
     "            }\n"
     "        }\n"
+    "        else if (colorMode == 4)\n"
+    "        {\n"
+    "            float sample = (height - minHeight) / (maxHeight - minHeight);\n"
+    "            gl_FrontColor = texture2D(colorRamp, vec2(0.5, sample));\n"
+    "        }\n"
     "        else\n"
     "        {\n"
     "            gl_FrontColor = vec4(gl_Color.rgb, 1.0);\n"
@@ -138,6 +145,7 @@ _colorMode(RGB),
 _minPointSize(1.0),
 _maxPointSize(4.0),
 _minHeight(2.0),
+_maxHeight(300.0),
 _maxPointDistance(5000.0),
 _autoPointSize(true)
 {    
@@ -158,8 +166,9 @@ _autoPointSize(true)
     getOrCreateStateSet()->getOrCreateUniform("pointSize", osg::Uniform::FLOAT)->set(_pointSize);
     getOrCreateStateSet()->getOrCreateUniform("autoPointSize", osg::Uniform::BOOL)->set(_autoPointSize);
     getOrCreateStateSet()->getOrCreateUniform("minHeight", osg::Uniform::FLOAT)->set(_minHeight);
-
+    getOrCreateStateSet()->getOrCreateUniform("maxHeight", osg::Uniform::FLOAT)->set(_maxHeight);
     getOrCreateStateSet()->getOrCreateUniform("colorMode", osg::Uniform::INT)->set((int)_colorMode);
+    getOrCreateStateSet()->getOrCreateUniform("colorRamp", osg::Uniform::SAMPLER_2D)->set(0);
 
     getOrCreateStateSet()->setMode(GL_BLEND, osg::StateAttribute::ON);
 
@@ -193,6 +202,17 @@ void PointCloudDecorator::setMinHeight(float minHeight)
 {
     _minHeight = minHeight;
     getOrCreateStateSet()->getOrCreateUniform("minHeight", osg::Uniform::FLOAT)->set(_minHeight);
+}
+
+float PointCloudDecorator::getMaxHeight() const
+{
+    return _maxHeight;
+}
+
+void PointCloudDecorator::setMaxHeight(float maxHeight)
+{
+    _maxHeight = maxHeight;
+    getOrCreateStateSet()->getOrCreateUniform("maxHeight", osg::Uniform::FLOAT)->set(_maxHeight);
 }
 
 
@@ -296,4 +316,15 @@ void PointCloudDecorator::setAutoPointSize(bool autoPointSize)
 {
     _autoPointSize = autoPointSize;
     getOrCreateStateSet()->getOrCreateUniform("autoPointSize", osg::Uniform::BOOL)->set(_autoPointSize);
+}
+
+
+osg::Texture2D* PointCloudDecorator::getColorRamp()
+{
+    return dynamic_cast<osg::Texture2D*>(getOrCreateStateSet()->getTextureAttribute(0, osg::StateAttribute::TEXTURE));
+}
+
+void PointCloudDecorator::setColorRamp( osg::Texture2D* colorRamp )
+{
+    getOrCreateStateSet()->setTextureAttributeAndModes(0, colorRamp, osg::StateAttribute::ON);
 }

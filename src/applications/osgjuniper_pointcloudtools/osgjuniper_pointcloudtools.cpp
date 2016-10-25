@@ -83,6 +83,18 @@ struct MinHeightHandler : public ControlEventHandler
     osg::ref_ptr< PointCloudDecorator > _pointCloud;
 };
 
+struct MaxHeightHandler : public ControlEventHandler
+{
+    MaxHeightHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
+    void onValueChanged( Control* control, float value )
+    {        
+        _pointCloud->setMaxHeight(value);
+        OSG_NOTICE << "Max Height " << value << std::endl;
+    }
+
+    osg::ref_ptr< PointCloudDecorator > _pointCloud;
+};
+
 // http://resources.arcgis.com/en/help/main/10.1/index.html#//015w0000005q000000
 std::string classificationToString(unsigned short classification)
 {
@@ -246,11 +258,24 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
     minHeightBox->setHorizFill( true );
     minHeightBox->addControl( new LabelControl("Min Height:", 16) );
 
-    HSliderControl* minHeightSlider = minHeightBox->addControl(new HSliderControl(0.0f, 400.0, s_pointCloud->getMinHeight()));
+    HSliderControl* minHeightSlider = minHeightBox->addControl(new HSliderControl(0.0f, 30.0, s_pointCloud->getMinHeight()));
     minHeightSlider->setBackColor( Color::Gray );
     minHeightSlider->setHeight( 12 );
     minHeightSlider->setHorizFill( true, 200 );
     minHeightSlider->addEventHandler( new MinHeightHandler(s_pointCloud));   
+
+    // Max Height
+    HBox* maxHeightBox = container->addControl(new HBox());
+    maxHeightBox->setChildVertAlign( Control::ALIGN_CENTER );
+    maxHeightBox->setChildSpacing( 10 );
+    maxHeightBox->setHorizFill( true );
+    maxHeightBox->addControl( new LabelControl("Max Height:", 16) );
+
+    HSliderControl* maxHeightSlider = maxHeightBox->addControl(new HSliderControl(0.0f, 100.0, s_pointCloud->getMaxHeight()));
+    maxHeightSlider->setBackColor( Color::Gray );
+    maxHeightSlider->setHeight( 12 );
+    maxHeightSlider->setHorizFill( true, 200 );
+    maxHeightSlider->addEventHandler( new MaxHeightHandler(s_pointCloud));   
     
 
     // Color mode
@@ -272,6 +297,10 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
     LabelControl* height = new LabelControl("Height");
     height->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Height));
     toolbar->setControl(3, 0, height);   
+
+    LabelControl* ramp = new LabelControl("Ramp");
+    ramp->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Ramp));
+    toolbar->setControl(4, 0, ramp);   
 
     container->addChild(toolbar);
     
@@ -326,6 +355,14 @@ int main(int argc, char** argv)
         OSG_NOTICE << "Cannot find point cloud" << std::endl;
         return 1;
     }
+
+    // Set the color ramp to use for.
+    osg::Texture2D* colorRamp = new osg::Texture2D(osgDB::readImageFile("d:/dev/juniper/data/iron_gradient.png"));
+    colorRamp->setResizeNonPowerOfTwoHint(false);
+    colorRamp->setWrap( osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE );
+    colorRamp->setWrap( osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE );
+
+    s_pointCloud->setColorRamp(colorRamp);
 
     // any option left unread are converted into errors to write out later.
     arguments.reportRemainingOptionsAsUnrecognized();
