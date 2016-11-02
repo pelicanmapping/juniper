@@ -52,6 +52,8 @@ static const char *vertSource = {
     "uniform float minHeight;\n"
     "uniform float maxHeight;\n"
     "uniform sampler2D colorRamp;\n"
+    "uniform float hazeDistance;\n"
+    "varying float haze; \n"
 
     "vec4 classificationToColor(in int classification)\n"
     "{\n"
@@ -81,6 +83,7 @@ static const char *vertSource = {
     "    vec4 vertexView = gl_ModelViewMatrix * gl_Vertex;\n"    
     "    gl_Position = gl_ProjectionMatrix * vertexView ;\n"
     "    float distance = -vertexView.z;\n"
+    "    haze = clamp( distance/hazeDistance, 0.0, 0.75 ); \n"
     // Hide the vert if it's been filtered out.
     "    if (returnNumber > maxReturn || !classificationFilter[classification])\n"
     "    {\n"
@@ -128,9 +131,11 @@ static const char *vertSource = {
 };
 
 static const char *fragSource = {    
+    "varying float haze; \n"
     "void main(void)\n"
-    "{\n"    
-    "    gl_FragColor = gl_Color;\n"
+    "{\n"        
+    //"    gl_FragColor = gl_Color;\n"
+    "    gl_FragColor = mix(gl_Color, vec4(0.5, 0.5, 0.5, 1.0), haze);\n"
     "}\n"
 };
 
@@ -147,7 +152,8 @@ _maxPointSize(4.0),
 _minHeight(2.0),
 _maxHeight(300.0),
 _maxPointDistance(5000.0),
-_autoPointSize(true)
+_autoPointSize(true),
+_hazeDistance(FLT_MAX)
 {    
     getOrCreateStateSet()->setMode(GL_POINT_SMOOTH, osg::StateAttribute::ON);
 
@@ -169,6 +175,7 @@ _autoPointSize(true)
     getOrCreateStateSet()->getOrCreateUniform("maxHeight", osg::Uniform::FLOAT)->set(_maxHeight);
     getOrCreateStateSet()->getOrCreateUniform("colorMode", osg::Uniform::INT)->set((int)_colorMode);
     getOrCreateStateSet()->getOrCreateUniform("colorRamp", osg::Uniform::SAMPLER_2D)->set(0);
+    getOrCreateStateSet()->getOrCreateUniform("hazeDistance", osg::Uniform::FLOAT)->set(_hazeDistance);
 
     getOrCreateStateSet()->setMode(GL_BLEND, osg::StateAttribute::ON);
 
@@ -327,4 +334,15 @@ osg::Texture2D* PointCloudDecorator::getColorRamp()
 void PointCloudDecorator::setColorRamp( osg::Texture2D* colorRamp )
 {
     getOrCreateStateSet()->setTextureAttributeAndModes(0, colorRamp, osg::StateAttribute::ON);
+}
+
+float PointCloudDecorator::getHazeDistance() const
+{
+    return _hazeDistance;
+}
+
+void PointCloudDecorator::setHazeDistance(float hazeDistance)
+{
+    _hazeDistance = hazeDistance;
+    getOrCreateStateSet()->getOrCreateUniform("hazeDistance", osg::Uniform::FLOAT)->set(_hazeDistance);
 }

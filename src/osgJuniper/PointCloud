@@ -73,6 +73,10 @@ namespace osgJuniper
         unsigned short getMaxIntensity() const;
         void setMaxIntensity(unsigned short maxIntensity);
 
+        float getHazeDistance() const;
+        void setHazeDistance(float hazeDistance);
+
+
         enum ColorMode
         {
             RGB = 0,
@@ -102,12 +106,14 @@ namespace osgJuniper
         float _maxPointDistance;      
         float _minHeight;
         float _maxHeight;
+        float _hazeDistance;
 
         unsigned int _maxReturn;
 
         unsigned short _minIntensity;
         unsigned short _maxIntensity;
         bool _autoPointSize;
+        
 
         ColorMode _colorMode;
 
