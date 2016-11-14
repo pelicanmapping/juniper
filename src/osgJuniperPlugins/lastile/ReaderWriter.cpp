@@ -71,7 +71,7 @@ public:
         plod->addChild(node);
         plod->setRange(0,0,FLT_MAX);
 
-        double radiusFactor = 5;
+        double radiusFactor = 2.5;
         std::string ext = "laz";
         
         if (options && !options->getOptionString().empty())

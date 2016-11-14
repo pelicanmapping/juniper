@@ -458,7 +458,8 @@ osg::Node* loadSessionLLAFull(const std::string& neptecDir, unsigned int maxFile
 
 
 //double simulationStart = 63628; // good.    
-double simulationStart = 63629; // good.    
+//double simulationStart = 63629; // good.    
+double simulationStart = 63618.5;
 
 osg::AnimationPath* createPath( INSReadings& readings, osgEarth::MapNode* mapNode )
 {
@@ -856,7 +857,8 @@ osg::Node* createVideoHUD(osg::Image* image, float alpha = 1.0)
     hudCamera->setViewMatrix(osg::Matrix::identity());    
     hudCamera->setClearMask(GL_DEPTH_BUFFER_BIT);
 
-    hudCamera->setRenderOrder(osg::Camera::NESTED_RENDER, -10);    
+    //hudCamera->setRenderOrder(osg::Camera::NESTED_RENDER, -10);    
+    hudCamera->setRenderOrder(osg::Camera::POST_RENDER);    
     hudCamera->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
     hudCamera->getOrCreateStateSet()->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
     hudCamera->getOrCreateStateSet()->setMode(GL_BLEND, osg::StateAttribute::ON);
