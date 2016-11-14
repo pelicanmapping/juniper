@@ -1,0 +1,1316 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2011 Pelican Ventures, Inc.
+* http://wush.net/trac/juniper
+*
+* osgEarth is free software; you can redistribute it and/or modify
+* it under the terms of the GNU Lesser General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>
+*/
+#include <osgDB/ReadFile>
+#include <osgDB/FileUtils>
+#include <osgUtil/Optimizer>
+#include <osgUtil/PolytopeIntersector>
+#include <osg/Sequence>
+#include <osgEarth/ElevationQuery>
+#include <osg/Depth>
+
+
+#include <osgViewer/Viewer>
+#include <osgViewer/ViewerEventHandlers>
+
+#include <osgGA/StateSetManipulator>
+
+#include <osgEarth/MapNode>
+#include <osgEarth/StringUtils>
+#include <osgEarth/TerrainEngineNode>
+#include <osgEarthUtil/LatLongFormatter>
+#include <osgEarthUtil/ExampleResources>
+#include <osgEarthSymbology/Color>
+#include <osgEarth/GeoTransform>
+
+#include <osgJuniper/PointCloud>
+#include <osgJuniper/PointCloudTools>
+#include <osg/ImageStream>
+
+#include <iostream>
+
+using namespace osgJuniper;
+using namespace osgEarth;
+using namespace osgEarth::Util;
+
+
+/*******************************************/
+struct INSReading
+{
+    double _utcSeconds;  // UTCsecOfDay_Vec
+    osg::Vec3d _velocity; // velX_Vec, velY_Vec, velZ_Vec
+    double _velocityMag; // velMag_Vec
+    double _velocityXYMag; // velXYMag
+    double _waz; // waz_Vec
+    double _platAZ; // platAz_Vec
+    double _roll; // roll_Vec
+    double _pitch; // pitch_Vec
+    double _heading; // tHdg_Vec
+    double _latRadians; // lat_Vec
+    double _lonRadians; // lon_Vec
+    double _alt; // alt_Vec
+    double _rollRate; // rollRate_Vec
+    double _pitchRate; // pitchRate_Vec
+    double _yawRate; // yawRate_Vec
+    double _rollRateFilt; // rollRateFilt_Vec
+    double _pitchRateFilt; // pitchRageFilt_Vec
+    double _yawRateFilt; // yawRateFilt_Vec
+};
+
+typedef std::vector< INSReading> INSReadings;
+
+class INSReader
+{
+public:
+    static bool read(const std::string& filename, INSReadings& readings)
+    {
+        readings.clear();
+
+        std::ifstream in(filename, std::ios::in);
+        if (!in.is_open())
+        {
+            OSG_NOTICE << "Failed to load " << filename << std::endl;
+            return false;
+        }
+
+        //Read the first line of the file, it's the header.
+        std::string line;
+        getline(in, line);
+
+        osgEarth::StringTokenizer izer( "," );
+
+        int read = 0;
+
+        double prevLat = 0.0;
+        double prevLon = 0.0;
+        double prevAlt = 0.0;
+        double prevTime = 0.0;
+
+        bool readLine = false;
+        while (in.good())
+        {
+            //Read a line from the file            
+            getline(in, line);            
+            StringVector ized;
+            izer.tokenize(line, ized);                                   
+
+
+            if (ized.size() == 20)
+            {           
+                INSReading reading;                
+                reading._utcSeconds = as<double>(ized[0], 0.0);
+                reading._velocity.x() = as<double>(ized[1], 0.0);
+                reading._velocity.y() = as<double>(ized[2], 0.0);
+                reading._velocity.z() = as<double>(ized[3], 0.0);
+                reading._velocityMag = as<double>(ized[4], 0.0);
+                reading._velocityXYMag = as<double>(ized[5], 0.0);
+                reading._waz = as<double>(ized[6], 0.0);
+                reading._platAZ = as<double>(ized[7], 0.0);
+                reading._roll = as<double>(ized[8], 0.0);
+                reading._pitch = as<double>(ized[9], 0.0);
+                reading._heading = as<double>(ized[10], 0.0);
+                reading._latRadians = as<double>(ized[11], 0.0);
+                reading._lonRadians  = as<double>(ized[12], 0.0);
+                reading._alt = as<double>(ized[13], 0.0);
+                reading._rollRate = as<double>(ized[14], 0.0);
+                reading._pitchRate = as<double>(ized[15], 0.0);
+                reading._yawRate = as<double>(ized[16], 0.0);
+                reading._rollRateFilt = as<double>(ized[17], 0.0);
+                reading._pitchRateFilt = as<double>(ized[18], 0.0);
+                reading._yawRateFilt = as<double>(ized[19], 0.0);                
+
+                //if (reading._utcSeconds - prevTime > 3)
+                //if (prevLat != reading._latRadians || prevLon != reading._lonRadians || prevAlt != reading._alt)
+                {
+                    //OE_NOTICE << std::setprecision(20) << reading._latRadians << ", " << reading._lonRadians << ", " << reading._alt << std::endl;
+                    readings.push_back( reading );
+                    prevTime = reading._utcSeconds;                
+                    prevLat = reading._latRadians;
+                    prevLon = reading._lonRadians;                
+                    prevAlt = reading._alt;
+
+                }                           
+                read++;
+            }
+
+        }
+
+        return true;
+    }
+};
+
+osg::Node* makeINSNode(INSReadings& readings)
+{   
+    osg::Geometry* geometry = new osg::Geometry;
+    osg::Vec3Array* verts =new osg::Vec3Array;
+    verts->reserve(readings.size());
+    geometry->setVertexArray(verts);
+    osg::Vec4Array* colors = new osg::Vec4Array();
+    colors->push_back( osg::Vec4(1,1,0,1));
+    geometry->setColorArray(colors, osg::Array::BIND_OVERALL);
+    osgEarth::GeoPoint anchorMap(SpatialReference::create("wgs84"), osg::RadiansToDegrees(readings.front()._lonRadians), osg::RadiansToDegrees(readings.front()._latRadians), readings.front()._alt);
+    osg::Vec3d anchor;
+    anchorMap.toWorld(anchor);
+
+    for (INSReadings::iterator itr = readings.begin(); itr != readings.end(); ++itr)
+    {
+        osgEarth::GeoPoint map(SpatialReference::create("wgs84"), osg::RadiansToDegrees(itr->_lonRadians), osg::RadiansToDegrees(itr->_latRadians), itr->_alt);
+        osg::Vec3d world;
+        map.toWorld(world);
+        osg::Vec3d diff = world - anchor;
+        verts->push_back(diff);
+    }
+    geometry->addPrimitiveSet(new osg::DrawArrays(GL_LINE_STRIP, 0, verts->size()));
+    osg::MatrixTransform *mt = new osg::MatrixTransform;
+    mt->setMatrix(osg::Matrixd::translate(anchor));
+    mt->addChild(geometry);
+    mt->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+    return mt;
+}
+
+typedef std::list< GeoPoint > GeoPointList;
+
+bool loadNeptecLidar(const std::string& filename, GeoPointList& readings)
+{
+    osg::Timer_t start = osg::Timer::instance()->tick();
+    readings.clear();
+
+    std::ifstream in(filename, std::ios::in);
+    if (!in.is_open())
+    {
+        OSG_NOTICE << "Failed to load " << filename << std::endl;
+        return false;
+    }
+
+    //Read the first line of the file, it's the header.
+    std::string line;
+    
+    osgEarth::StringTokenizer izer( "," );
+
+    int read = 0;
+
+    const osgEarth::SpatialReference* wgs84 = osgEarth::SpatialReference::create("wgs84");
+
+    bool readLine = false;
+    while (in.good())
+    {
+        //Read a line from the file            
+        getline(in, line);            
+        StringVector ized;
+        izer.tokenize(line, ized);                                   
+
+        if (ized.size() == 3)
+        {           
+            double lat = as<double>(ized[0], 0.0);
+            double lon = as<double>(ized[1], 0.0);
+            double alt = as<double>(ized[2], 0.0);
+
+            if (alt < -1000 || alt > 100) continue;            
+
+            readings.push_back( GeoPoint(wgs84, lon, lat, alt));
+
+            read++;
+        }
+    }
+
+    osg::Timer_t end = osg::Timer::instance()->tick();
+    OE_NOTICE << "Read " << filename << " in " << osg::Timer::instance()->delta_m(start, end) << std::endl;
+
+    return true;
+}
+
+void writeLLA(const std::string& filename, GeoPointList& readings)
+{
+    std::ofstream fout; 
+    fout.open(filename, std::ios::binary | std::ios::out);
+    for (GeoPointList::iterator itr = readings.begin(); itr != readings.end(); ++itr)
+    {
+        fout.write((char *)&itr->x(), sizeof(double));
+        fout.write((char *)&itr->y(), sizeof(double));
+        fout.write((char *)&itr->z(), sizeof(double));
+    }
+    fout.close();
+}
+
+void readLLA(const std::string& filename, GeoPointList& readings)
+{
+    osg::Timer_t start = osg::Timer::instance()->tick();
+    std::ifstream fout; 
+    fout.open(filename, std::ios::binary | std::ios::in);
+    const osgEarth::SpatialReference* wgs84 = osgEarth::SpatialReference::create("wgs84");
+    double lon, lat, alt;
+    while (!fout.eof())
+    {
+        fout.read((char *)&lon, sizeof(double));
+        fout.read((char *)&lat, sizeof(double));
+        fout.read((char *)&alt, sizeof(double));
+        readings.push_back(GeoPoint(wgs84, lon, lat, alt));
+    }
+    fout.close();
+
+    osg::Timer_t end = osg::Timer::instance()->tick();
+    OE_NOTICE << "Read " << filename << " in " << osg::Timer::instance()->delta_m(start, end) << std::endl;
+}
+
+void convertCSVtoLLA(const std::string& directory)
+{
+    osgDB::DirectoryContents neptecFiles = osgDB::getDirectoryContents(directory);    
+    for( osgDB::DirectoryContents::const_iterator f = neptecFiles.begin(); f != neptecFiles.end(); ++f )
+    {
+        if ( f->compare(".") == 0 || f->compare("..") == 0 )
+            continue;
+
+        std::string filepath = directory + "/" +  *f;
+        std::string ext = osgDB::getFileExtension(filepath);
+        if (ext == "csv" && osgDB::fileType(filepath) == osgDB::REGULAR_FILE)
+        {
+            OE_NOTICE << "Loading " << filepath << std::endl;
+            GeoPointList neptecPoints;
+            loadNeptecLidar(filepath, neptecPoints);
+
+            std::string base = osgDB::getNameLessExtension(filepath);
+            std::string out = base + ".lla";
+            OE_NOTICE << "Writing to " << out << std::endl;
+            writeLLA(out, neptecPoints);
+        }
+    }    
+}
+
+
+
+osg::Node* makeNepticNode( GeoPointList& readings, const osg::Vec4& color)
+{
+    osg::Geometry* geometry = new osg::Geometry;
+    osg::Vec3Array* verts =new osg::Vec3Array;
+    verts->reserve(readings.size());
+    geometry->setVertexArray(verts);
+    osg::Vec4Array* colors = new osg::Vec4Array();
+    colors->push_back( color );
+    geometry->setColorArray(colors, osg::Array::BIND_OVERALL);
+    geometry->setUseDisplayList(false);
+    geometry->setUseVertexBufferObjects(true);
+
+    osgEarth::GeoPoint anchorMap(readings.front());
+    osg::Vec3d anchor;
+    anchorMap.toWorld(anchor);
+
+    OE_NOTICE << "Making node with " << readings.size() << " points" << std::endl;
+
+    for (GeoPointList::iterator itr = readings.begin(); itr != readings.end(); ++itr)
+    {
+        osg::Vec3d world;
+        itr->toWorld(world);
+        verts->push_back(world - anchor);
+    }
+    geometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, verts->size()));
+    osg::MatrixTransform *mt = new osg::MatrixTransform;
+    mt->setMatrix(osg::Matrixd::translate(anchor));
+    mt->addChild(geometry);
+    mt->getOrCreateStateSet()->setAttributeAndModes(new osg::Point(2.0));
+    mt->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+    return mt;
+}
+
+osg::Sequence* loadSession(const std::string& neptecDir, unsigned int maxFiles)
+{
+    unsigned int numRead = 0;
+    osg::Sequence* neptecGroup = new osg::Sequence();
+    osgDB::DirectoryContents neptecFiles = osgDB::getDirectoryContents(neptecDir);
+    for( osgDB::DirectoryContents::const_iterator f = neptecFiles.begin(); f != neptecFiles.end(); ++f )
+    {
+        if ( f->compare(".") == 0 || f->compare("..") == 0 )
+            continue;
+
+        std::string filepath = neptecDir + "/" +  *f;
+        std::string ext = osgDB::getFileExtension(filepath);
+        if (ext == "csv" && osgDB::fileType(filepath) == osgDB::REGULAR_FILE)
+        {
+            OE_NOTICE << "Loading " << filepath << std::endl;
+            GeoPointList neptecPoints;
+            loadNeptecLidar(filepath, neptecPoints);
+            if (!neptecPoints.empty())
+            {
+                neptecGroup->addChild(makeNepticNode(neptecPoints, osg::Vec4(1,1,1,1)), 0.1);
+                numRead++;
+                if (numRead == maxFiles)
+                {
+                    break;
+                }
+            }
+        }
+    }
+    neptecGroup->setInterval(osg::Sequence::LOOP, 0, -1);
+    neptecGroup->setDuration(1.0f, -1);
+    neptecGroup->setMode(osg::Sequence::START);    
+    return neptecGroup;    
+}
+
+osg::Node* loadSessionLLA(const std::string& neptecDir, unsigned int maxFiles)
+{
+    unsigned int numRead = 0;
+    osg::Sequence* neptecGroup = new osg::Sequence();
+
+    std::vector< std::string > filenames;
+    
+
+    osgDB::DirectoryContents neptecFiles = osgDB::getDirectoryContents(neptecDir);
+    for( osgDB::DirectoryContents::const_iterator f = neptecFiles.begin(); f != neptecFiles.end(); ++f )
+    {
+        if ( f->compare(".") == 0 || f->compare("..") == 0 )
+            continue;
+
+        std::string filepath = neptecDir + "/" +  *f;
+        std::string ext = osgDB::getFileExtension(filepath);
+        if (ext == "lla" && osgDB::fileType(filepath) == osgDB::REGULAR_FILE)
+        {
+            filenames.push_back( filepath );            
+        }
+    }    
+
+
+
+    OE_NOTICE << "Loading " << filenames.size() << std::endl;
+    std::sort(filenames.begin(), filenames.end());
+
+    for (unsigned int i = 0; i < filenames.size(); i++)
+    {
+        std::string filename = filenames[i];
+        OE_NOTICE << "Loading " << numRead << " " << filename << std::endl;
+        GeoPointList neptecPoints;
+        readLLA(filename, neptecPoints);
+        if (neptecPoints.size() > 10)
+        {
+            OE_NOTICE << "Read " << neptecPoints.size() << std::endl;
+            neptecGroup->addChild(makeNepticNode(neptecPoints, osg::Vec4(1,0,1,1)));        
+            neptecGroup->setTime(neptecGroup->getNumChildren()-1, 0.01);            
+            numRead++;
+            if (numRead == maxFiles)
+            {
+                break;
+            }
+        }
+    }
+
+    neptecGroup->setInterval(osg::Sequence::LOOP, 0, -1);
+    neptecGroup->setDuration(1.0f, -1);
+    neptecGroup->setMode(osg::Sequence::START);
+    OE_NOTICE << "Number of frames " << neptecGroup->getNumChildren() << std::endl;
+    return neptecGroup;    
+}
+
+osg::Node* loadSessionLLAFull(const std::string& neptecDir, unsigned int maxFiles)
+{
+    unsigned int numRead = 0;
+
+    std::vector< std::string > filenames;
+  
+    osgDB::DirectoryContents neptecFiles = osgDB::getDirectoryContents(neptecDir);
+    for( osgDB::DirectoryContents::const_iterator f = neptecFiles.begin(); f != neptecFiles.end(); ++f )
+    {
+        if ( f->compare(".") == 0 || f->compare("..") == 0 )
+            continue;
+
+        std::string filepath = neptecDir + "/" +  *f;
+        std::string ext = osgDB::getFileExtension(filepath);
+        if (ext == "lla" && osgDB::fileType(filepath) == osgDB::REGULAR_FILE)
+        {
+            filenames.push_back( filepath );            
+        }
+    }    
+
+
+
+    
+    
+    OE_NOTICE << "Loading " << filenames.size() << std::endl;
+    std::sort(filenames.begin(), filenames.end());
+
+    GeoPointList neptecPoints;
+    for (unsigned int i = 0; i < filenames.size(); i++)
+    {
+        std::string filename = filenames[i];
+        OE_NOTICE << "Loading " << numRead << " " << filename << std::endl;        
+        readLLA(filename, neptecPoints);
+        numRead++;
+        if (numRead == maxFiles)
+        {
+            break;
+        }        
+    }
+
+    return makeNepticNode(neptecPoints, osg::Vec4(1,1,1,1));
+}
+
+
+//double simulationStart = 63628; // good.    
+double simulationStart = 63629; // good.    
+
+osg::AnimationPath* createPath( INSReadings& readings, osgEarth::MapNode* mapNode )
+{
+    //double startTime = readings.front()._utcSeconds;    
+    // Actual start of video, I think.
+
+    // Doc says it starts at 17:40:21, which is 63621
+    //double startTime = 63621;
+    // Actual video says it starts at 17:40:18
+    //double startTime = 63618;    
+    // 17:44:27
+    //double startTime = 63867.0;
+    osg::AnimationPath* path = new osg::AnimationPath();
+    const SpatialReference* wgs84 = SpatialReference::create("wgs84");
+    double heading = 0.0;
+
+    ElevationQuery   query(mapNode->getMap());
+    for (INSReadings::iterator itr = readings.begin(); itr != readings.end(); ++itr)
+    {
+        
+
+        osgEarth::GeoPoint map(wgs84, osg::RadiansToDegrees(itr->_lonRadians), osg::RadiansToDegrees(itr->_latRadians), itr->_alt);
+        double elevation;
+        //query.getElevation(map, elevation);
+        //OE_NOTICE << "alt="<< itr->_alt << " elevation=" << elevation << std::endl;
+        //map.alt() += elevation;
+        osg::Vec3d world;
+        map.toWorld(world);
+        osg::Matrixd local2world;
+        map.createLocalToWorld( local2world );  
+        
+        double pitch = itr->_pitch;        
+        double heading = itr->_heading;
+        double roll = itr->_roll;      
+        double platAZ = itr->_platAZ;
+
+
+        osg::Quat pitchTo90(osg::DegreesToRadians(90.0), osg::Vec3(1,0,0));
+        //osg::Quat platAZRot(osg::RadiansToDegrees(platAZ), osg::Vec3(0,0,-1));
+        osg::Quat ori =
+        osg::Quat(roll, osg::Vec3(0,1,0)) * // roll
+        osg::Quat(pitch, osg::Vec3(1,0,0)) * //pitch        
+        osg::Quat(heading, osg::Vec3(0,0,-1));
+
+        /*
+        osg::Quat ori(osg::DegreesToRadians(90.0), osg::Vec3(0,1,0),
+                 heading, osg::Vec3(0,0,-1),
+                 pitch, osg::Vec3(1,0,0));
+                 */
+                
+
+        osg::Quat rot = pitchTo90 * ori * local2world.getRotate();
+        //osg::Quat rot = pitchTo90 * ori * platAZRot * local2world.getRotate();
+
+        /*
+        osg::Vec3d world;
+        map.toWorld( world );
+        osg::Quat rot;
+        
+        osg::Matrixd local2world;
+        map.createLocalToWorld( local2world );  
+
+       //osg::Quat rotHeading(osg::DegreesToRadians(45.0), upVector);        
+        rot = local2world.getRotate();
+
+        osg::Vec3d lookVector = getFrontVector(local2world);
+        osg::Vec3d sideVector = getSideVector(local2world);
+        osg::Vec3d upVector = getUpVector(local2world);
+
+        rot *= osg::Quat(osg::DegreesToRadians(180.0), upVector);
+        */
+
+        double time = itr->_utcSeconds - simulationStart;
+        if (time >= 0.0)
+        {
+            //OE_NOTICE << "time=" << time << std::endl;
+            path->insert(time, osg::AnimationPath::ControlPoint(world, rot));
+        }
+       
+    }
+    return path;
+}
+
+osg::AnimationPath* createPathSimple( INSReadings& readings )
+{
+    double time = 0.0;
+    osg::AnimationPath* path = new osg::AnimationPath();
+    const SpatialReference* wgs84 = SpatialReference::create("wgs84");
+    double startTime = readings.front()._utcSeconds;    
+    for (unsigned int i = 0; i < readings.size()-1; i++)
+    {
+        INSReading& reading0 = readings[i];
+        INSReading& reading1 = readings[i+1];
+
+        osgEarth::GeoPoint map0(wgs84, osg::RadiansToDegrees(reading0._lonRadians), osg::RadiansToDegrees(reading0._latRadians), reading0._alt);
+        osg::Vec3d p0;
+        map0.toWorld(p0);
+
+        osgEarth::GeoPoint map1(wgs84, osg::RadiansToDegrees(reading1._lonRadians), osg::RadiansToDegrees(reading1._latRadians), reading1._alt);
+        osg::Vec3d p1;
+        map1.toWorld(p1);
+
+        osg::Vec3d up = p0;
+        up.normalize();
+
+        osg::Vec3d look = p1 - p0;
+        double dist = look.length();
+        osg::Quat rot = osg::Matrixd::lookAt(p0, p1, up).getRotate();
+        rot = rot.inverse();        
+        double time = reading0._utcSeconds - startTime;
+        path->insert(time, osg::AnimationPath::ControlPoint(p0, rot));        
+    }
+    return path;    
+}
+
+osg::Matrixd getViewMatrix(INSReading& reading)
+{
+    const SpatialReference* wgs84 = SpatialReference::create("wgs84");
+        osgEarth::GeoPoint map(wgs84, osg::RadiansToDegrees(reading._lonRadians), osg::RadiansToDegrees(reading._latRadians), reading._alt);        
+        osg::Matrixd local2world;
+        map.createLocalToWorld( local2world );  
+
+        double pitch = osg::DegreesToRadians(90.0) + reading._pitch;        
+        double heading = reading._heading;
+        double roll = reading._roll;
+
+        osg::Quat ori =
+        osg::Quat(pitch, osg::Vec3(1,0,0)) * //pitch
+        osg::Quat(roll, osg::Vec3(0,1,0)) * // roll
+        osg::Quat(heading, osg::Vec3(0,0,-1));
+
+        return osg::Matrixd(ori) * local2world;
+}
+
+
+/*******************************************/
+
+
+
+
+
+static PointCloudDecorator* s_pointCloud;
+
+static LabelControl* s_status;
+static LabelControl* s_frameTime;
+static LabelControl* s_videoTime;
+
+osg::Node::NodeMask MaskMapNode = 0x01;
+osg::Node::NodeMask MaskPointCloud = 0x02;
+
+struct PointSizeHandler : public ControlEventHandler
+{
+    PointSizeHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
+    void onValueChanged( Control* control, float value )
+    {        
+        _pointCloud->setPointSize(value);
+        OSG_NOTICE << "Point size " << value << std::endl;
+    }
+    osg::ref_ptr< PointCloudDecorator > _pointCloud;
+};
+
+struct MaxIntensityHandler : public ControlEventHandler
+{
+    MaxIntensityHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
+    void onValueChanged( Control* control, float value )
+    {        
+        _pointCloud->setMaxIntensity(value);
+        OSG_NOTICE << "Max Intensity " << value << std::endl;
+    }
+
+    osg::ref_ptr< PointCloudDecorator > _pointCloud;
+};
+
+struct MinHeightHandler : public ControlEventHandler
+{
+    MinHeightHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
+    void onValueChanged( Control* control, float value )
+    {        
+        _pointCloud->setMinHeight(value);
+        OSG_NOTICE << "Min Height " << value << std::endl;
+    }
+
+    osg::ref_ptr< PointCloudDecorator > _pointCloud;
+};
+
+//double fov = 66.0;
+double fov = 90.0;
+
+struct FOVHandler : public ControlEventHandler
+{
+    FOVHandler( )
+    {
+    }
+
+    void onValueChanged( Control* control, float value )
+    {        
+        fov = value;
+        OSG_NOTICE << "fov " << fov << std::endl;
+    }
+};
+
+struct UniformHandler : public ControlEventHandler
+{
+    UniformHandler(osg::Uniform* uniform ):
+_uniform(uniform)
+    {
+    }
+
+    void onValueChanged( Control* control, float value )
+    {                
+        _uniform->set(value);
+    }
+
+    osg::ref_ptr< osg::Uniform > _uniform;
+};
+
+
+
+struct MaxHeightHandler : public ControlEventHandler
+{
+    MaxHeightHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
+    void onValueChanged( Control* control, float value )
+    {        
+        _pointCloud->setMaxHeight(value);
+        OSG_NOTICE << "Max Height " << value << std::endl;
+    }
+
+    osg::ref_ptr< PointCloudDecorator > _pointCloud;
+};
+
+struct HazeDistanceHandler : public ControlEventHandler
+{
+    HazeDistanceHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
+    void onValueChanged( Control* control, float value )
+    {        
+        _pointCloud->setHazeDistance(value);
+        OSG_NOTICE << "Haze distance " << value << std::endl;
+    }
+
+    osg::ref_ptr< PointCloudDecorator > _pointCloud;
+};
+
+// http://resources.arcgis.com/en/help/main/10.1/index.html#//015w0000005q000000
+std::string classificationToString(unsigned short classification)
+{
+
+    switch (classification)
+    {
+    case 0:
+        return "Never classified";
+    case 1:
+        return "Unassigned";
+    case 2:
+        return "Ground";
+    case 3:
+        return "Low Vegetation";
+    case 4:
+        return "Medium Vegetation";
+    case 5:
+        return "High Vegetation";
+    case 6:
+        return "Building";
+    case 7:
+        return "Noise";
+    case 8:
+        return "Model Key";
+    case 9:
+        return "Water";
+    case 10:
+        return "Reserved for ASPRS Definition";
+    case 11:
+        return "Reserved for ASPRS Definition";
+    case 12:
+        return "Overlap";
+    default:
+        return "Reserved fro ASPRS Definition";
+    };
+}
+
+
+/**
+* Callback for when a point is identified.  Updates a label with info about the point.
+*/
+struct IdentifyCallback : public IdentifyPointHandler::Callback
+{
+    IdentifyCallback(LabelControl* label):
+_label(label)
+{
+}
+
+virtual void selected(const Point& point)
+{
+    // Assume the point is in geocentric
+    osgEarth::SpatialReference* wgs84 = osgEarth::SpatialReference::create("epsg:4326");
+    osgEarth::GeoPoint geoPoint;
+    geoPoint.fromWorld(wgs84, point.position);
+    LatLongFormatter formatter;
+    formatter.setPrecision(8);
+    std::stringstream buf;
+    buf << "Location: " << formatter.format(geoPoint) << ", " << geoPoint.z() << std::endl
+        << "Classification: " << classificationToString(point.classification) << std::endl
+        << "Intensity: " << point.intensity << std::endl
+        << "RGBA: " << (int)point.color.r() << ", " << (int)point.color.g() << ", " << (int)point.color.b() << ", " << (int)point.color.a() << std::endl
+        << "Return: " << (int)point.returnNumber << std::endl;
+
+    s_status->setText( buf.str() );     
+
+}
+
+virtual void reset()
+{
+    s_status->setText("");
+}
+
+LabelControl* _label;
+};
+
+struct P2PMeasureCallback : public P2PMeasureHandler::Callback
+{
+    virtual void distanceChanged(double distance)
+    {
+        std::stringstream buf;
+        buf << "Distance: " << distance << "m";
+        s_status->setText(buf.str());
+    }
+};
+
+struct ChangeColorModeHandler : public ControlEventHandler
+{
+    ChangeColorModeHandler(PointCloudDecorator::ColorMode colorMode):
+_colorMode(colorMode)
+{
+}
+
+void onClick(Control* control, int mouseButtonMask)
+{
+    s_pointCloud->setColorMode(_colorMode);
+}
+
+PointCloudDecorator::ColorMode _colorMode;
+};
+
+struct ToggleClassificationHandler : public ControlEventHandler
+{
+    ToggleClassificationHandler(unsigned char classification):
+_classification(classification)
+{
+}
+
+void onValueChanged(Control* control, bool value)
+{
+    s_pointCloud->setClassificationVisible(_classification, value);
+}
+
+unsigned char _classification;
+};
+
+struct AutoPointSizeHandler : public ControlEventHandler
+{
+    void onValueChanged(Control* control, bool value)
+    {
+        s_pointCloud->setAutoPointSize(!s_pointCloud->getAutoPointSize());
+    }
+};
+
+
+static const char *vertSource = 
+        "varying vec4 texCoord0;\n"   
+        "void main()"
+        "{\n"
+        "    texCoord0 = gl_MultiTexCoord0;\n"
+        "    gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * gl_Vertex;\n"
+        "\n"
+        "}\n";
+
+    static const char* fragSource =
+        "varying vec4 texCoord0;\n"   
+        "uniform sampler2D texture_unit;\n"
+        "uniform float opacity;\n"
+        "uniform float slider;\n"
+        "void main()"
+        "{\n"
+        "   vec4 color = texture2D(texture_unit, texCoord0.st);\n"
+        "   color.a = color.a * opacity;\n"
+        "   if (gl_FragCoord.x < slider) discard;\n"
+        "   gl_FragColor = color;\n"
+        "}\n";
+
+
+osg::Node* createVideoHUD(osg::Image* image, float alpha = 1.0)
+{
+    osg::Camera* hudCamera = new osg::Camera;
+    hudCamera->setReferenceFrame(osg::Transform::ABSOLUTE_RF);
+    hudCamera->setProjectionMatrix(osg::Matrix::ortho2D(0.0, 1.0, 0.0, 1.0));
+    hudCamera->setViewMatrix(osg::Matrix::identity());    
+    hudCamera->setClearMask(GL_DEPTH_BUFFER_BIT);
+
+    hudCamera->setRenderOrder(osg::Camera::NESTED_RENDER, -10);    
+    hudCamera->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+    hudCamera->getOrCreateStateSet()->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
+    hudCamera->getOrCreateStateSet()->setMode(GL_BLEND, osg::StateAttribute::ON);
+    osg::Depth* depth = new osg::Depth();
+    depth->setWriteMask(false);
+    hudCamera->getOrCreateStateSet()->setAttributeAndModes(depth);
+    hudCamera->setAllowEventFocus(false);
+
+    osg::Geometry* geometry = new osg::Geometry;
+    osg::Vec3Array* verts = new osg::Vec3Array;
+    geometry->setVertexArray(verts);
+    verts->push_back(osg::Vec3(0.0, 0.0, 0.0));
+    verts->push_back(osg::Vec3(1.0, 0.0, 0.0));
+    verts->push_back(osg::Vec3(1.0, 1.0, 0.0));
+    verts->push_back(osg::Vec3(0.0, 1.0, 0.0));
+
+    osg::Vec2Array* texCoords = new osg::Vec2Array;
+
+    bool flip = image->getOrigin()==osg::Image::TOP_LEFT;    
+    texCoords->push_back(osg::Vec2(0.0f, flip? 1.0f: 0.0f));
+    texCoords->push_back(osg::Vec2(1.0f, flip? 1.0f: 0.0f));
+    texCoords->push_back(osg::Vec2(1.0f, flip? 0.0f: 1.0f));
+    texCoords->push_back(osg::Vec2(0.0f, flip? 0.0f: 1.0f));
+    geometry->setTexCoordArray(0, texCoords);
+
+    osg::Vec4Array* colors = new osg::Vec4Array();
+    colors->push_back(osg::Vec4(1, 1, 1, alpha));
+    geometry->setColorArray(colors);
+    geometry->setColorBinding(osg::Geometry::BIND_OVERALL);
+
+    osg::Texture2D* texture = new osg::Texture2D(image);
+    texture->setResizeNonPowerOfTwoHint(false);
+    texture->setFilter(osg::Texture2D::MIN_FILTER, osg::Texture2D::LINEAR_MIPMAP_LINEAR);
+    texture->setFilter(osg::Texture2D::MAG_FILTER, osg::Texture2D::LINEAR);    
+    geometry->getOrCreateStateSet()->setTextureAttributeAndModes(0, texture, osg::StateAttribute::ON);
+
+    geometry->addPrimitiveSet(new osg::DrawArrays(GL_QUADS, 0, verts->size()));
+
+    osg::Program *program = new osg::Program;
+    program->addShader(new osg::Shader(osg::Shader::VERTEX, vertSource));
+    program->addShader(new osg::Shader(osg::Shader::FRAGMENT, fragSource));
+    geometry->getOrCreateStateSet()->setAttributeAndModes(program, osg::StateAttribute::ON);
+    geometry->getOrCreateStateSet()->addUniform(new osg::Uniform("texture_unit", 0));
+            
+    hudCamera->addChild( geometry );
+
+    return hudCamera;
+        
+}
+
+
+
+void buildControls(osgViewer::Viewer& viewer, osg::Group* root, osg::Node* videoNode)
+{
+    ControlCanvas* canvas = ControlCanvas::getOrCreate( &viewer );
+    VBox* container = canvas->addControl(new VBox());
+    container->setBackColor(Color(Color::Black,0.5));
+
+    // Point size
+    HBox* pointSizeBox = container->addControl(new HBox());
+    pointSizeBox->setChildVertAlign( Control::ALIGN_CENTER );
+    pointSizeBox->setChildSpacing( 10 );
+    pointSizeBox->setHorizFill( true );
+    pointSizeBox->addControl( new LabelControl("Point Size:", 16) );
+
+    HSliderControl* pointSlider = pointSizeBox->addControl(new HSliderControl(1.0, 10.0f, 1.0f));
+    pointSlider->setBackColor( Color::Gray );
+    pointSlider->setHeight( 12 );
+    pointSlider->setHorizFill( true, 200 );
+    pointSlider->addEventHandler( new PointSizeHandler(s_pointCloud));   
+
+    // Max Intensity
+    HBox* maxIntensityBox = container->addControl(new HBox());
+    maxIntensityBox->setChildVertAlign( Control::ALIGN_CENTER );
+    maxIntensityBox->setChildSpacing( 10 );
+    maxIntensityBox->setHorizFill( true );
+    maxIntensityBox->addControl( new LabelControl("Max Intensity:", 16) );
+
+    //HSliderControl* intensitySlider = maxIntensityBox->addControl(new HSliderControl(0.0f, USHRT_MAX, s_pointCloud->getMaxIntensity()));
+    HSliderControl* intensitySlider = maxIntensityBox->addControl(new HSliderControl(0.0f, 255.0, 255.0));
+    intensitySlider->setBackColor( Color::Gray );
+    intensitySlider->setHeight( 12 );
+    intensitySlider->setHorizFill( true, 200 );
+    intensitySlider->addEventHandler( new MaxIntensityHandler(s_pointCloud));   
+
+    // Min Height
+    HBox* minHeightBox = container->addControl(new HBox());
+    minHeightBox->setChildVertAlign( Control::ALIGN_CENTER );
+    minHeightBox->setChildSpacing( 10 );
+    minHeightBox->setHorizFill( true );
+    minHeightBox->addControl( new LabelControl("Min Height:", 16) );
+
+    HSliderControl* minHeightSlider = minHeightBox->addControl(new HSliderControl(0.0f, 30.0, s_pointCloud->getMinHeight()));
+    minHeightSlider->setBackColor( Color::Gray );
+    minHeightSlider->setHeight( 12 );
+    minHeightSlider->setHorizFill( true, 200 );
+    minHeightSlider->addEventHandler( new MinHeightHandler(s_pointCloud));   
+
+    // Max Height
+    HBox* maxHeightBox = container->addControl(new HBox());
+    maxHeightBox->setChildVertAlign( Control::ALIGN_CENTER );
+    maxHeightBox->setChildSpacing( 10 );
+    maxHeightBox->setHorizFill( true );
+    maxHeightBox->addControl( new LabelControl("Max Height:", 16) );
+
+    HSliderControl* maxHeightSlider = maxHeightBox->addControl(new HSliderControl(0.0f, 100.0, 100.0));
+    maxHeightSlider->setBackColor( Color::Gray );
+    maxHeightSlider->setHeight( 12 );
+    maxHeightSlider->setHorizFill( true, 200 );
+    maxHeightSlider->addEventHandler( new MaxHeightHandler(s_pointCloud));   
+
+    // video slider
+    HBox* sliderBox = container->addControl(new HBox());
+    sliderBox->setChildVertAlign( Control::ALIGN_CENTER );
+    sliderBox->setChildSpacing( 10 );
+    sliderBox->setHorizFill( true );
+    sliderBox->addControl( new LabelControl("Video Slider:", 16) );
+
+    HSliderControl* sliderSlider = sliderBox->addControl(new HSliderControl(0.0, 1280.0, 0.0));
+    sliderSlider->setBackColor( Color::Gray );
+    sliderSlider->setHeight( 12 );
+    sliderSlider->setHorizFill( true, 200 );
+    sliderSlider->addEventHandler( new UniformHandler(videoNode->getOrCreateStateSet()->getOrCreateUniform("slider", osg::Uniform::FLOAT)));   
+
+
+    // video opacity
+    HBox* alphaBox = container->addControl(new HBox());
+    alphaBox->setChildVertAlign( Control::ALIGN_CENTER );
+    alphaBox->setChildSpacing( 10 );
+    alphaBox->setHorizFill( true );
+    alphaBox->addControl( new LabelControl("Video Opacity:", 16) );
+
+    HSliderControl* alphaSlider = alphaBox->addControl(new HSliderControl(0.0, 1.0, 1.0));
+    alphaSlider->setBackColor( Color::Gray );
+    alphaSlider->setHeight( 12 );
+    alphaSlider->setHorizFill( true, 200 );
+    alphaSlider->addEventHandler( new UniformHandler(videoNode->getOrCreateStateSet()->getOrCreateUniform("opacity", osg::Uniform::FLOAT)));       
+
+
+#if 1
+    // fov
+    HBox* fovBox = container->addControl(new HBox());
+    fovBox->setChildVertAlign( Control::ALIGN_CENTER );
+    fovBox->setChildSpacing( 10 );
+    fovBox->setHorizFill( true );
+    fovBox->addControl( new LabelControl("FOV:", 16) );
+
+    HSliderControl* fovSlider = fovBox->addControl(new HSliderControl(0.0, 180.0, 60.0));
+    fovSlider->setBackColor( Color::Gray );
+    fovSlider->setHeight( 12 );
+    fovSlider->setHorizFill( true, 200 );
+    fovSlider->addEventHandler( new FOVHandler());   
+#endif
+
+    // Haze distance
+    HBox* hazeBox = container->addControl(new HBox());
+    hazeBox->setChildVertAlign( Control::ALIGN_CENTER );
+    hazeBox->setChildSpacing( 10 );
+    hazeBox->setHorizFill( true );
+    hazeBox->addControl( new LabelControl("Haze Distance:", 16) );
+
+    HSliderControl* hazeSlider = hazeBox->addControl(new HSliderControl(0.0f, 10000.0, 5000.0f));
+    hazeSlider->setBackColor( Color::Gray );
+    hazeSlider->setHeight( 12 );
+    hazeSlider->setHorizFill( true, 200 );
+    hazeSlider->addEventHandler( new HazeDistanceHandler(s_pointCloud));   
+
+
+
+
+    // Color mode
+    Grid* toolbar = new Grid();    
+    toolbar->setAbsorbEvents( true );    
+
+    LabelControl* rgb = new LabelControl("RGB");
+    rgb->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::RGB));
+    toolbar->setControl(0, 0, rgb);
+
+    LabelControl* intensity = new LabelControl("Intensity");
+    intensity->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Intensity));
+    toolbar->setControl(1, 0, intensity);
+
+    LabelControl* classifiction = new LabelControl("Classification");
+    classifiction->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Classification));
+    toolbar->setControl(2, 0, classifiction);   
+
+    LabelControl* height = new LabelControl("Height");
+    height->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Height));
+    toolbar->setControl(3, 0, height);   
+
+    LabelControl* ramp = new LabelControl("Ramp");
+    ramp->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Ramp));
+    toolbar->setControl(4, 0, ramp);   
+
+    container->addChild(toolbar);
+
+    HBox* box = container->addControl(new HBox());
+    CheckBoxControl* vegToggle = box->addControl(new CheckBoxControl(true));
+    vegToggle->addEventHandler(new ToggleClassificationHandler(3));
+    vegToggle->addEventHandler(new ToggleClassificationHandler(4));
+    vegToggle->addEventHandler(new ToggleClassificationHandler(5));
+    box->addControl(new LabelControl("Vegetation"));
+
+    box = container->addControl(new HBox());
+    CheckBoxControl* buildingToggle = box->addControl(new CheckBoxControl(true));
+    buildingToggle->addEventHandler(new ToggleClassificationHandler(6));
+    box->addControl(new LabelControl("Buildings"));
+
+    box = container->addControl(new HBox());
+    CheckBoxControl* groundToggle = box->addControl(new CheckBoxControl(true));
+    groundToggle->addEventHandler(new ToggleClassificationHandler(2));
+    box->addControl(new LabelControl("Ground"));
+
+    box = container->addControl(new HBox());
+    CheckBoxControl* autoPointSizeToggle = box->addControl(new CheckBoxControl(s_pointCloud->getAutoPointSize()));
+    autoPointSizeToggle->addEventHandler(new AutoPointSizeHandler());
+    box->addControl(new LabelControl("Auto Point Size"));
+
+    // Add a status label
+    s_status = container->addControl(new LabelControl());
+
+    s_videoTime = container->addControl(new LabelControl());
+    s_frameTime = container->addControl(new LabelControl());
+
+    //root->addChild(canvas);
+}
+
+struct APHandler : public osgGA::GUIEventHandler 
+{
+    APHandler( osgGA::AnimationPathManipulator* manip, osg::ImageStream* video) : _manip(manip),_video(video) { }
+
+    bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
+    {
+        double delta = 0.25;
+        if ( ea.getEventType() == ea.KEYDOWN && ea.getKey() == 'o' )
+        {
+            _manip->setTimeOffset(_manip->getTimeOffset() + delta);
+            OSG_NOTICE << "timeoffset=" << _manip->getTimeOffset() << std::endl;
+        }
+        else if ( ea.getEventType() == ea.KEYDOWN && ea.getKey() == 'O' )
+        {
+            _manip->setTimeOffset(_manip->getTimeOffset() - delta);
+            OSG_NOTICE << "timeoffset=" << _manip->getTimeOffset() << std::endl;
+        }
+        else if ( ea.getEventType() == ea.KEYDOWN && ea.getKey() == 'p' )
+        {
+            if (_video->getStatus() == osg::ImageStream::PAUSED)
+            {
+                _video->play();
+            }
+            else
+            {
+                _video->pause();
+            }
+        }
+        return false;
+    }
+
+    osg::observer_ptr<osgGA::AnimationPathManipulator> _manip;
+    osg::observer_ptr< osg::ImageStream > _video;
+};
+
+
+int main(int argc, char** argv)
+{    
+    osg::ArgumentParser arguments(&argc,argv);
+
+    osgViewer::Viewer viewer(arguments);    
+
+    //viewer.setCameraManipulator( new EarthManipulator());
+
+    osg::Group* root = new osg::Group;
+
+    osg::Node* loaded = osgEarth::Util::MapNodeHelper().load(arguments, &viewer);//osgDB::readNodeFiles(arguments);
+    root->addChild(loaded);
+
+    osg::ref_ptr< MapNode > mapNode = MapNode::findMapNode(loaded);
+    mapNode->getTerrainEngine()->setNodeMask(MaskMapNode);
+    mapNode->getModelLayerGroup()->setNodeMask(MaskPointCloud);
+
+    s_pointCloud = osgEarth::findTopMostNodeOfType<PointCloudDecorator>(loaded);
+    if (!s_pointCloud)
+    {
+        OSG_NOTICE << "Cannot find point cloud" << std::endl;
+        return 1;
+    }    
+
+    s_pointCloud->getOrCreateStateSet()->setRenderBinDetails(99999, "RenderBin");
+
+    // Set the color ramp to use for.
+    osg::Texture2D* colorRamp = new osg::Texture2D(osgDB::readImageFile("d:/dev/juniper/data/iron_gradient.png"));
+    colorRamp->setResizeNonPowerOfTwoHint(false);
+    colorRamp->setWrap( osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE );
+    colorRamp->setWrap( osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE );
+
+    s_pointCloud->setColorRamp(colorRamp);
+
+    // any option left unread are converted into errors to write out later.
+    arguments.reportRemainingOptionsAsUnrecognized();
+
+#if 1
+    osg::ref_ptr< osg::ImageStream > video = dynamic_cast< osg::ImageStream*>(osgDB::readImageFile("D:/geodata/NorthrupGruman/video/20160908_1223._16-056-01-HH1O_s2_APHillWires.mp4.ffmpeg"));
+    //osg::ref_ptr< osg::ImageStream > video = dynamic_cast< osg::ImageStream*>(osgDB::readImageFile("D:/geodata/NorthrupGruman/video/20160908_1223._16-056-01-HH1O_s2_APHillWires.wmv.ffmpeg"));
+    osg::Node* videoNode = 0;
+    if (video.valid())
+    {
+        OSG_NOTICE << "Loaded video length=" << video->getLength() << std::endl;        
+        videoNode = createVideoHUD(video, 0.5f);
+        root->addChild( videoNode );
+    }
+
+    videoNode->getOrCreateStateSet()->getOrCreateUniform("opacity", osg::Uniform::FLOAT)->set(1.0f);
+    videoNode->getOrCreateStateSet()->getOrCreateUniform("slider", osg::Uniform::FLOAT)->set(0.0f);
+
+#endif
+
+
+
+    buildControls(viewer, root, videoNode);
+
+    bool measure = arguments.read("--measure");    
+
+    if (measure)
+    {
+        OSG_NOTICE << "measuring" << std::endl;
+    }
+    else
+    {
+        OSG_NOTICE << "identifying" << std::endl;
+    }
+    if (!measure)
+    {        
+        IdentifyPointHandler* identify = new IdentifyPointHandler();
+        identify->addCallback( new IdentifyCallback(s_status));
+        identify->setNodeMask(MaskPointCloud);
+        viewer.addEventHandler(identify);          
+    }
+    else
+    {
+        P2PMeasureHandler* measure = new P2PMeasureHandler(root);
+        measure->addCallback(new P2PMeasureCallback());
+        measure->setNodeMask(MaskPointCloud);
+        viewer.addEventHandler(measure);
+    }
+
+    viewer.addEventHandler(new osgViewer::StatsHandler());
+    viewer.addEventHandler(new osgViewer::WindowSizeHandler());
+    viewer.addEventHandler(new osgViewer::ThreadingHandler());
+    viewer.addEventHandler(new osgViewer::LODScaleHandler());
+    viewer.addEventHandler(new osgGA::StateSetManipulator(viewer.getCamera()->getOrCreateStateSet()));
+    viewer.addEventHandler(new osgViewer::RecordCameraPathHandler());
+    
+
+    viewer.getCamera()->setNearFarRatio(0.00002);
+
+
+    // Read INS camera path.
+    INSReadings readings;
+    osg::Timer_t startTime = osg::Timer::instance()->tick();
+    //INSReader::read("D:/geodata/NorthrupGruman/video/16-056-01-HA1O-Sessn002_INSdata/INShistory.csv", readings);
+    INSReader::read("D:/geodata/NorthrupGruman/INS Data New/16-056-01-HA1O-Sessn002_INSdata/INShistory.csv", readings);
+    osg::Timer_t stopTime = osg::Timer::instance()->tick();
+    OE_NOTICE << "Read " << readings.size() << " INS readings in " << osg::Timer::instance()->delta_s(startTime, stopTime) << std::endl;
+    root->addChild(makeINSNode(readings));
+
+    /*
+
+    osgEarth::GeoTransform* xform = new osgEarth::GeoTransform();
+    xform->setPosition( osgEarth::GeoPoint(mapNode->getMapSRS(), -77.4483,  37.9965, 0, ALTMODE_ABSOLUTE) );
+    xform->addChild( osgDB::readNodeFile("cow.osg.500,500,500.scale"));
+    root->addChild( xform );
+    */
+
+
+    // Load Neptic lidar
+    //osg::Group* neptecGroup = new osg::Group;
+    /*
+    root->addChild(loadSession("D:/geodata/NorthrupGruman/neptec_lidar/3", 50));
+    root->addChild(loadSession("D:/geodata/NorthrupGruman/neptec_lidar/1/", 2000));
+    */
+
+    /*
+    GeoPointList points;
+    loadNeptecLidar("J:/fdp2/DVE-M_01450_2016_09_09_18_23_07_7.csv", points);
+    OE_NOTICE << "Read " << points.size() << " points from csv" << std::endl;
+    //writeLLA("J:/fdp2/DVE-M_01450_2016_09_09_18_23_07_7.lla", points);
+    GeoPointList points2;
+    readLLA("J:/fdp2/DVE-M_01450_2016_09_09_18_23_07_7.lla", points2);
+    OE_NOTICE << "Read " << points2.size() << "points from lla" << std::endl;
+    root->addChild(makeNepticNode(points2, osg::Vec4(1,1,1,1)));
+    */
+
+    // Convert a folder of csv files to lla.
+    //convertCSVtoLLA("J:/fdp1");
+    //convertCSVtoLLA("J:/fdp3");
+    //convertCSVtoLLA("J:/fdp4");
+    //return 0;
+
+    /*
+    GeoPointList points;
+    readLLA("J:/fdp2/DVE-M_01450_2016_09_09_18_23_07_7.lla", points);
+    OE_NOTICE << "Read " << points.size() << "points from lla" << std::endl;
+    */
+
+    //root->addChild(loadSessionLLA("J:/fdp1", UINT_MAX));
+    //root->addChild(loadSessionLLAFull("J:/fdp2", UINT_MAX));
+
+
+    //s_pointCloud->setNodeMask(0);
+    //mapNode->getTerrainEngine()->setNodeMask(0);
+   
+
+    
+
+   
+    // Animate...    
+    osg::AnimationPath* path = createPath( readings, mapNode);
+    osgGA::AnimationPathManipulator* apm = new osgGA::AnimationPathManipulator( path );
+    viewer.setCameraManipulator( apm );    
+
+    viewer.addEventHandler(new APHandler(apm, video));
+
+    viewer.setSceneData( root );
+
+    
+    viewer.getCamera()->setProjectionResizePolicy(osg::Camera::FIXED);
+
+    video->play();
+    while (!viewer.done())
+    {
+        double frameTime = simulationStart + viewer.getFrameStamp()->getReferenceTime();
+        double videoTime = simulationStart + video->getCurrentTime();
+        s_frameTime->setText("Frame time " + osgEarth::prettyPrintTime(frameTime));
+        s_videoTime->setText("Video time " + osgEarth::prettyPrintTime(videoTime));
+        //OE_NOTICE << "Frame time " << viewer.getFrameStamp()->getReferenceTime() << std::endl;
+        //OE_NOTICE << "Video time " << video->getCurrentTime() << std::endl;
+        if (osg::absolute(video->getCurrentTime() - viewer.getFrameStamp()->getReferenceTime()) > 1.0)
+        {
+            video->seek(viewer.getFrameStamp()->getReferenceTime());
+            OE_NOTICE << "Seeking to " << viewer.getFrameStamp()->getReferenceTime() << std::endl;
+        }        
+
+        double fovy, ar, znear, zfar;
+        viewer.getCamera()->getProjectionMatrixAsPerspective( fovy, ar, znear, zfar );        
+        viewer.getCamera()->setProjectionMatrixAsPerspective( fov, ar, znear, zfar );         
+
+        float hfov = osg::RadiansToDegrees(2.0 * atan( tan((osg::DegreesToRadians(fov) / 2.0) * ar) ));
+
+        /*
+        OE_NOTICE << "fov=" << fov << std::endl;
+        OE_NOTICE << "ar=" << ar << std::endl;
+        OE_NOTICE << "hfov=" << hfov << std::endl;
+        */
+
+        viewer.frame();
+    }
+}
