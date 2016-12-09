@@ -478,9 +478,7 @@ osg::AnimationPath* createPath( INSReadings& readings, osgEarth::MapNode* mapNod
 
     ElevationQuery   query(mapNode->getMap());
     for (INSReadings::iterator itr = readings.begin(); itr != readings.end(); ++itr)
-    {
-        
-
+    {       
         osgEarth::GeoPoint map(wgs84, osg::RadiansToDegrees(itr->_lonRadians), osg::RadiansToDegrees(itr->_latRadians), itr->_alt);
         double elevation;
         //query.getElevation(map, elevation);
@@ -1121,14 +1119,16 @@ struct APHandler : public osgGA::GUIEventHandler
     osg::observer_ptr< osg::ImageStream > _video;
 };
 
-
 int main(int argc, char** argv)
 {    
     osg::ArgumentParser arguments(&argc,argv);
 
     osgViewer::Viewer viewer(arguments);    
 
-    //viewer.setCameraManipulator( new EarthManipulator());
+    // Turn on incremental compile operation 
+    viewer.setIncrementalCompileOperation(new osgUtil::IncrementalCompileOperation());
+
+    viewer.setCameraManipulator( new EarthManipulator());
 
     osg::Group* root = new osg::Group;
 
@@ -1148,20 +1148,29 @@ int main(int argc, char** argv)
 
     s_pointCloud->getOrCreateStateSet()->setRenderBinDetails(99999, "RenderBin");
 
-    // Set the color ramp to use for.
-    osg::Texture2D* colorRamp = new osg::Texture2D(osgDB::readImageFile("d:/dev/juniper/data/iron_gradient.png"));
+    // Load the color ramp gradient.
+    std::string gradient = "data/iron_gradient.png";
+    arguments.read("--gradient", gradient);
+    osg::Texture2D* colorRamp = new osg::Texture2D(osgDB::readImageFile(gradient));
     colorRamp->setResizeNonPowerOfTwoHint(false);
     colorRamp->setWrap( osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE );
     colorRamp->setWrap( osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE );
-
     s_pointCloud->setColorRamp(colorRamp);
+    s_pointCloud->setColorMode(PointCloudDecorator::Ramp);
 
     // any option left unread are converted into errors to write out later.
     arguments.reportRemainingOptionsAsUnrecognized();
 
-#if 1
-    osg::ref_ptr< osg::ImageStream > video = dynamic_cast< osg::ImageStream*>(osgDB::readImageFile("D:/geodata/NorthrupGruman/video/20160908_1223._16-056-01-HH1O_s2_APHillWires.mp4.ffmpeg"));
-    //osg::ref_ptr< osg::ImageStream > video = dynamic_cast< osg::ImageStream*>(osgDB::readImageFile("D:/geodata/NorthrupGruman/video/20160908_1223._16-056-01-HH1O_s2_APHillWires.wmv.ffmpeg"));
+    // Preload the ffmpeg plugin.
+    std::string ffmpegLib = osgDB::Registry::instance()->createLibraryNameForExtension( "ffmpeg" );
+    if ( !ffmpegLib.empty() )
+        osgDB::Registry::instance()->loadLibrary( ffmpegLib );    
+
+    // Load the video file.
+    std::string videoFile = "video/20160908_1223._16-056-01-HH1O_s2_APHillWires.mp4";
+    arguments.read("--video", videoFile);
+
+    osg::ref_ptr< osg::ImageStream > video = dynamic_cast< osg::ImageStream*>(osgDB::readImageFile(videoFile));
     osg::Node* videoNode = 0;
     if (video.valid())
     {
@@ -1173,83 +1182,34 @@ int main(int argc, char** argv)
     videoNode->getOrCreateStateSet()->getOrCreateUniform("opacity", osg::Uniform::FLOAT)->set(1.0f);
     videoNode->getOrCreateStateSet()->getOrCreateUniform("slider", osg::Uniform::FLOAT)->set(0.0f);
 
-#endif
-
-
-
     buildControls(viewer, root, videoNode);
-
-    bool measure = arguments.read("--measure");    
-
-    if (measure)
-    {
-        OSG_NOTICE << "measuring" << std::endl;
-    }
-    else
-    {
-        OSG_NOTICE << "identifying" << std::endl;
-    }
-    if (!measure)
-    {        
-        IdentifyPointHandler* identify = new IdentifyPointHandler();
-        identify->addCallback( new IdentifyCallback(s_status));
-        identify->setNodeMask(MaskPointCloud);
-        viewer.addEventHandler(identify);          
-    }
-    else
-    {
-        P2PMeasureHandler* measure = new P2PMeasureHandler(root);
-        measure->addCallback(new P2PMeasureCallback());
-        measure->setNodeMask(MaskPointCloud);
-        viewer.addEventHandler(measure);
-    }
 
     viewer.addEventHandler(new osgViewer::StatsHandler());
     viewer.addEventHandler(new osgViewer::WindowSizeHandler());
-    viewer.addEventHandler(new osgViewer::ThreadingHandler());
     viewer.addEventHandler(new osgViewer::LODScaleHandler());
     viewer.addEventHandler(new osgGA::StateSetManipulator(viewer.getCamera()->getOrCreateStateSet()));
-    viewer.addEventHandler(new osgViewer::RecordCameraPathHandler());
-    
+   
 
     viewer.getCamera()->setNearFarRatio(0.00002);
 
 
     // Read INS camera path.
+    std::string insFile = "INS Data New/16-056-01-HA1O-Sessn002_INSdata/INShistory.csv";
+    arguments.read("--ins", insFile);   
     INSReadings readings;
     osg::Timer_t startTime = osg::Timer::instance()->tick();
-    //INSReader::read("D:/geodata/NorthrupGruman/video/16-056-01-HA1O-Sessn002_INSdata/INShistory.csv", readings);
-    INSReader::read("D:/geodata/NorthrupGruman/INS Data New/16-056-01-HA1O-Sessn002_INSdata/INShistory.csv", readings);
+    INSReader::read(insFile, readings);
     osg::Timer_t stopTime = osg::Timer::instance()->tick();
     OE_NOTICE << "Read " << readings.size() << " INS readings in " << osg::Timer::instance()->delta_s(startTime, stopTime) << std::endl;
     root->addChild(makeINSNode(readings));
 
-    /*
-
-    osgEarth::GeoTransform* xform = new osgEarth::GeoTransform();
-    xform->setPosition( osgEarth::GeoPoint(mapNode->getMapSRS(), -77.4483,  37.9965, 0, ALTMODE_ABSOLUTE) );
-    xform->addChild( osgDB::readNodeFile("cow.osg.500,500,500.scale"));
-    root->addChild( xform );
-    */
-
-
-    // Load Neptic lidar
-    //osg::Group* neptecGroup = new osg::Group;
-    /*
-    root->addChild(loadSession("D:/geodata/NorthrupGruman/neptec_lidar/3", 50));
-    root->addChild(loadSession("D:/geodata/NorthrupGruman/neptec_lidar/1/", 2000));
-    */
-
-    /*
-    GeoPointList points;
-    loadNeptecLidar("J:/fdp2/DVE-M_01450_2016_09_09_18_23_07_7.csv", points);
-    OE_NOTICE << "Read " << points.size() << " points from csv" << std::endl;
-    //writeLLA("J:/fdp2/DVE-M_01450_2016_09_09_18_23_07_7.lla", points);
-    GeoPointList points2;
-    readLLA("J:/fdp2/DVE-M_01450_2016_09_09_18_23_07_7.lla", points2);
-    OE_NOTICE << "Read " << points2.size() << "points from lla" << std::endl;
-    root->addChild(makeNepticNode(points2, osg::Vec4(1,1,1,1)));
-    */
+    // Load directories full of the neptec lidar series.
+    std::string neptec;
+    while (arguments.read("--neptec", neptec))
+    {
+        OSG_NOTICE << "Loading neptec lidar directory " << neptec << std::endl;
+        root->addChild(loadSessionLLA(neptec, UINT_MAX));
+    }
 
     // Convert a folder of csv files to lla.
     //convertCSVtoLLA("J:/fdp1");
@@ -1257,61 +1217,39 @@ int main(int argc, char** argv)
     //convertCSVtoLLA("J:/fdp4");
     //return 0;
 
-    /*
-    GeoPointList points;
-    readLLA("J:/fdp2/DVE-M_01450_2016_09_09_18_23_07_7.lla", points);
-    OE_NOTICE << "Read " << points.size() << "points from lla" << std::endl;
-    */
-
-    //root->addChild(loadSessionLLA("J:/fdp1", UINT_MAX));
-    //root->addChild(loadSessionLLAFull("J:/fdp2", UINT_MAX));
-
-
-    //s_pointCloud->setNodeMask(0);
-    //mapNode->getTerrainEngine()->setNodeMask(0);
-   
-
-    
-
-   
-    // Animate...    
-    osg::AnimationPath* path = createPath( readings, mapNode);
-    osgGA::AnimationPathManipulator* apm = new osgGA::AnimationPathManipulator( path );
-    viewer.setCameraManipulator( apm );    
-
-    viewer.addEventHandler(new APHandler(apm, video));
+    // Animation path if we loaded some INS data.
+    if (readings.size() > 0)
+    {
+        osg::AnimationPath* path = createPath( readings, mapNode);
+        osgGA::AnimationPathManipulator* apm = new osgGA::AnimationPathManipulator( path );
+        viewer.setCameraManipulator( apm );    
+    }    
 
     viewer.setSceneData( root );
 
-    
     viewer.getCamera()->setProjectionResizePolicy(osg::Camera::FIXED);
 
-    video->play();
+    if (video)
+    {
+        video->play();
+    }
     while (!viewer.done())
     {
         double frameTime = simulationStart + viewer.getFrameStamp()->getReferenceTime();
-        double videoTime = simulationStart + video->getCurrentTime();
         s_frameTime->setText("Frame time " + osgEarth::prettyPrintTime(frameTime));
-        s_videoTime->setText("Video time " + osgEarth::prettyPrintTime(videoTime));
-        //OE_NOTICE << "Frame time " << viewer.getFrameStamp()->getReferenceTime() << std::endl;
-        //OE_NOTICE << "Video time " << video->getCurrentTime() << std::endl;
-        if (osg::absolute(video->getCurrentTime() - viewer.getFrameStamp()->getReferenceTime()) > 1.0)
+        if (video)
         {
-            video->seek(viewer.getFrameStamp()->getReferenceTime());
-            OE_NOTICE << "Seeking to " << viewer.getFrameStamp()->getReferenceTime() << std::endl;
-        }        
-
+            double videoTime = simulationStart + video->getCurrentTime();        
+            s_videoTime->setText("Video time " + osgEarth::prettyPrintTime(videoTime));
+            if (osg::absolute(video->getCurrentTime() - viewer.getFrameStamp()->getReferenceTime()) > 1.0)
+            {
+                video->seek(viewer.getFrameStamp()->getReferenceTime());
+                OE_NOTICE << "Seeking to " << viewer.getFrameStamp()->getReferenceTime() << std::endl;
+            }        
+        }
         double fovy, ar, znear, zfar;
         viewer.getCamera()->getProjectionMatrixAsPerspective( fovy, ar, znear, zfar );        
         viewer.getCamera()->setProjectionMatrixAsPerspective( fov, ar, znear, zfar );         
-
-        float hfov = osg::RadiansToDegrees(2.0 * atan( tan((osg::DegreesToRadians(fov) / 2.0) * ar) ));
-
-        /*
-        OE_NOTICE << "fov=" << fov << std::endl;
-        OE_NOTICE << "ar=" << ar << std::endl;
-        OE_NOTICE << "hfov=" << hfov << std::endl;
-        */
 
         viewer.frame();
     }
