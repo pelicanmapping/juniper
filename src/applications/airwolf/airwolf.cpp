@@ -360,7 +360,7 @@ osg::Sequence* loadSession(const std::string& neptecDir, unsigned int maxFiles)
     return neptecGroup;    
 }
 
-osg::Node* loadSessionLLA(const std::string& neptecDir, unsigned int maxFiles)
+osg::Node* loadSessionLLA(const std::string& neptecDir, unsigned int maxFiles, double timePerFrame)
 {
     unsigned int numRead = 0;
     osg::Sequence* neptecGroup = new osg::Sequence();
@@ -397,7 +397,7 @@ osg::Node* loadSessionLLA(const std::string& neptecDir, unsigned int maxFiles)
         {
             OE_NOTICE << "Read " << neptecPoints.size() << std::endl;
             neptecGroup->addChild(makeNepticNode(neptecPoints, osg::Vec4(1,0,1,1)));        
-            neptecGroup->setTime(neptecGroup->getNumChildren()-1, 0.01);            
+            neptecGroup->setTime(neptecGroup->getNumChildren()-1, timePerFrame);            
             numRead++;
             if (numRead == maxFiles)
             {
@@ -1006,6 +1006,7 @@ usage( const std::string& msg )
         << "    --lodScale                          ; The lod scale to start with" << std::endl        
         << "    --gradient                          ; The gradient texture to load" << std::endl        
         << "    --neptec                            ; Load a directory of neptec lla files" << std::endl        
+        << "    --neptecFrameTime                   ; The time in seconds to display each neptec lidar frame" << std::endl
         << "    map.earth" << std::endl
         << std::endl;
 
@@ -1116,12 +1117,15 @@ int main(int argc, char** argv)
         root->addChild(makeINSNode(readings));
     }
 
+    double neptecFrameTime = 0.1;
+    arguments.read("--neptecFrameTime", neptecFrameTime);
+
     // Load directories full of the neptec lidar series.
     std::string neptec;
     while (arguments.read("--neptec", neptec))
     {
         OSG_NOTICE << "Loading neptec lidar directory " << neptec << std::endl;
-        root->addChild(loadSessionLLA(neptec, UINT_MAX));
+        root->addChild(loadSessionLLA(neptec, UINT_MAX, neptecFrameTime));
     }
 
     // any option left unread are converted into errors to write out later.
