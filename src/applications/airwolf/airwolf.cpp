@@ -812,58 +812,61 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root, osg::Node* video
     VBox* container = canvas->addControl(new VBox());
     container->setBackColor(Color(Color::Black,0.5));
 
-    // Point size
-    HBox* pointSizeBox = container->addControl(new HBox());
-    pointSizeBox->setChildVertAlign( Control::ALIGN_CENTER );
-    pointSizeBox->setChildSpacing( 10 );
-    pointSizeBox->setHorizFill( true );
-    pointSizeBox->addControl( new LabelControl("Point Size:", 16) );
+    if (s_pointCloud)
+    {
+        // Point size
+        HBox* pointSizeBox = container->addControl(new HBox());
+        pointSizeBox->setChildVertAlign( Control::ALIGN_CENTER );
+        pointSizeBox->setChildSpacing( 10 );
+        pointSizeBox->setHorizFill( true );
+        pointSizeBox->addControl( new LabelControl("Point Size:", 16) );
 
-    HSliderControl* pointSlider = pointSizeBox->addControl(new HSliderControl(1.0, 10.0f, 1.0f));
-    pointSlider->setBackColor( Color::Gray );
-    pointSlider->setHeight( 12 );
-    pointSlider->setHorizFill( true, 200 );
-    pointSlider->addEventHandler( new PointSizeHandler(s_pointCloud));   
+        HSliderControl* pointSlider = pointSizeBox->addControl(new HSliderControl(1.0, 10.0f, 1.0f));
+        pointSlider->setBackColor( Color::Gray );
+        pointSlider->setHeight( 12 );
+        pointSlider->setHorizFill( true, 200 );
+        pointSlider->addEventHandler( new PointSizeHandler(s_pointCloud));   
 
-    // Max Intensity
-    HBox* maxIntensityBox = container->addControl(new HBox());
-    maxIntensityBox->setChildVertAlign( Control::ALIGN_CENTER );
-    maxIntensityBox->setChildSpacing( 10 );
-    maxIntensityBox->setHorizFill( true );
-    maxIntensityBox->addControl( new LabelControl("Max Intensity:", 16) );
+        // Max Intensity
+        HBox* maxIntensityBox = container->addControl(new HBox());
+        maxIntensityBox->setChildVertAlign( Control::ALIGN_CENTER );
+        maxIntensityBox->setChildSpacing( 10 );
+        maxIntensityBox->setHorizFill( true );
+        maxIntensityBox->addControl( new LabelControl("Max Intensity:", 16) );
 
-    //HSliderControl* intensitySlider = maxIntensityBox->addControl(new HSliderControl(0.0f, USHRT_MAX, s_pointCloud->getMaxIntensity()));
-    HSliderControl* intensitySlider = maxIntensityBox->addControl(new HSliderControl(0.0f, 255.0, 255.0));
-    intensitySlider->setBackColor( Color::Gray );
-    intensitySlider->setHeight( 12 );
-    intensitySlider->setHorizFill( true, 200 );
-    intensitySlider->addEventHandler( new MaxIntensityHandler(s_pointCloud));   
+        //HSliderControl* intensitySlider = maxIntensityBox->addControl(new HSliderControl(0.0f, USHRT_MAX, s_pointCloud->getMaxIntensity()));
+        HSliderControl* intensitySlider = maxIntensityBox->addControl(new HSliderControl(0.0f, 255.0, 255.0));
+        intensitySlider->setBackColor( Color::Gray );
+        intensitySlider->setHeight( 12 );
+        intensitySlider->setHorizFill( true, 200 );
+        intensitySlider->addEventHandler( new MaxIntensityHandler(s_pointCloud));   
 
-    // Min Height
-    HBox* minHeightBox = container->addControl(new HBox());
-    minHeightBox->setChildVertAlign( Control::ALIGN_CENTER );
-    minHeightBox->setChildSpacing( 10 );
-    minHeightBox->setHorizFill( true );
-    minHeightBox->addControl( new LabelControl("Min Height:", 16) );
+        // Min Height
+        HBox* minHeightBox = container->addControl(new HBox());
+        minHeightBox->setChildVertAlign( Control::ALIGN_CENTER );
+        minHeightBox->setChildSpacing( 10 );
+        minHeightBox->setHorizFill( true );
+        minHeightBox->addControl( new LabelControl("Min Height:", 16) );
 
-    HSliderControl* minHeightSlider = minHeightBox->addControl(new HSliderControl(0.0f, 30.0, s_pointCloud->getMinHeight()));
-    minHeightSlider->setBackColor( Color::Gray );
-    minHeightSlider->setHeight( 12 );
-    minHeightSlider->setHorizFill( true, 200 );
-    minHeightSlider->addEventHandler( new MinHeightHandler(s_pointCloud));   
+        HSliderControl* minHeightSlider = minHeightBox->addControl(new HSliderControl(0.0f, 30.0, s_pointCloud->getMinHeight()));
+        minHeightSlider->setBackColor( Color::Gray );
+        minHeightSlider->setHeight( 12 );
+        minHeightSlider->setHorizFill( true, 200 );
+        minHeightSlider->addEventHandler( new MinHeightHandler(s_pointCloud));   
 
-    // Max Height
-    HBox* maxHeightBox = container->addControl(new HBox());
-    maxHeightBox->setChildVertAlign( Control::ALIGN_CENTER );
-    maxHeightBox->setChildSpacing( 10 );
-    maxHeightBox->setHorizFill( true );
-    maxHeightBox->addControl( new LabelControl("Max Height:", 16) );
+        // Max Height
+        HBox* maxHeightBox = container->addControl(new HBox());
+        maxHeightBox->setChildVertAlign( Control::ALIGN_CENTER );
+        maxHeightBox->setChildSpacing( 10 );
+        maxHeightBox->setHorizFill( true );
+        maxHeightBox->addControl( new LabelControl("Max Height:", 16) );
 
-    HSliderControl* maxHeightSlider = maxHeightBox->addControl(new HSliderControl(0.0f, 100.0, 100.0));
-    maxHeightSlider->setBackColor( Color::Gray );
-    maxHeightSlider->setHeight( 12 );
-    maxHeightSlider->setHorizFill( true, 200 );
-    maxHeightSlider->addEventHandler( new MaxHeightHandler(s_pointCloud));   
+        HSliderControl* maxHeightSlider = maxHeightBox->addControl(new HSliderControl(0.0f, 100.0, 100.0));
+        maxHeightSlider->setBackColor( Color::Gray );
+        maxHeightSlider->setHeight( 12 );
+        maxHeightSlider->setHorizFill( true, 200 );
+        maxHeightSlider->addEventHandler( new MaxHeightHandler(s_pointCloud));   
+    }
 
     // video slider
     HBox* sliderBox = container->addControl(new HBox());
@@ -911,74 +914,77 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root, osg::Node* video
     fovSlider->addEventHandler( new FOVHandler());   
 #endif
 
-    // Haze distance
-    HBox* hazeBox = container->addControl(new HBox());
-    hazeBox->setChildVertAlign( Control::ALIGN_CENTER );
-    hazeBox->setChildSpacing( 10 );
-    hazeBox->setHorizFill( true );
-    hazeBox->addControl( new LabelControl("Haze Distance:", 16) );
+    if (s_pointCloud)
+    {
+        // Haze distance
+        HBox* hazeBox = container->addControl(new HBox());
+        hazeBox->setChildVertAlign( Control::ALIGN_CENTER );
+        hazeBox->setChildSpacing( 10 );
+        hazeBox->setHorizFill( true );
+        hazeBox->addControl( new LabelControl("Haze Distance:", 16) );
 
-    HSliderControl* hazeSlider = hazeBox->addControl(new HSliderControl(0.0f, 10000.0, 5000.0f));
-    hazeSlider->setBackColor( Color::Gray );
-    hazeSlider->setHeight( 12 );
-    hazeSlider->setHorizFill( true, 200 );
-    hazeSlider->addEventHandler( new HazeDistanceHandler(s_pointCloud));   
+        HSliderControl* hazeSlider = hazeBox->addControl(new HSliderControl(0.0f, 10000.0, 5000.0f));
+        hazeSlider->setBackColor( Color::Gray );
+        hazeSlider->setHeight( 12 );
+        hazeSlider->setHorizFill( true, 200 );
+        hazeSlider->addEventHandler( new HazeDistanceHandler(s_pointCloud));   
 
+        // Color mode
+        Grid* toolbar = new Grid();    
+        toolbar->setAbsorbEvents( true );    
 
+        LabelControl* rgb = new LabelControl("RGB");
+        rgb->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::RGB));
+        toolbar->setControl(0, 0, rgb);
 
+        LabelControl* intensity = new LabelControl("Intensity");
+        intensity->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Intensity));
+        toolbar->setControl(1, 0, intensity);
 
-    // Color mode
-    Grid* toolbar = new Grid();    
-    toolbar->setAbsorbEvents( true );    
+        LabelControl* classifiction = new LabelControl("Classification");
+        classifiction->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Classification));
+        toolbar->setControl(2, 0, classifiction);   
 
-    LabelControl* rgb = new LabelControl("RGB");
-    rgb->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::RGB));
-    toolbar->setControl(0, 0, rgb);
+        LabelControl* height = new LabelControl("Height");
+        height->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Height));
+        toolbar->setControl(3, 0, height);   
 
-    LabelControl* intensity = new LabelControl("Intensity");
-    intensity->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Intensity));
-    toolbar->setControl(1, 0, intensity);
+        LabelControl* ramp = new LabelControl("Ramp");
+        ramp->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Ramp));
+        toolbar->setControl(4, 0, ramp);   
 
-    LabelControl* classifiction = new LabelControl("Classification");
-    classifiction->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Classification));
-    toolbar->setControl(2, 0, classifiction);   
+        container->addChild(toolbar);
 
-    LabelControl* height = new LabelControl("Height");
-    height->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Height));
-    toolbar->setControl(3, 0, height);   
+        HBox* box = container->addControl(new HBox());
+        CheckBoxControl* vegToggle = box->addControl(new CheckBoxControl(true));
+        vegToggle->addEventHandler(new ToggleClassificationHandler(3));
+        vegToggle->addEventHandler(new ToggleClassificationHandler(4));
+        vegToggle->addEventHandler(new ToggleClassificationHandler(5));
+        box->addControl(new LabelControl("Vegetation"));
 
-    LabelControl* ramp = new LabelControl("Ramp");
-    ramp->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Ramp));
-    toolbar->setControl(4, 0, ramp);   
+        box = container->addControl(new HBox());
+        CheckBoxControl* buildingToggle = box->addControl(new CheckBoxControl(true));
+        buildingToggle->addEventHandler(new ToggleClassificationHandler(6));
+        box->addControl(new LabelControl("Buildings"));
 
-    container->addChild(toolbar);
+        box = container->addControl(new HBox());
+        CheckBoxControl* groundToggle = box->addControl(new CheckBoxControl(true));
+        groundToggle->addEventHandler(new ToggleClassificationHandler(2));
+        box->addControl(new LabelControl("Ground"));
 
-    HBox* box = container->addControl(new HBox());
-    CheckBoxControl* vegToggle = box->addControl(new CheckBoxControl(true));
-    vegToggle->addEventHandler(new ToggleClassificationHandler(3));
-    vegToggle->addEventHandler(new ToggleClassificationHandler(4));
-    vegToggle->addEventHandler(new ToggleClassificationHandler(5));
-    box->addControl(new LabelControl("Vegetation"));
-
-    box = container->addControl(new HBox());
-    CheckBoxControl* buildingToggle = box->addControl(new CheckBoxControl(true));
-    buildingToggle->addEventHandler(new ToggleClassificationHandler(6));
-    box->addControl(new LabelControl("Buildings"));
-
-    box = container->addControl(new HBox());
-    CheckBoxControl* groundToggle = box->addControl(new CheckBoxControl(true));
-    groundToggle->addEventHandler(new ToggleClassificationHandler(2));
-    box->addControl(new LabelControl("Ground"));
-
-    box = container->addControl(new HBox());
-    CheckBoxControl* autoPointSizeToggle = box->addControl(new CheckBoxControl(s_pointCloud->getAutoPointSize()));
-    autoPointSizeToggle->addEventHandler(new AutoPointSizeHandler());
-    box->addControl(new LabelControl("Auto Point Size"));
+        box = container->addControl(new HBox());
+        CheckBoxControl* autoPointSizeToggle = box->addControl(new CheckBoxControl(s_pointCloud->getAutoPointSize()));
+        autoPointSizeToggle->addEventHandler(new AutoPointSizeHandler());
+        box->addControl(new LabelControl("Auto Point Size"));
+    }
 
     // Add a status label
     s_status = container->addControl(new LabelControl());
 
-    s_videoTime = container->addControl(new LabelControl());
+    if (videoNode)
+    {
+        s_videoTime = container->addControl(new LabelControl());
+    }
     s_frameTime = container->addControl(new LabelControl());
 }
 
@@ -1002,32 +1008,27 @@ int main(int argc, char** argv)
     mapNode->getTerrainEngine()->setNodeMask(MaskMapNode);
     mapNode->getModelLayerGroup()->setNodeMask(MaskPointCloud);
 
-    s_pointCloud = osgEarth::findTopMostNodeOfType<PointCloudDecorator>(loaded);
-    if (!s_pointCloud)
-    {
-        OSG_NOTICE << "Cannot find point cloud" << std::endl;
-        return 1;
-    }    
-
-    s_pointCloud->getOrCreateStateSet()->setRenderBinDetails(99999, "RenderBin");
-
-    // Load the color ramp gradient.
     std::string gradient = "data/iron_gradient.png";
     arguments.read("--gradient", gradient);
-    osg::Texture2D* colorRamp = new osg::Texture2D(osgDB::readImageFile(gradient));
-    colorRamp->setResizeNonPowerOfTwoHint(false);
-    colorRamp->setWrap( osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE );
-    colorRamp->setWrap( osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE );
-    s_pointCloud->setColorRamp(colorRamp);
-    s_pointCloud->setColorMode(PointCloudDecorator::Ramp);
+
+
+    s_pointCloud = osgEarth::findTopMostNodeOfType<PointCloudDecorator>(loaded);
+    if (s_pointCloud)
+    {
+        s_pointCloud->getOrCreateStateSet()->setRenderBinDetails(99999, "RenderBin");
+
+        // Load the color ramp gradient.        
+        osg::Texture2D* colorRamp = new osg::Texture2D(osgDB::readImageFile(gradient));
+        colorRamp->setResizeNonPowerOfTwoHint(false);
+        colorRamp->setWrap( osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE );
+        colorRamp->setWrap( osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE );
+        s_pointCloud->setColorRamp(colorRamp);
+        s_pointCloud->setColorMode(PointCloudDecorator::Ramp);
+    }
 
     double simulationStart = 63629;
     arguments.read("--startTime", simulationStart);
     OSG_NOTICE << "Simulation start time " << simulationStart << std::endl;
-
-
-    // any option left unread are converted into errors to write out later.
-    arguments.reportRemainingOptionsAsUnrecognized();
 
     // Preload the ffmpeg plugin.
     std::string ffmpegLib = osgDB::Registry::instance()->createLibraryNameForExtension( "ffmpeg" );
@@ -1041,7 +1042,7 @@ int main(int argc, char** argv)
     osg::ref_ptr< osg::Node > videoNode;
     osg::ref_ptr< osg::ImageStream > video;
 
-    if (videoFile.empty())
+    if (!videoFile.empty())
     {
         video = dynamic_cast< osg::ImageStream*>(osgDB::readImageFile(videoFile));
         if (video.valid())
@@ -1073,14 +1074,17 @@ int main(int argc, char** argv)
 
 
     // Read INS camera path.
-    std::string insFile = "INS Data New/16-056-01-HA1O-Sessn002_INSdata/INShistory.csv";
+    std::string insFile;
     arguments.read("--ins", insFile);   
     INSReadings readings;
-    osg::Timer_t startTime = osg::Timer::instance()->tick();
-    INSReader::read(insFile, readings);
-    osg::Timer_t stopTime = osg::Timer::instance()->tick();
-    OE_NOTICE << "Read " << readings.size() << " INS readings in " << osg::Timer::instance()->delta_s(startTime, stopTime) << std::endl;
-    root->addChild(makeINSNode(readings));
+    if (!insFile.empty())
+    {        
+        osg::Timer_t startTime = osg::Timer::instance()->tick();
+        INSReader::read(insFile, readings);
+        osg::Timer_t stopTime = osg::Timer::instance()->tick();
+        OE_NOTICE << "Read " << readings.size() << " INS readings in " << osg::Timer::instance()->delta_s(startTime, stopTime) << std::endl;
+        root->addChild(makeINSNode(readings));
+    }
 
     // Load directories full of the neptec lidar series.
     std::string neptec;
@@ -1089,6 +1093,10 @@ int main(int argc, char** argv)
         OSG_NOTICE << "Loading neptec lidar directory " << neptec << std::endl;
         root->addChild(loadSessionLLA(neptec, UINT_MAX));
     }
+
+    // any option left unread are converted into errors to write out later.
+    arguments.reportRemainingOptionsAsUnrecognized();
+
 
     // Convert a folder of csv files to lla.
     //convertCSVtoLLA("J:/fdp1");
