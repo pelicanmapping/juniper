@@ -988,9 +988,39 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root, osg::Node* video
     s_frameTime = container->addControl(new LabelControl());
 }
 
+int
+usage( const std::string& msg )
+{
+    if ( !msg.empty() )
+    {
+        std::cout << msg << std::endl;
+    }
+
+    std::cout
+        << std::endl
+        << "USAGE: airwolf" << std::endl
+        << std::endl
+        << "    --video videoFile                   ; The video to load" << std::endl
+        << "    --ins insFile                       ; The INS csv to load" << std::endl        
+        << "    --startTime utcTime                 ; The start time for the INS animation, used to sync with the video" << std::endl        
+        << "    --lodScale                          ; The lod scale to start with" << std::endl        
+        << "    --gradient                          ; The gradient texture to load" << std::endl        
+        << "    --neptec                            ; Load a directory of neptec lla files" << std::endl        
+        << "    map.earth" << std::endl
+        << std::endl;
+
+    return -1;
+}
+
+
 int main(int argc, char** argv)
 {    
     osg::ArgumentParser arguments(&argc,argv);
+
+    if (arguments.argc() <= 1)
+    {
+        return usage("Please specify a .earth file");
+    }
 
     osgViewer::Viewer viewer(arguments);    
 
@@ -1064,7 +1094,7 @@ int main(int argc, char** argv)
     viewer.addEventHandler(new osgViewer::LODScaleHandler());
     viewer.addEventHandler(new osgGA::StateSetManipulator(viewer.getCamera()->getOrCreateStateSet()));
 
-    float lodScale = 2.0;
+    float lodScale = 1.0;
     // Up the lod scale so things behave a bit nicer.
     viewer.getCamera()->setLODScale(lodScale);
     arguments.read("--lodScale", lodScale);
