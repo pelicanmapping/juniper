@@ -867,30 +867,33 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root, osg::Node* video
 
     // video slider
     HBox* sliderBox = container->addControl(new HBox());
-    sliderBox->setChildVertAlign( Control::ALIGN_CENTER );
-    sliderBox->setChildSpacing( 10 );
-    sliderBox->setHorizFill( true );
-    sliderBox->addControl( new LabelControl("Video Slider:", 16) );
+    if (videoNode)
+    {
+        sliderBox->setChildVertAlign( Control::ALIGN_CENTER );
+        sliderBox->setChildSpacing( 10 );
+        sliderBox->setHorizFill( true );
+        sliderBox->addControl( new LabelControl("Video Slider:", 16) );
 
-    HSliderControl* sliderSlider = sliderBox->addControl(new HSliderControl(0.0, 1280.0, 0.0));
-    sliderSlider->setBackColor( Color::Gray );
-    sliderSlider->setHeight( 12 );
-    sliderSlider->setHorizFill( true, 200 );
-    sliderSlider->addEventHandler( new UniformHandler(videoNode->getOrCreateStateSet()->getOrCreateUniform("slider", osg::Uniform::FLOAT)));   
+        HSliderControl* sliderSlider = sliderBox->addControl(new HSliderControl(0.0, 1280.0, 0.0));
+        sliderSlider->setBackColor( Color::Gray );
+        sliderSlider->setHeight( 12 );
+        sliderSlider->setHorizFill( true, 200 );
+        sliderSlider->addEventHandler( new UniformHandler(videoNode->getOrCreateStateSet()->getOrCreateUniform("slider", osg::Uniform::FLOAT)));   
 
 
-    // video opacity
-    HBox* alphaBox = container->addControl(new HBox());
-    alphaBox->setChildVertAlign( Control::ALIGN_CENTER );
-    alphaBox->setChildSpacing( 10 );
-    alphaBox->setHorizFill( true );
-    alphaBox->addControl( new LabelControl("Video Opacity:", 16) );
+        // video opacity
+        HBox* alphaBox = container->addControl(new HBox());
+        alphaBox->setChildVertAlign( Control::ALIGN_CENTER );
+        alphaBox->setChildSpacing( 10 );
+        alphaBox->setHorizFill( true );
+        alphaBox->addControl( new LabelControl("Video Opacity:", 16) );
 
-    HSliderControl* alphaSlider = alphaBox->addControl(new HSliderControl(0.0, 1.0, 1.0));
-    alphaSlider->setBackColor( Color::Gray );
-    alphaSlider->setHeight( 12 );
-    alphaSlider->setHorizFill( true, 200 );
-    alphaSlider->addEventHandler( new UniformHandler(videoNode->getOrCreateStateSet()->getOrCreateUniform("opacity", osg::Uniform::FLOAT)));       
+        HSliderControl* alphaSlider = alphaBox->addControl(new HSliderControl(0.0, 1.0, 1.0));
+        alphaSlider->setBackColor( Color::Gray );
+        alphaSlider->setHeight( 12 );
+        alphaSlider->setHorizFill( true, 200 );
+        alphaSlider->addEventHandler( new UniformHandler(videoNode->getOrCreateStateSet()->getOrCreateUniform("opacity", osg::Uniform::FLOAT)));       
+    }
 
 
 #if 0
@@ -979,41 +982,6 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root, osg::Node* video
     s_frameTime = container->addControl(new LabelControl());
 }
 
-struct APHandler : public osgGA::GUIEventHandler 
-{
-    APHandler( osgGA::AnimationPathManipulator* manip, osg::ImageStream* video) : _manip(manip),_video(video) { }
-
-    bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
-    {
-        double delta = 0.25;
-        if ( ea.getEventType() == ea.KEYDOWN && ea.getKey() == 'o' )
-        {
-            _manip->setTimeOffset(_manip->getTimeOffset() + delta);
-            OSG_NOTICE << "timeoffset=" << _manip->getTimeOffset() << std::endl;
-        }
-        else if ( ea.getEventType() == ea.KEYDOWN && ea.getKey() == 'O' )
-        {
-            _manip->setTimeOffset(_manip->getTimeOffset() - delta);
-            OSG_NOTICE << "timeoffset=" << _manip->getTimeOffset() << std::endl;
-        }
-        else if ( ea.getEventType() == ea.KEYDOWN && ea.getKey() == 'p' )
-        {
-            if (_video->getStatus() == osg::ImageStream::PAUSED)
-            {
-                _video->play();
-            }
-            else
-            {
-                _video->pause();
-            }
-        }
-        return false;
-    }
-
-    osg::observer_ptr<osgGA::AnimationPathManipulator> _manip;
-    osg::observer_ptr< osg::ImageStream > _video;
-};
-
 int main(int argc, char** argv)
 {    
     osg::ArgumentParser arguments(&argc,argv);
@@ -1027,7 +995,7 @@ int main(int argc, char** argv)
 
     osg::Group* root = new osg::Group;
 
-    osg::Node* loaded = osgEarth::Util::MapNodeHelper().load(arguments, &viewer);//osgDB::readNodeFiles(arguments);
+    osg::Node* loaded = osgEarth::Util::MapNodeHelper().load(arguments, &viewer);
     root->addChild(loaded);
 
     osg::ref_ptr< MapNode > mapNode = MapNode::findMapNode(loaded);
@@ -1067,20 +1035,26 @@ int main(int argc, char** argv)
         osgDB::Registry::instance()->loadLibrary( ffmpegLib );    
 
     // Load the video file.
-    std::string videoFile = "video/20160908_1223._16-056-01-HH1O_s2_APHillWires.mp4";
+    std::string videoFile;
     arguments.read("--video", videoFile);
 
-    osg::ref_ptr< osg::ImageStream > video = dynamic_cast< osg::ImageStream*>(osgDB::readImageFile(videoFile));
-    osg::Node* videoNode = 0;
-    if (video.valid())
-    {
-        OSG_NOTICE << "Loaded video length=" << video->getLength() << std::endl;        
-        videoNode = createVideoHUD(video, 0.5f);
-        root->addChild( videoNode );
-    }
+    osg::ref_ptr< osg::Node > videoNode;
+    osg::ref_ptr< osg::ImageStream > video;
 
-    videoNode->getOrCreateStateSet()->getOrCreateUniform("opacity", osg::Uniform::FLOAT)->set(1.0f);
-    videoNode->getOrCreateStateSet()->getOrCreateUniform("slider", osg::Uniform::FLOAT)->set(0.0f);
+    if (videoFile.empty())
+    {
+        video = dynamic_cast< osg::ImageStream*>(osgDB::readImageFile(videoFile));
+        if (video.valid())
+        {
+            OSG_NOTICE << "Loaded video length=" << video->getLength() << std::endl;        
+            videoNode = createVideoHUD(video, 0.5f);
+            root->addChild( videoNode );
+
+            videoNode->getOrCreateStateSet()->getOrCreateUniform("opacity", osg::Uniform::FLOAT)->set(1.0f);
+            videoNode->getOrCreateStateSet()->getOrCreateUniform("slider", osg::Uniform::FLOAT)->set(0.0f);
+        }
+    }
+    
 
     buildControls(viewer, root, videoNode);
 
