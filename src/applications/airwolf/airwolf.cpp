@@ -457,21 +457,8 @@ osg::Node* loadSessionLLAFull(const std::string& neptecDir, unsigned int maxFile
 }
 
 
-//double simulationStart = 63628; // good.    
-//double simulationStart = 63629; // good.    
-double simulationStart = 63618.5;
-
-osg::AnimationPath* createPath( INSReadings& readings, osgEarth::MapNode* mapNode )
+osg::AnimationPath* createPath( INSReadings& readings, osgEarth::MapNode* mapNode, double simulationStart )
 {
-    //double startTime = readings.front()._utcSeconds;    
-    // Actual start of video, I think.
-
-    // Doc says it starts at 17:40:21, which is 63621
-    //double startTime = 63621;
-    // Actual video says it starts at 17:40:18
-    //double startTime = 63618;    
-    // 17:44:27
-    //double startTime = 63867.0;
     osg::AnimationPath* path = new osg::AnimationPath();
     const SpatialReference* wgs84 = SpatialReference::create("wgs84");
     double heading = 0.0;
@@ -481,9 +468,6 @@ osg::AnimationPath* createPath( INSReadings& readings, osgEarth::MapNode* mapNod
     {       
         osgEarth::GeoPoint map(wgs84, osg::RadiansToDegrees(itr->_lonRadians), osg::RadiansToDegrees(itr->_latRadians), itr->_alt);
         double elevation;
-        //query.getElevation(map, elevation);
-        //OE_NOTICE << "alt="<< itr->_alt << " elevation=" << elevation << std::endl;
-        //map.alt() += elevation;
         osg::Vec3d world;
         map.toWorld(world);
         osg::Matrixd local2world;
@@ -496,108 +480,21 @@ osg::AnimationPath* createPath( INSReadings& readings, osgEarth::MapNode* mapNod
 
 
         osg::Quat pitchTo90(osg::DegreesToRadians(90.0), osg::Vec3(1,0,0));
-        //osg::Quat platAZRot(osg::RadiansToDegrees(platAZ), osg::Vec3(0,0,-1));
         osg::Quat ori =
         osg::Quat(roll, osg::Vec3(0,1,0)) * // roll
         osg::Quat(pitch, osg::Vec3(1,0,0)) * //pitch        
-        osg::Quat(heading, osg::Vec3(0,0,-1));
-
-        /*
-        osg::Quat ori(osg::DegreesToRadians(90.0), osg::Vec3(0,1,0),
-                 heading, osg::Vec3(0,0,-1),
-                 pitch, osg::Vec3(1,0,0));
-                 */
-                
+        osg::Quat(heading, osg::Vec3(0,0,-1));                
 
         osg::Quat rot = pitchTo90 * ori * local2world.getRotate();
-        //osg::Quat rot = pitchTo90 * ori * platAZRot * local2world.getRotate();
-
-        /*
-        osg::Vec3d world;
-        map.toWorld( world );
-        osg::Quat rot;
-        
-        osg::Matrixd local2world;
-        map.createLocalToWorld( local2world );  
-
-       //osg::Quat rotHeading(osg::DegreesToRadians(45.0), upVector);        
-        rot = local2world.getRotate();
-
-        osg::Vec3d lookVector = getFrontVector(local2world);
-        osg::Vec3d sideVector = getSideVector(local2world);
-        osg::Vec3d upVector = getUpVector(local2world);
-
-        rot *= osg::Quat(osg::DegreesToRadians(180.0), upVector);
-        */
 
         double time = itr->_utcSeconds - simulationStart;
         if (time >= 0.0)
         {
-            //OE_NOTICE << "time=" << time << std::endl;
             path->insert(time, osg::AnimationPath::ControlPoint(world, rot));
-        }
-       
+        }       
     }
     return path;
 }
-
-osg::AnimationPath* createPathSimple( INSReadings& readings )
-{
-    double time = 0.0;
-    osg::AnimationPath* path = new osg::AnimationPath();
-    const SpatialReference* wgs84 = SpatialReference::create("wgs84");
-    double startTime = readings.front()._utcSeconds;    
-    for (unsigned int i = 0; i < readings.size()-1; i++)
-    {
-        INSReading& reading0 = readings[i];
-        INSReading& reading1 = readings[i+1];
-
-        osgEarth::GeoPoint map0(wgs84, osg::RadiansToDegrees(reading0._lonRadians), osg::RadiansToDegrees(reading0._latRadians), reading0._alt);
-        osg::Vec3d p0;
-        map0.toWorld(p0);
-
-        osgEarth::GeoPoint map1(wgs84, osg::RadiansToDegrees(reading1._lonRadians), osg::RadiansToDegrees(reading1._latRadians), reading1._alt);
-        osg::Vec3d p1;
-        map1.toWorld(p1);
-
-        osg::Vec3d up = p0;
-        up.normalize();
-
-        osg::Vec3d look = p1 - p0;
-        double dist = look.length();
-        osg::Quat rot = osg::Matrixd::lookAt(p0, p1, up).getRotate();
-        rot = rot.inverse();        
-        double time = reading0._utcSeconds - startTime;
-        path->insert(time, osg::AnimationPath::ControlPoint(p0, rot));        
-    }
-    return path;    
-}
-
-osg::Matrixd getViewMatrix(INSReading& reading)
-{
-    const SpatialReference* wgs84 = SpatialReference::create("wgs84");
-        osgEarth::GeoPoint map(wgs84, osg::RadiansToDegrees(reading._lonRadians), osg::RadiansToDegrees(reading._latRadians), reading._alt);        
-        osg::Matrixd local2world;
-        map.createLocalToWorld( local2world );  
-
-        double pitch = osg::DegreesToRadians(90.0) + reading._pitch;        
-        double heading = reading._heading;
-        double roll = reading._roll;
-
-        osg::Quat ori =
-        osg::Quat(pitch, osg::Vec3(1,0,0)) * //pitch
-        osg::Quat(roll, osg::Vec3(0,1,0)) * // roll
-        osg::Quat(heading, osg::Vec3(0,0,-1));
-
-        return osg::Matrixd(ori) * local2world;
-}
-
-
-/*******************************************/
-
-
-
-
 
 static PointCloudDecorator* s_pointCloud;
 
@@ -996,7 +893,7 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root, osg::Node* video
     alphaSlider->addEventHandler( new UniformHandler(videoNode->getOrCreateStateSet()->getOrCreateUniform("opacity", osg::Uniform::FLOAT)));       
 
 
-#if 1
+#if 0
     // fov
     HBox* fovBox = container->addControl(new HBox());
     fovBox->setChildVertAlign( Control::ALIGN_CENTER );
@@ -1080,8 +977,6 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root, osg::Node* video
 
     s_videoTime = container->addControl(new LabelControl());
     s_frameTime = container->addControl(new LabelControl());
-
-    //root->addChild(canvas);
 }
 
 struct APHandler : public osgGA::GUIEventHandler 
@@ -1158,6 +1053,11 @@ int main(int argc, char** argv)
     s_pointCloud->setColorRamp(colorRamp);
     s_pointCloud->setColorMode(PointCloudDecorator::Ramp);
 
+    double simulationStart = 63629;
+    arguments.read("--startTime", simulationStart);
+    OSG_NOTICE << "Simulation start time " << simulationStart << std::endl;
+
+
     // any option left unread are converted into errors to write out later.
     arguments.reportRemainingOptionsAsUnrecognized();
 
@@ -1188,8 +1088,13 @@ int main(int argc, char** argv)
     viewer.addEventHandler(new osgViewer::WindowSizeHandler());
     viewer.addEventHandler(new osgViewer::LODScaleHandler());
     viewer.addEventHandler(new osgGA::StateSetManipulator(viewer.getCamera()->getOrCreateStateSet()));
-   
 
+    float lodScale = 2.0;
+    // Up the lod scale so things behave a bit nicer.
+    viewer.getCamera()->setLODScale(lodScale);
+    arguments.read("--lodScale", lodScale);
+    OSG_NOTICE << "lodScale=" << lodScale << std::endl;
+      
     viewer.getCamera()->setNearFarRatio(0.00002);
 
 
@@ -1220,7 +1125,7 @@ int main(int argc, char** argv)
     // Animation path if we loaded some INS data.
     if (readings.size() > 0)
     {
-        osg::AnimationPath* path = createPath( readings, mapNode);
+        osg::AnimationPath* path = createPath( readings, mapNode, simulationStart);
         osgGA::AnimationPathManipulator* apm = new osgGA::AnimationPathManipulator( path );
         viewer.setCameraManipulator( apm );    
     }    
