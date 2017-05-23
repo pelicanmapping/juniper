@@ -28,6 +28,7 @@
 
 #include <osgEarth/MapNode>
 #include <osgEarth/TerrainEngineNode>
+#include <osgEarth/NodeUtils>
 #include <osgEarthUtil/LatLongFormatter>
 #include <osgEarthUtil/ExampleResources>
 #include <osgEarthSymbology/Color>
