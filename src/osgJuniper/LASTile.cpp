@@ -99,6 +99,7 @@ public:
 
 OctreeCellBuilder::OctreeCellBuilder():
 _innerLevel(6),
+    _maxLevel(8),
     _targetNumPoints(0),
     _writer(0),
     _reader(0),
@@ -138,6 +139,16 @@ unsigned int OctreeCellBuilder::getInnerLevel() const
 void OctreeCellBuilder::setInnerLevel(unsigned int innerLevel)
 {
     _innerLevel = innerLevel;
+}
+
+unsigned int OctreeCellBuilder::getMaxLevel() const
+{
+    return _maxLevel;
+}
+
+void OctreeCellBuilder::setMaxLevel(unsigned int maxLevel)
+{
+    _maxLevel = maxLevel;
 }
 
 std::vector<std::string>& OctreeCellBuilder::getInputFiles()
@@ -399,7 +410,7 @@ void OctreeCellBuilder::build()
             //OSG_NOTICE << "Processed " << (numAdded + numRejected) << " of " << total << " points. " << (int)(100.0f * (float)numProcessed/(float)total) << "%" << std::endl;
         }        
 
-        if ((_targetNumPoints != 0 && keep()) || count == 0)
+        if ((_targetNumPoints != 0 && keep()) || count == 0 || _node->getID().z >= _maxLevel)
         {
             // The point passed, so write it to the output file.
             point->set_x(world.x());

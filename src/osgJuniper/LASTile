@@ -78,6 +78,10 @@ namespace osgJuniper
 
         void setInnerLevel(unsigned int innerLevel);
 
+        unsigned int getMaxLevel() const;
+
+        void setMaxLevel(unsigned int maxLevel);
+
         std::vector<std::string>& getInputFiles();
 
         std::vector<std::string>& getOutputFiles();
@@ -149,6 +153,7 @@ namespace osgJuniper
 
         osg::ref_ptr< OctreeNode > _node;
         unsigned int _innerLevel;
+        unsigned int _maxLevel;
         unsigned int _targetNumPoints;
         std::vector<std::string> _inputFiles;
         std::vector<std::string> _outputFiles;

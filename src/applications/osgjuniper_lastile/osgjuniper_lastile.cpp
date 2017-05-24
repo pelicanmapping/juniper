@@ -61,6 +61,12 @@ int main(int argc, char** argv)
     unsigned int innerLevel = 8;
     arguments.read("--innerLevel", innerLevel);
 
+    unsigned int maxLevel = 8;
+    arguments.read("--maxLevel", maxLevel);
+
+    // Initialize the threads
+    unsigned int numThreads = OpenThreads::GetNumberOfProcessors();
+    arguments.read("--threads", numThreads);
 
     std::string srcSRSString;
     arguments.read("--src", srcSRSString);
@@ -120,10 +126,6 @@ int main(int argc, char** argv)
         }
     }
 
-     // Initialize the threads
-    unsigned int numThreads = OpenThreads::GetNumberOfProcessors();
-    arguments.read("--threads", numThreads);
-
     OctreeCellBuilder builder;    
     for (unsigned int i = 0; i < filenames.size(); i++)
     {
@@ -131,6 +133,7 @@ int main(int argc, char** argv)
         OSG_NOTICE << "Processing filenames " << filenames[i] << std::endl;
     }
     builder.setInnerLevel(innerLevel);
+    builder.setMaxLevel(maxLevel);
     builder.setTargetNumPoints(targetNumPoints);
     builder.setSourceSRS(srcSRS.get());
     builder.setDestSRS(destSRS.get());
