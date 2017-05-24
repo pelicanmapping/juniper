@@ -1,20 +1,20 @@
 /* -*-c++-*- */
 /* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
-* Copyright 2010-2011 Pelican Ventures, Inc.
-* http://wush.net/trac/juniper
+* Copyright 2010-2017 Pelican Mapping
+* Pelican Mapping CONFIDENTIAL
+* Copyright (c) 2010-2017 [Pelican Mapping], All Rights Reserved.
 *
-* osgEarth is free software; you can redistribute it and/or modify
-* it under the terms of the GNU Lesser General Public License as published by
-* the Free Software Foundation; either version 2 of the License, or
-* (at your option) any later version.
+* NOTICE:  All information contained herein is, and remains the property of Pelican Mapping. The intellectual and technical concepts contained
+* herein are proprietary to Pelican Mapping and may be covered by U.S. and Foreign Patents, patents in process, and are protected by trade secret or copyright law.
+* Dissemination of this information or reproduction of this material is strictly forbidden unless prior written permission is obtained
+* from Pelican Mapping.  Access to the source code contained herein is hereby forbidden to anyone except current Pelican Mapping employees, managers or contractors who have executed
+* Confidentiality and Non-disclosure agreements explicitly covering such access.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
-*
-* You should have received a copy of the GNU Lesser General Public License
-* along with this program.  If not, see <http://www.gnu.org/licenses/>
+* The copyright notice above does not evidence any actual or intended publication or disclosure  of  this source code, which includes
+* information that is confidential and/or proprietary, and is a trade secret, of Pelican Mapping.   ANY REPRODUCTION, MODIFICATION, DISTRIBUTION, PUBLIC  PERFORMANCE,
+* OR PUBLIC DISPLAY OF OR THROUGH USE  OF THIS  SOURCE CODE  WITHOUT  THE EXPRESS WRITTEN CONSENT OF PELICAN MAPPING IS STRICTLY PROHIBITED, AND IN VIOLATION OF APPLICABLE
+* LAWS AND INTERNATIONAL TREATIES.  THE RECEIPT OR POSSESSION OF  THIS SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY ANY RIGHTS
+* TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
 */
 
 #include <osgText/Text>
@@ -68,7 +68,7 @@ public:
     /**
     * Sets the number of points that this source will stream.
     */
-    void setNumPoints( unsigned int numPoints ) { _numPoints = numPoints; }        
+    void setNumPoints( unsigned int numPoints ) { _numPoints = numPoints; }
 
     typedef std::vector< osg::Vec3d> LocationList;
 
@@ -93,7 +93,7 @@ public:
     double getRadius() const { return _radius;}
     void setRadius( double radius) { _radius = radius;}
 
-protected:        
+protected:
 
     /**
     * Utility method for creating a node with the given points and colors.
@@ -149,8 +149,8 @@ void
 PositionedStreamingNodeSource::run()
 {
     do
-    {        
-        osg::ref_ptr< osg::Group > root = new osg::Group;        
+    {
+        osg::ref_ptr< osg::Group > root = new osg::Group;
 
         //We try to use the same batchsize to promote OSG's VBO reuse which can help quite a bit with graphics memory.  If you use the same
         //batch size for a VBO OSG can reuse OpenGL buffer objects more effeciently.
@@ -170,8 +170,8 @@ PositionedStreamingNodeSource::run()
             if (randVal > 0.5)
             {
                 range = randVal * _radius;
-            }            
-            
+            }
+
             double angle = (double)i * (osg::PI * 2.0 / (double)_numSlices);
             double x = range * cos( angle );
             double y = range * sin( angle );
@@ -181,7 +181,7 @@ PositionedStreamingNodeSource::run()
                 {
                     verts = new osg::Vec3Array( batchSize );
                     colors = new osg::Vec4Array( batchSize );
-                }                
+                }
                 double z = (_radius / (double)_numSlices) * (double)k;
                 (*verts)[j]  = osg::Vec3d(x, y, z );
                 (*colors)[j] = osg::Vec4(1,0,0,1);//Utils::randomColor();
@@ -221,7 +221,7 @@ PositionedStreamingNodeSource::run()
 
 
         //Sleep for little bit
-        OpenThreads::Thread::microSleep( _frameTime * 1000 * 1000 );        
+        OpenThreads::Thread::microSleep( _frameTime * 1000 * 1000 );
     } while (!_done && !testCancel());
 }
 
@@ -230,7 +230,7 @@ PositionedStreamingNodeSource::cancel()
 {
     _done = true;
     while (isRunning())
-    {               
+    {
         OpenThreads::Thread::YieldCurrentThread();
     }
     return 0;
@@ -252,16 +252,16 @@ PositionedStreamingNodeSource::makePoints(osg::Vec3Array* points, osg::Vec4Array
     osg::Geode *geode = new osg::Geode;
     geode->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
     geode->addDrawable( geometry );
-    return geode;    
+    return geode;
 }
 
 int main( int argc, char **argv )
-{   
+{
     // use an ArgumentParser object to manage the program arguments.
     osg::ArgumentParser arguments(&argc,argv);
 
     unsigned int history = 0;
-    while (arguments.read("--history", history)){};    
+    while (arguments.read("--history", history)){};
 
     // construct the viewer.
     osgViewer::Viewer viewer(arguments);
@@ -281,13 +281,13 @@ int main( int argc, char **argv )
         std::cout << "Please specify a .earth file" << std::endl;
         return 0;
     }
-    
+
     //Add the map to the scene graph
     root->addChild( mapNode );
 
     //Create a new PositionedStreamingNodeSource and give it some positions
     osg::ref_ptr< PositionedStreamingNodeSource > source = new PositionedStreamingNodeSource( mapNode );
-    
+
     //Start in the gaslamp
     double startLon = -117.1623;
     double startLat = 32.7155;
@@ -309,7 +309,7 @@ int main( int argc, char **argv )
                              latRad, lonRad );
         source->getLocations().push_back( osg::Vec3d( osg::RadiansToDegrees( lonRad ), osg::RadiansToDegrees( latRad ), 0 ) );
     }
-    
+
     source->startStreaming();
     StreamingNode* streamingNode = new StreamingNode( source );
     streamingNode->setHistory( history );

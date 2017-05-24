@@ -1,21 +1,21 @@
 /* -*-c++-*- */
 /* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
- * Copyright 2010-2011 Pelican Ventures, Inc.
- * http://wush.net/trac/juniper
- *
- * osgEarth is free software; you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
- */
+* Copyright 2010-2017 Pelican Mapping
+* Pelican Mapping CONFIDENTIAL
+* Copyright (c) 2010-2017 [Pelican Mapping], All Rights Reserved.
+*
+* NOTICE:  All information contained herein is, and remains the property of Pelican Mapping. The intellectual and technical concepts contained
+* herein are proprietary to Pelican Mapping and may be covered by U.S. and Foreign Patents, patents in process, and are protected by trade secret or copyright law.
+* Dissemination of this information or reproduction of this material is strictly forbidden unless prior written permission is obtained
+* from Pelican Mapping.  Access to the source code contained herein is hereby forbidden to anyone except current Pelican Mapping employees, managers or contractors who have executed
+* Confidentiality and Non-disclosure agreements explicitly covering such access.
+*
+* The copyright notice above does not evidence any actual or intended publication or disclosure  of  this source code, which includes
+* information that is confidential and/or proprietary, and is a trade secret, of Pelican Mapping.   ANY REPRODUCTION, MODIFICATION, DISTRIBUTION, PUBLIC  PERFORMANCE,
+* OR PUBLIC DISPLAY OF OR THROUGH USE  OF THIS  SOURCE CODE  WITHOUT  THE EXPRESS WRITTEN CONSENT OF PELICAN MAPPING IS STRICTLY PROHIBITED, AND IN VIOLATION OF APPLICABLE
+* LAWS AND INTERNATIONAL TREATIES.  THE RECEIPT OR POSSESSION OF  THIS SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY ANY RIGHTS
+* TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
+*/
 
 #include <osgDB/ReadFile>
 #include <osgUtil/Optimizer>
@@ -100,7 +100,7 @@ int main(int argc, char** argv)
         keyswitchManipulator->addMatrixManipulator( '1', "Trackball", new osgGA::TrackballManipulator() );
         keyswitchManipulator->addMatrixManipulator( '2', "Flight", new osgGA::FlightManipulator() );
         keyswitchManipulator->addMatrixManipulator( '3', "Drive", new osgGA::DriveManipulator() );
-        keyswitchManipulator->addMatrixManipulator( '4', "Terrain", new osgGA::TerrainManipulator() );        
+        keyswitchManipulator->addMatrixManipulator( '4', "Terrain", new osgGA::TerrainManipulator() );
         keyswitchManipulator->addMatrixManipulator( '5', "Bundler", cm);
 
         std::string pathfile;
@@ -108,7 +108,7 @@ int main(int argc, char** argv)
         while (arguments.read("-p",pathfile))
         {
             osgGA::AnimationPathManipulator* apm = new osgGA::AnimationPathManipulator(pathfile);
-            if (apm || !apm->valid()) 
+            if (apm || !apm->valid())
             {
                 unsigned int num = keyswitchManipulator->getNumMatrixManipulators();
                 keyswitchManipulator->addMatrixManipulator( keyForAnimationPath, "Path", apm );
@@ -146,7 +146,7 @@ int main(int argc, char** argv)
 
     // load the data
     osg::ref_ptr<osg::Node> loadedModel = osgDB::readNodeFiles(arguments);
-    if (!loadedModel) 
+    if (!loadedModel)
     {
         std::cout << arguments.getApplicationName() <<": No data loaded" << std::endl;
         return 1;
@@ -165,7 +165,7 @@ int main(int argc, char** argv)
 
     IBRCameraFinder cf;
     loadedModel->accept(cf);
- 
+
     for (int i = 0; i < cf._cameraList.size(); ++i) {
         //Set the opacity and scale of all the cameras
         cf._cameraList[i]->setOpacity( 0.1f );
@@ -203,7 +203,7 @@ int main(int argc, char** argv)
         {
             viewer.getCamera()->setComputeNearFarMode( osg::CullSettings::COMPUTE_NEAR_FAR_USING_BOUNDING_VOLUMES );
         }
-        viewer.frame();	
+        viewer.frame();
     }
     return 0;
 }

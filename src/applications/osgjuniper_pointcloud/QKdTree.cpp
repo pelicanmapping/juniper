@@ -1,28 +1,21 @@
 /* -*-c++-*- */
 /* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
- * Copyright 2010-2011 Pelican Ventures, Inc.
- * http://wush.net/trac/juniper
- *
- * osgEarth is free software; you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
- */
-
-/**
- * NOTE:
- * This code has taken from osg::KdTree and adapted to work with points.
- * Please refer to osg/KdTree for original copyright and license info.
- */
-
+* Copyright 2010-2017 Pelican Mapping
+* Pelican Mapping CONFIDENTIAL
+* Copyright (c) 2010-2017 [Pelican Mapping], All Rights Reserved.
+*
+* NOTICE:  All information contained herein is, and remains the property of Pelican Mapping. The intellectual and technical concepts contained
+* herein are proprietary to Pelican Mapping and may be covered by U.S. and Foreign Patents, patents in process, and are protected by trade secret or copyright law.
+* Dissemination of this information or reproduction of this material is strictly forbidden unless prior written permission is obtained
+* from Pelican Mapping.  Access to the source code contained herein is hereby forbidden to anyone except current Pelican Mapping employees, managers or contractors who have executed
+* Confidentiality and Non-disclosure agreements explicitly covering such access.
+*
+* The copyright notice above does not evidence any actual or intended publication or disclosure  of  this source code, which includes
+* information that is confidential and/or proprietary, and is a trade secret, of Pelican Mapping.   ANY REPRODUCTION, MODIFICATION, DISTRIBUTION, PUBLIC  PERFORMANCE,
+* OR PUBLIC DISPLAY OF OR THROUGH USE  OF THIS  SOURCE CODE  WITHOUT  THE EXPRESS WRITTEN CONSENT OF PELICAN MAPPING IS STRICTLY PROHIBITED, AND IN VIOLATION OF APPLICABLE
+* LAWS AND INTERNATIONAL TREATIES.  THE RECEIPT OR POSSESSION OF  THIS SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY ANY RIGHTS
+* TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
+*/
 #include "QKdTree"
 #include <osg/BoundingBox>
 #include <osg/Geode>
@@ -59,15 +52,15 @@ protected:
 
 bool QBuildKdTree::build(QKdTree::BuildOptions& options, osg::Geometry* geometry)
 {
-    
-#ifdef VERBOSE_OUTPUT    
+
+#ifdef VERBOSE_OUTPUT
     osg::notify(osg::NOTICE)<<"osg::KDTreeBuilder::createKDTree()"<<std::endl;
 #endif
 
     osg::Vec3Array* vertices = dynamic_cast<osg::Vec3Array*>(geometry->getVertexArray());
     if (!vertices)
         return false;
-    
+
     if (vertices->size() <= options._targetNumVertsPerLeaf)
         return false;
 
@@ -80,12 +73,12 @@ bool QBuildKdTree::build(QKdTree::BuildOptions& options, osg::Geometry* geometry
     _kdTree.setNormals(dynamic_cast<osg::Vec3Array*>(geometry->getNormalArray()));
     _kdTree.setColors(dynamic_cast<osg::Vec4Array*>(geometry->getColorArray()));
     _kdTree.setSize(dynamic_cast<osg::Vec4Array*>(geometry->getVertexAttribArray(11)));
-    
+
 
     unsigned int estimatedSize = (unsigned int)(2.0*float(vertices->size())/float(options._targetNumVertsPerLeaf));
 
     _kdTree.getNodes().reserve(estimatedSize);
-    
+
     computeDivisions(options);
 
     options._numVerticesProcessed += vertices->size();
@@ -116,7 +109,7 @@ bool QBuildKdTree::build(QKdTree::BuildOptions& options, osg::Geometry* geometry
 
     osg::BoundingBox bb = _bb;
     nodeNum = divide(options, bb, nodeNum, 0);
-    
+
     // now reorder the triangle list so that it's in order as per the primitiveIndex list.
     //KdTree::TriangleList triangleList(_kdTree.getTriangles().size());
     //for(unsigned int i=0; i<_primitiveIndices.size(); ++i)
@@ -125,13 +118,13 @@ bool QBuildKdTree::build(QKdTree::BuildOptions& options, osg::Geometry* geometry
     //}
     //
     //_kdTree.getTriangles().swap(triangleList);
-    
-    
-#ifdef VERBOSE_OUTPUT    
+
+
+#ifdef VERBOSE_OUTPUT
     osg::notify(osg::NOTICE)<<"Root nodeNum="<<nodeNum<<std::endl;
 #endif
-    
-    
+
+
 //    osg::notify(osg::NOTICE)<<"_kdNodes.size()="<<k_kdNodes.size()<<"  estimated size = "<<estimatedSize<<std::endl;
 //    osg::notify(osg::NOTICE)<<"_kdLeaves.size()="<<_kdLeaves.size()<<"  estimated size = "<<estimatedSize<<std::endl<<std::endl;
 
@@ -145,12 +138,12 @@ void QBuildKdTree::computeDivisions(QKdTree::BuildOptions& options)
                          _bb.yMax()-_bb.yMin(),
                          _bb.zMax()-_bb.zMin());
 
-#ifdef VERBOSE_OUTPUT    
+#ifdef VERBOSE_OUTPUT
     osg::notify(osg::NOTICE)<<"computeDivisions("<<options._maxNumLevels<<") "<<dimensions<< " { "<<std::endl;
 #endif
 
     _axisStack.reserve(options._maxNumLevels);
- 
+
     for(unsigned int level=0; level<options._maxNumLevels; ++level)
     {
         int axis = 0;
@@ -165,12 +158,12 @@ void QBuildKdTree::computeDivisions(QKdTree::BuildOptions& options)
         _axisStack.push_back(axis);
         dimensions[axis] /= 2.0f;
 
-#ifdef VERBOSE_OUTPUT    
+#ifdef VERBOSE_OUTPUT
         osg::notify(osg::NOTICE)<<"  "<<level<<", "<<dimensions<<", "<<axis<<std::endl;
 #endif
     }
 
-#ifdef VERBOSE_OUTPUT    
+#ifdef VERBOSE_OUTPUT
     osg::notify(osg::NOTICE)<<"}"<<std::endl;
 #endif
 }
@@ -190,7 +183,7 @@ int QBuildKdTree::divide(QKdTree::BuildOptions& options, osg::BoundingBox& bb, i
             osg::notify(osg::INFO) << "level " << level << " create leaf of " << node.second << " vertexes" << std::endl;
             int istart = -node.first-1;
             int iend = istart+node.second-1;
-    
+
             // leaf is done, now compute bound on it.
             node.bb.init();
             for(int i=istart; i<=iend; ++i)
@@ -203,7 +196,7 @@ int QBuildKdTree::divide(QKdTree::BuildOptions& options, osg::BoundingBox& bb, i
                 //const osg::Vec3& v2 = (*_kdTree.getVertices())[tri.p2];
                 //node.bb.expandBy(v0);
                 //node.bb.expandBy(v1);
-                //node.bb.expandBy(v2);                
+                //node.bb.expandBy(v2);
             }
 
             if (node.bb.valid())
@@ -216,8 +209,8 @@ int QBuildKdTree::divide(QKdTree::BuildOptions& options, osg::BoundingBox& bb, i
                 node.bb._max.y() += epsilon;
                 node.bb._max.z() += epsilon;
             }
-            
-#ifdef VERBOSE_OUTPUT    
+
+#ifdef VERBOSE_OUTPUT
             if (!node.bb.valid())
             {
                 osg::notify(osg::NOTICE)<<"After reset "<<node.first<<","<<node.second<<std::endl;
@@ -241,14 +234,14 @@ int QBuildKdTree::divide(QKdTree::BuildOptions& options, osg::BoundingBox& bb, i
 #endif
 
     if (node.first<0)
-    {    
+    {
         // leaf node as first <= 0, so look at dividing it.
-        
+
         int istart = -node.first-1;
         int iend = istart+node.second-1;
 
         //osg::notify(osg::NOTICE)<<"  divide leaf"<<std::endl;
-        
+
         float original_min = bb._min[axis];
         float original_max = bb._max[axis];
 
@@ -262,7 +255,7 @@ int QBuildKdTree::divide(QKdTree::BuildOptions& options, osg::BoundingBox& bb, i
             const osg::Vec3Array* vertices = _kdTree.getVertices();
             int left = istart;
             int right = iend;
-            
+
             while(left<right)
             {
                 //while(left<right && (_centers[_primitiveIndices[left]][axis]<=mid)) { ++left; }
@@ -270,7 +263,7 @@ int QBuildKdTree::divide(QKdTree::BuildOptions& options, osg::BoundingBox& bb, i
 
                 //while(left<right && (_centers[_primitiveIndices[right]][axis]>mid)) { --right; }
                 while(left<right && ( (*vertices)[_primitiveIndices[right]][axis]>mid)) { --right; }
-                
+
                 //while(left<right && (_centers[_primitiveIndices[right]][axis]>mid)) { --right; }
                 //while(left<right && ( (*vertices)[_primitiveIndices[right]][axis]>mid)) { --right; }
 
@@ -281,14 +274,14 @@ int QBuildKdTree::divide(QKdTree::BuildOptions& options, osg::BoundingBox& bb, i
                     --right;
                 }
             }
-            
+
             if (left==right)
             {
                 if ( (*vertices)[_primitiveIndices[left]][axis]<=mid) ++left;
                 //if (_centers[_primitiveIndices[left]][axis]<=mid) ++left;
                 else --right;
             }
-            
+
             QKdTree::KdNode leftLeaf(-istart-1, (right-istart)+1);
             QKdTree::KdNode rightLeaf(-left-1, (iend-left)+1);
 
@@ -335,31 +328,31 @@ int QBuildKdTree::divide(QKdTree::BuildOptions& options, osg::BoundingBox& bb, i
             }
         }
 
-        
+
         float restore = bb._max[axis];
         bb._max[axis] = mid;
 
         //osg::notify(osg::NOTICE)<<"  divide leftLeaf "<<kdTree.getNode(nodeNum).first<<std::endl;
         int leftChildIndex = originalLeftChildIndex!=0 ? divide(options, bb, originalLeftChildIndex, level+1) : 0;
         bb._max[axis] = restore;
-        
+
         restore = bb._min[axis];
         bb._min[axis] = mid;
 
         //osg::notify(osg::NOTICE)<<"  divide rightLeaf "<<kdTree.getNode(nodeNum).second<<std::endl;
         int rightChildIndex = originalRightChildIndex!=0 ? divide(options, bb, originalRightChildIndex, level+1) : 0;
-        
+
         bb._min[axis] = restore;
-        
+
 
         if (!insitueDivision)
         {
             // take a second reference to node we are working on as the std::vector<> resize could
             // have invalidate the previous node ref.
             QKdTree::KdNode& newNodeRef = _kdTree.getNode(nodeIndex);
-        
+
             newNodeRef.first = leftChildIndex;
-            newNodeRef.second = rightChildIndex; 
+            newNodeRef.second = rightChildIndex;
 
             insitueDivision = true;
 
@@ -373,7 +366,7 @@ int QBuildKdTree::divide(QKdTree::BuildOptions& options, osg::BoundingBox& bb, i
         osg::notify(osg::NOTICE)<<"NOT expecting to get here"<<std::endl;
     }
 
-    return nodeIndex;    
+    return nodeIndex;
 }
 
 
@@ -401,7 +394,7 @@ bool QKdTree::build(BuildOptions& options, osg::Geometry* geometry)
 
 KdTreeBuilder::KdTreeBuilder():
     osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN)
-{            
+{
     _kdTreePrototype = new QKdTree;
 }
 
@@ -417,7 +410,7 @@ KdTreeBuilder::KdTreeBuilder(const KdTreeBuilder& rhs):
 void KdTreeBuilder::apply(osg::Geode& geode)
 {
     for(unsigned int i=0; i<geode.getNumDrawables(); ++i)
-    {            
+    {
 
         osg::Geometry* geom = geode.getDrawable(i)->asGeometry();
         if (geom)
@@ -431,6 +424,6 @@ void KdTreeBuilder::apply(osg::Geode& geode)
             {
                 geom->setShape(kdTree.get());
             }
-        }   
+        }
     }
 }

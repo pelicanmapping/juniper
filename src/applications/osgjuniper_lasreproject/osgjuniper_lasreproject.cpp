@@ -1,20 +1,20 @@
 /* -*-c++-*- */
 /* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
-* Copyright 2010-2011 Pelican Ventures, Inc.
-* http://wush.net/trac/juniper
+* Copyright 2010-2017 Pelican Mapping
+* Pelican Mapping CONFIDENTIAL
+* Copyright (c) 2010-2017 [Pelican Mapping], All Rights Reserved.
 *
-* osgEarth is free software; you can redistribute it and/or modify
-* it under the terms of the GNU Lesser General Public License as published by
-* the Free Software Foundation; either version 2 of the License, or
-* (at your option) any later version.
+* NOTICE:  All information contained herein is, and remains the property of Pelican Mapping. The intellectual and technical concepts contained
+* herein are proprietary to Pelican Mapping and may be covered by U.S. and Foreign Patents, patents in process, and are protected by trade secret or copyright law.
+* Dissemination of this information or reproduction of this material is strictly forbidden unless prior written permission is obtained
+* from Pelican Mapping.  Access to the source code contained herein is hereby forbidden to anyone except current Pelican Mapping employees, managers or contractors who have executed
+* Confidentiality and Non-disclosure agreements explicitly covering such access.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
-*
-* You should have received a copy of the GNU Lesser General Public License
-* along with this program.  If not, see <http://www.gnu.org/licenses/>
+* The copyright notice above does not evidence any actual or intended publication or disclosure  of  this source code, which includes
+* information that is confidential and/or proprietary, and is a trade secret, of Pelican Mapping.   ANY REPRODUCTION, MODIFICATION, DISTRIBUTION, PUBLIC  PERFORMANCE,
+* OR PUBLIC DISPLAY OF OR THROUGH USE  OF THIS  SOURCE CODE  WITHOUT  THE EXPRESS WRITTEN CONSENT OF PELICAN MAPPING IS STRICTLY PROHIBITED, AND IN VIOLATION OF APPLICABLE
+* LAWS AND INTERNATIONAL TREATIES.  THE RECEIPT OR POSSESSION OF  THIS SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY ANY RIGHTS
+* TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
 */
 #include "lasreader.hpp"
 #include "laswriter.hpp"
@@ -34,21 +34,21 @@ using namespace osgEarth;
 using namespace osgJuniper;
 
 osg::Vec3d reprojectPoint(const osg::Vec3d& input, osgEarth::SpatialReference* srcSRS, osgEarth::SpatialReference* destSRS, bool makeWorld)
-{    
-    osgEarth::GeoPoint geoPoint(srcSRS, input);                  
+{
+    osgEarth::GeoPoint geoPoint(srcSRS, input);
     osgEarth::GeoPoint mapPoint;
-    geoPoint.transform(destSRS, mapPoint);     
+    geoPoint.transform(destSRS, mapPoint);
     if (!makeWorld)
     {
         return mapPoint.vec3d();
-    }    
+    }
     osg::Vec3d world;
     mapPoint.toWorld(world);
-    return world;              
-} 
+    return world;
+}
 
 int main(int argc, char** argv)
-{    
+{
     osg::Timer_t startTime = osg::Timer::instance()->tick();
 
     osg::ArgumentParser arguments(&argc,argv);
@@ -135,7 +135,7 @@ int main(int argc, char** argv)
 
     // Figure out the offset in geocentric by computing the midpoint from the file.
     LASquantizer *quantizer = new LASquantizer();
-    
+
     osg::Vec3d midPoint((reader->header.min_x+reader->header.max_x)/2.0,
                         (reader->header.min_y+reader->header.max_y)/2.0,
                         (reader->header.min_z+reader->header.max_z)/2.0);
@@ -145,19 +145,19 @@ int main(int argc, char** argv)
     {
         precision = 1e-7;
     }
-       
-    osg::Vec3d center = reprojectPoint(midPoint, srcSRS.get(), destSRS.get(), geocentric);    
+
+    osg::Vec3d center = reprojectPoint(midPoint, srcSRS.get(), destSRS.get(), geocentric);
     quantizer->x_scale_factor = precision;
     quantizer->y_scale_factor = precision;
     quantizer->z_scale_factor = precision;
     quantizer->x_offset = ((I64)((center.x()/quantizer->x_scale_factor)/10000000))*10000000*quantizer->x_scale_factor;
     quantizer->y_offset = ((I64)((center.y()/quantizer->y_scale_factor)/10000000))*10000000*quantizer->y_scale_factor;
     quantizer->z_offset = ((I64)((center.z()/quantizer->z_scale_factor)/10000000))*10000000*quantizer->z_scale_factor;
-  
 
-  
+
+
     /*
-    osg::Vec3d center = reprojectPoint(midPoint, srcSRS.get(), destSRS.get(), geocentric);    
+    osg::Vec3d center = reprojectPoint(midPoint, srcSRS.get(), destSRS.get(), geocentric);
     OSG_NOTICE << "Midpoint is " << midPoint.x() << ", " << midPoint.y() << ", " << midPoint.z() << std::endl;
     OSG_NOTICE << "Geocentric is " << center.x() << ", " << center.y() << ", " << center.z() << std::endl;
     OSG_NOTICE << "Precision " << precision << std::endl;
@@ -175,7 +175,7 @@ int main(int argc, char** argv)
     *writeHeader = *quantizer;
 
     LASwriteOpener writeOpener;
-    writeOpener.set_file_name(output.c_str());            
+    writeOpener.set_file_name(output.c_str());
     LASwriter* writer = writeOpener.open(writeHeader);
 
 

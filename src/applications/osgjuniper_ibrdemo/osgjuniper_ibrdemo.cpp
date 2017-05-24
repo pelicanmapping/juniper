@@ -1,22 +1,21 @@
 /* -*-c++-*- */
 /* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
- * Copyright 2010-2011 Pelican Ventures, Inc.
- * http://wush.net/trac/juniper
- *
- * osgEarth is free software; you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
- */
-
+* Copyright 2010-2017 Pelican Mapping
+* Pelican Mapping CONFIDENTIAL
+* Copyright (c) 2010-2017 [Pelican Mapping], All Rights Reserved.
+*
+* NOTICE:  All information contained herein is, and remains the property of Pelican Mapping. The intellectual and technical concepts contained
+* herein are proprietary to Pelican Mapping and may be covered by U.S. and Foreign Patents, patents in process, and are protected by trade secret or copyright law.
+* Dissemination of this information or reproduction of this material is strictly forbidden unless prior written permission is obtained
+* from Pelican Mapping.  Access to the source code contained herein is hereby forbidden to anyone except current Pelican Mapping employees, managers or contractors who have executed
+* Confidentiality and Non-disclosure agreements explicitly covering such access.
+*
+* The copyright notice above does not evidence any actual or intended publication or disclosure  of  this source code, which includes
+* information that is confidential and/or proprietary, and is a trade secret, of Pelican Mapping.   ANY REPRODUCTION, MODIFICATION, DISTRIBUTION, PUBLIC  PERFORMANCE,
+* OR PUBLIC DISPLAY OF OR THROUGH USE  OF THIS  SOURCE CODE  WITHOUT  THE EXPRESS WRITTEN CONSENT OF PELICAN MAPPING IS STRICTLY PROHIBITED, AND IN VIOLATION OF APPLICABLE
+* LAWS AND INTERNATIONAL TREATIES.  THE RECEIPT OR POSSESSION OF  THIS SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY ANY RIGHTS
+* TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
+*/
 #include <osg/Point>
 #include <osgDB/ReadFile>
 #include <osgUtil/Optimizer>
@@ -54,7 +53,7 @@ using namespace osgEarth;
 using namespace osgEarth::Util;
 using namespace osgJuniper;
 
-struct GoToTheBeachHandler : public osgGA::GUIEventHandler 
+struct GoToTheBeachHandler : public osgGA::GUIEventHandler
 {
     GoToTheBeachHandler( EarthManipulator* manip ) : _manip(manip) { }
 
@@ -95,7 +94,7 @@ struct ModelPositionCallback : public osgGA::GUIEventHandler
 		if (!_enabled) return false;
 
 		osgViewer::View* view = dynamic_cast<osgViewer::View*>(&aa);
-		if (ea.getEventType() == osgGA::GUIEventAdapter::PUSH && 
+		if (ea.getEventType() == osgGA::GUIEventAdapter::PUSH &&
 			ea.getButton() == osgGA::GUIEventAdapter::MIDDLE_MOUSE_BUTTON &&
 			ea.getModKeyMask() & osgGA::GUIEventAdapter::MODKEY_CTRL)
 		{
@@ -193,12 +192,12 @@ struct ModelPositionCallback : public osgGA::GUIEventHandler
 	{
 		osg::Matrixd localToWorld;
 		_csn->getEllipsoidModel()->computeLocalToWorldTransformFromLatLongHeight(_lat, _lon, _height, localToWorld);
-		
+
 	    //Scale the matrix
 		localToWorld.preMult( osg::Matrixd::scale( _scale, _scale, _scale ) );
 
 		osg::Matrix rot_mat;
-		rot_mat.makeRotate( 
+		rot_mat.makeRotate(
 			osg::DegreesToRadians(_pitch), osg::Vec3(1,0,0),
 			osg::DegreesToRadians(_heading), osg::Vec3(0,0,1),
 			osg::DegreesToRadians(_roll), osg::Vec3(0,1,0) );
@@ -315,7 +314,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    
+
 	EarthManipulator* earthManip = new EarthManipulator();
 
 	earthManip->getSettings()->setMinMaxPitch(-89.9, -1);
@@ -330,7 +329,7 @@ int main(int argc, char** argv)
 
     // add the stats handler
     viewer.addEventHandler(new osgViewer::StatsHandler);
-	
+
 
 	osg::Group* root = new osg::Group;
 
@@ -352,7 +351,7 @@ int main(int argc, char** argv)
     osg::ref_ptr< osgEarth::MapNode > mapNode = osgEarth::MapNode::findMapNode( globe );
 
     osg::ref_ptr<AutoClipPlaneCullCallback> autoClip = new AutoClipPlaneCullCallback(mapNode);
-    viewer.getCamera()->addCullCallback( autoClip.get() );    
+    viewer.getCamera()->addCullCallback( autoClip.get() );
 
 
   std::string pointcloud;
@@ -430,7 +429,7 @@ int main(int argc, char** argv)
 
     viewer.realize();
 
-	//viewer.getCamera()->setComputeNearFarMode( osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR );    
+	//viewer.getCamera()->setComputeNearFarMode( osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR );
 
     //return viewer.run();
 	while (!viewer.done())
@@ -438,7 +437,7 @@ int main(int argc, char** argv)
 		if (keyswitchManipulator->getCurrentMatrixManipulator() == cm)
 		{
 			if (autoClip.valid())
-			{				
+			{
 				autoClip = NULL;
                 viewer.getCamera()->removeCullCallback( autoClip.get() );
 			}
@@ -454,12 +453,12 @@ int main(int argc, char** argv)
 			if (!autoClip.valid())
 			{
 				autoClip = new AutoClipPlaneCullCallback(mapNode);
-                viewer.getCamera()->addCullCallback( autoClip.get() );    
-				
+                viewer.getCamera()->addCullCallback( autoClip.get() );
+
 			}
 			//viewer.getCamera()->setComputeNearFarMode( osg::CullSettings::COMPUTE_NEAR_FAR_USING_BOUNDING_VOLUMES );
 		}
-		viewer.frame();	
+		viewer.frame();
 	}
 	return 0;
 

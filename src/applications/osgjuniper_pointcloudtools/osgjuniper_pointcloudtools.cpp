@@ -1,21 +1,21 @@
 /* -*-c++-*- */
 /* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
- * Copyright 2010-2011 Pelican Ventures, Inc.
- * http://wush.net/trac/juniper
- *
- * osgEarth is free software; you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
- */
+* Copyright 2010-2017 Pelican Mapping
+* Pelican Mapping CONFIDENTIAL
+* Copyright (c) 2010-2017 [Pelican Mapping], All Rights Reserved.
+*
+* NOTICE:  All information contained herein is, and remains the property of Pelican Mapping. The intellectual and technical concepts contained
+* herein are proprietary to Pelican Mapping and may be covered by U.S. and Foreign Patents, patents in process, and are protected by trade secret or copyright law.
+* Dissemination of this information or reproduction of this material is strictly forbidden unless prior written permission is obtained
+* from Pelican Mapping.  Access to the source code contained herein is hereby forbidden to anyone except current Pelican Mapping employees, managers or contractors who have executed
+* Confidentiality and Non-disclosure agreements explicitly covering such access.
+*
+* The copyright notice above does not evidence any actual or intended publication or disclosure  of  this source code, which includes
+* information that is confidential and/or proprietary, and is a trade secret, of Pelican Mapping.   ANY REPRODUCTION, MODIFICATION, DISTRIBUTION, PUBLIC  PERFORMANCE,
+* OR PUBLIC DISPLAY OF OR THROUGH USE  OF THIS  SOURCE CODE  WITHOUT  THE EXPRESS WRITTEN CONSENT OF PELICAN MAPPING IS STRICTLY PROHIBITED, AND IN VIOLATION OF APPLICABLE
+* LAWS AND INTERNATIONAL TREATIES.  THE RECEIPT OR POSSESSION OF  THIS SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY ANY RIGHTS
+* TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
+*/
 #include <osgDB/ReadFile>
 #include <osgUtil/Optimizer>
 #include <osgUtil/PolytopeIntersector>
@@ -53,7 +53,7 @@ struct PointSizeHandler : public ControlEventHandler
 {
     PointSizeHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
     void onValueChanged( Control* control, float value )
-    {        
+    {
         _pointCloud->setPointSize(value);
         OSG_NOTICE << "Point size " << value << std::endl;
     }
@@ -64,7 +64,7 @@ struct MaxIntensityHandler : public ControlEventHandler
 {
     MaxIntensityHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
     void onValueChanged( Control* control, float value )
-    {        
+    {
         _pointCloud->setMaxIntensity(value);
         OSG_NOTICE << "Max Intensity " << value << std::endl;
     }
@@ -76,7 +76,7 @@ struct MinHeightHandler : public ControlEventHandler
 {
     MinHeightHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
     void onValueChanged( Control* control, float value )
-    {        
+    {
         _pointCloud->setMinHeight(value);
         OSG_NOTICE << "Min Height " << value << std::endl;
     }
@@ -88,7 +88,7 @@ struct MaxHeightHandler : public ControlEventHandler
 {
     MaxHeightHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
     void onValueChanged( Control* control, float value )
-    {        
+    {
         _pointCloud->setMaxHeight(value);
         OSG_NOTICE << "Max Height " << value << std::endl;
     }
@@ -158,8 +158,8 @@ _label(label)
             << "RGBA: " << (int)point.color.r() << ", " << (int)point.color.g() << ", " << (int)point.color.b() << ", " << (int)point.color.a() << std::endl
             << "Return: " << (int)point.returnNumber << std::endl;
 
-        s_status->setText( buf.str() );     
-        
+        s_status->setText( buf.str() );
+
     }
 
     virtual void reset()
@@ -236,7 +236,7 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
     pointSlider->setBackColor( Color::Gray );
     pointSlider->setHeight( 12 );
     pointSlider->setHorizFill( true, 200 );
-    pointSlider->addEventHandler( new PointSizeHandler(s_pointCloud));   
+    pointSlider->addEventHandler( new PointSizeHandler(s_pointCloud));
 
     // Max Intensity
     HBox* maxIntensityBox = container->addControl(new HBox());
@@ -250,7 +250,7 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
     intensitySlider->setBackColor( Color::Gray );
     intensitySlider->setHeight( 12 );
     intensitySlider->setHorizFill( true, 200 );
-    intensitySlider->addEventHandler( new MaxIntensityHandler(s_pointCloud));   
+    intensitySlider->addEventHandler( new MaxIntensityHandler(s_pointCloud));
 
     // Min Height
     HBox* minHeightBox = container->addControl(new HBox());
@@ -263,7 +263,7 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
     minHeightSlider->setBackColor( Color::Gray );
     minHeightSlider->setHeight( 12 );
     minHeightSlider->setHorizFill( true, 200 );
-    minHeightSlider->addEventHandler( new MinHeightHandler(s_pointCloud));   
+    minHeightSlider->addEventHandler( new MinHeightHandler(s_pointCloud));
 
     // Max Height
     HBox* maxHeightBox = container->addControl(new HBox());
@@ -276,12 +276,12 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
     maxHeightSlider->setBackColor( Color::Gray );
     maxHeightSlider->setHeight( 12 );
     maxHeightSlider->setHorizFill( true, 200 );
-    maxHeightSlider->addEventHandler( new MaxHeightHandler(s_pointCloud));   
-    
+    maxHeightSlider->addEventHandler( new MaxHeightHandler(s_pointCloud));
+
 
     // Color mode
-    Grid* toolbar = new Grid();    
-    toolbar->setAbsorbEvents( true );    
+    Grid* toolbar = new Grid();
+    toolbar->setAbsorbEvents( true );
 
     LabelControl* rgb = new LabelControl("RGB");
     rgb->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::RGB));
@@ -293,18 +293,18 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
 
     LabelControl* classifiction = new LabelControl("Classification");
     classifiction->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Classification));
-    toolbar->setControl(2, 0, classifiction);   
+    toolbar->setControl(2, 0, classifiction);
 
     LabelControl* height = new LabelControl("Height");
     height->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Height));
-    toolbar->setControl(3, 0, height);   
+    toolbar->setControl(3, 0, height);
 
     LabelControl* ramp = new LabelControl("Ramp");
     ramp->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Ramp));
-    toolbar->setControl(4, 0, ramp);   
+    toolbar->setControl(4, 0, ramp);
 
     container->addChild(toolbar);
-    
+
     HBox* box = container->addControl(new HBox());
     CheckBoxControl* vegToggle = box->addControl(new CheckBoxControl(true));
     vegToggle->addEventHandler(new ToggleClassificationHandler(3));
@@ -326,7 +326,7 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
     CheckBoxControl* autoPointSizeToggle = box->addControl(new CheckBoxControl(s_pointCloud->getAutoPointSize()));
     autoPointSizeToggle->addEventHandler(new AutoPointSizeHandler());
     box->addControl(new LabelControl("Auto Point Size"));
-        
+
     // Add a status label
     s_status = container->addControl(new LabelControl());
 
@@ -334,9 +334,9 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
 }
 
 int main(int argc, char** argv)
-{    
+{
     osg::ArgumentParser arguments(&argc,argv);
-    
+
     osgViewer::Viewer viewer(arguments);
 
     viewer.setCameraManipulator( new EarthManipulator());
@@ -370,7 +370,7 @@ int main(int argc, char** argv)
 
     buildControls(viewer, root);
 
-    bool measure = arguments.read("--measure");    
+    bool measure = arguments.read("--measure");
 
     if (measure)
     {
@@ -381,11 +381,11 @@ int main(int argc, char** argv)
         OSG_NOTICE << "identifying" << std::endl;
     }
     if (!measure)
-    {        
+    {
         IdentifyPointHandler* identify = new IdentifyPointHandler();
         identify->addCallback( new IdentifyCallback(s_status));
         identify->setNodeMask(MaskPointCloud);
-        viewer.addEventHandler(identify);          
+        viewer.addEventHandler(identify);
     }
     else
     {
@@ -404,8 +404,8 @@ int main(int argc, char** argv)
     viewer.addEventHandler(new osgViewer::RecordCameraPathHandler());
 
     viewer.getCamera()->setNearFarRatio(0.00002);
-  
-    viewer.setSceneData( root );    
+
+    viewer.setSceneData( root );
 
     return viewer.run();
 

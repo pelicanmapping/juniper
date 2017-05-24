@@ -1,21 +1,21 @@
 /* -*-c++-*- */
 /* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
- * Copyright 2010-2011 Pelican Ventures, Inc.
- * http://wush.net/trac/juniper
- *
- * osgEarth is free software; you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
- */
+* Copyright 2010-2017 Pelican Mapping
+* Pelican Mapping CONFIDENTIAL
+* Copyright (c) 2010-2017 [Pelican Mapping], All Rights Reserved.
+*
+* NOTICE:  All information contained herein is, and remains the property of Pelican Mapping. The intellectual and technical concepts contained
+* herein are proprietary to Pelican Mapping and may be covered by U.S. and Foreign Patents, patents in process, and are protected by trade secret or copyright law.
+* Dissemination of this information or reproduction of this material is strictly forbidden unless prior written permission is obtained
+* from Pelican Mapping.  Access to the source code contained herein is hereby forbidden to anyone except current Pelican Mapping employees, managers or contractors who have executed
+* Confidentiality and Non-disclosure agreements explicitly covering such access.
+*
+* The copyright notice above does not evidence any actual or intended publication or disclosure  of  this source code, which includes
+* information that is confidential and/or proprietary, and is a trade secret, of Pelican Mapping.   ANY REPRODUCTION, MODIFICATION, DISTRIBUTION, PUBLIC  PERFORMANCE,
+* OR PUBLIC DISPLAY OF OR THROUGH USE  OF THIS  SOURCE CODE  WITHOUT  THE EXPRESS WRITTEN CONSENT OF PELICAN MAPPING IS STRICTLY PROHIBITED, AND IN VIOLATION OF APPLICABLE
+* LAWS AND INTERNATIONAL TREATIES.  THE RECEIPT OR POSSESSION OF  THIS SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY ANY RIGHTS
+* TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
+*/
 
 #include <osgText/Text>
 #include <osg/Geode>
@@ -40,8 +40,8 @@
 
 
 struct AssignColorVisitor : public osg::NodeVisitor
-{    
-    AssignColorVisitor(const osg::Vec4f& color) : 
+{
+    AssignColorVisitor(const osg::Vec4f& color) :
       osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN),
       _color( color )
       {}
@@ -82,7 +82,7 @@ osg::Vec3dArray* loadSpine( const std::string& filename )
             //OSG_NOTICE << "Pushing back " << x << ", " << y << ", " << z << std::endl;
             result->push_back( osg::Vec3d(x,y,z) );
         }
-    }            
+    }
     return result;
 }
 
@@ -97,9 +97,9 @@ osg::AnimationPath* createPath( osg::Vec3dArray* spine, double speed )
         osg::Vec3d look = p1 - p0;
         double dist = look.length();
         osg::Quat rot = osg::Matrixd::lookAt(p0, p1, osg::Vec3d(0,0,1)).getRotate();
-        rot = rot.inverse();        
+        rot = rot.inverse();
         path->insert(time, osg::AnimationPath::ControlPoint(p0, rot));
-        time += (dist / speed );       
+        time += (dist / speed );
     }
     return path;
 }
@@ -133,7 +133,7 @@ osg::Node* makeSpine( osg::Vec3dArray* spine )
 
 
 int main( int argc, char **argv )
-{   
+{
     // use an ArgumentParser object to manage the program arguments.
     osg::ArgumentParser arguments(&argc,argv);
 
@@ -153,12 +153,12 @@ int main( int argc, char **argv )
     tunnel->accept( v );
 
     root->addChild( makeSpine( spine ) );
-    root->addChild( tunnel );    
+    root->addChild( tunnel );
 
     osg::AnimationPath* path = createPath( spine, 1.0 );
     osgGA::AnimationPathManipulator* apm = new osgGA::AnimationPathManipulator( path );
     viewer.setCameraManipulator( apm );
-    
+
     // add model to viewer.
     viewer.setSceneData(root);
 

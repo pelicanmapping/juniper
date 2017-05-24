@@ -1,21 +1,21 @@
 /* -*-c++-*- */
 /* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
- * Copyright 2010-2011 Pelican Ventures, Inc.
- * http://wush.net/trac/juniper
- *
- * osgEarth is free software; you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
- */
+* Copyright 2010-2017 Pelican Mapping
+* Pelican Mapping CONFIDENTIAL
+* Copyright (c) 2010-2017 [Pelican Mapping], All Rights Reserved.
+*
+* NOTICE:  All information contained herein is, and remains the property of Pelican Mapping. The intellectual and technical concepts contained
+* herein are proprietary to Pelican Mapping and may be covered by U.S. and Foreign Patents, patents in process, and are protected by trade secret or copyright law.
+* Dissemination of this information or reproduction of this material is strictly forbidden unless prior written permission is obtained
+* from Pelican Mapping.  Access to the source code contained herein is hereby forbidden to anyone except current Pelican Mapping employees, managers or contractors who have executed
+* Confidentiality and Non-disclosure agreements explicitly covering such access.
+*
+* The copyright notice above does not evidence any actual or intended publication or disclosure  of  this source code, which includes
+* information that is confidential and/or proprietary, and is a trade secret, of Pelican Mapping.   ANY REPRODUCTION, MODIFICATION, DISTRIBUTION, PUBLIC  PERFORMANCE,
+* OR PUBLIC DISPLAY OF OR THROUGH USE  OF THIS  SOURCE CODE  WITHOUT  THE EXPRESS WRITTEN CONSENT OF PELICAN MAPPING IS STRICTLY PROHIBITED, AND IN VIOLATION OF APPLICABLE
+* LAWS AND INTERNATIONAL TREATIES.  THE RECEIPT OR POSSESSION OF  THIS SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY ANY RIGHTS
+* TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
+*/
 
 #include <osg/io_utils>
 #include <osgDB/FileUtils>
@@ -196,7 +196,7 @@ protected:
         }
 
         osg::Vec3 color((float)point.color.r()/255.0f, (float)point.color.g()/255.0f, (float)point.color.b()/255.0f);
-        color *= 255.0f;        
+        color *= 255.0f;
         _out.write((char*)point.position._v, sizeof(double) * 3);
         _out.write((char*)point.normal._v, sizeof(float) * 3);
         _out.write((char*)color._v, sizeof(float) * 3);
@@ -205,7 +205,7 @@ protected:
 
     osg::ref_ptr< OctreeNode > _node;
     std::string _filename;
-    unsigned int _numPoints;    
+    unsigned int _numPoints;
     std::ofstream _out;
     bool _needsProcessed;
     PointList _points;
@@ -303,27 +303,27 @@ _useVBO( true )
 {
 }
 
-void MakeSceneVisitor::addRejectionFile(RejectionFile* rejectionFile, OctreeNode& node) 
+void MakeSceneVisitor::addRejectionFile(RejectionFile* rejectionFile, OctreeNode& node)
 {
     //Close the rejection file
     rejectionFile->close();
-    //osg::notify(osg::NOTICE) << "Rejection file " << rejectionFiles[i]->getFilename() << " contains " << rejectionFiles[i]->getNumPoints() << std::endl;            
+    //osg::notify(osg::NOTICE) << "Rejection file " << rejectionFiles[i]->getFilename() << " contains " << rejectionFiles[i]->getNumPoints() << std::endl;
     unsigned int numReadRejectionFile = 0;
     osg::ref_ptr< PointSource > rejectionSource = rejectionFile->createPointSource();
-    osg::ref_ptr< PointCursor > rejectionCursor = rejectionSource->createPointCursor();                
+    osg::ref_ptr< PointCursor > rejectionCursor = rejectionSource->createPointCursor();
     Point p;
     while (rejectionCursor->nextPoint(p))
-    {               
-        {            
+    {
+        {
             AddPointVisitor apv(p, _innerMaxLevel);
             apv.setStrategy(AddPointVisitor::ACCEPT);
-            node.accept(apv);            
+            node.accept(apv);
         }
-    }    
+    }
     //Delete the cursor and close the rejection file
     rejectionCursor = NULL;
-    rejectionFile->setNeedsProcessed(false);    
-    rejectionFile->remove();      
+    rejectionFile->setNeedsProcessed(false);
+    rejectionFile->remove();
 }
 
 void
@@ -364,7 +364,7 @@ MakeSceneVisitor::apply(OctreeNode& node)
             apv.setStrategy(AddPointVisitor::REJECT);
         }
         else
-        {                    
+        {
             osg::notify(osg::NOTICE) << "Reached max level of " << _outerMaxLevel << ", accepting all points" << std::endl;
             //We can't break it down any further, just accept the points and move on
             apv.setStrategy(AddPointVisitor::ACCEPT);
@@ -403,14 +403,14 @@ MakeSceneVisitor::apply(OctreeNode& node)
 
     /*
     if (numPointsAdded + numPointsRejected < maxSize)
-    {       
+    {
         OSG_DEBUG << "Adding points from rejection file, total size of node is < " << maxSize << std::endl;
         for (unsigned int i = 0; i < 8; ++i)
         {
             addRejectionFile(rejectionFiles[i], innerOctree);
             numPointsAdded += rejectionFiles[i]->getNumPoints();
             numPointsRejected -= rejectionFiles[i]->getNumPoints();
-        }       
+        }
     }
     else
     {
@@ -425,7 +425,7 @@ MakeSceneVisitor::apply(OctreeNode& node)
                 numPointsAdded += rejectionFiles[i]->getNumPoints();
                 numPointsRejected -= rejectionFiles[i]->getNumPoints();
             }
-        }       
+        }
     }
     */
 
@@ -440,7 +440,7 @@ MakeSceneVisitor::apply(OctreeNode& node)
             numPointsAdded += rejectionFiles[i]->getNumPoints();
             numPointsRejected -= rejectionFiles[i]->getNumPoints();
         }
-    }       
+    }
 
     if (numPointsAdded + numPointsRejected != numPointsRead)
     {
@@ -458,7 +458,7 @@ MakeSceneVisitor::apply(OctreeNode& node)
     std::string nodeFilename = createURI(node);
 
     //Create a PagedLOD for this node
-    osg::ref_ptr< osg::PagedLOD > pagedLOD = new osg::PagedLOD;        
+    osg::ref_ptr< osg::PagedLOD > pagedLOD = new osg::PagedLOD;
     osg::Vec3 center = node.getBoundingBox().center();
     pagedLOD->setRadius(node.getBoundingBox().radius());
     pagedLOD->setCenter(center);
@@ -497,8 +497,8 @@ MakeSceneVisitor::apply(OctreeNode& node)
             msv.setRadiusFactor( _radiusFactor );
             msv.setUseVBO( _useVBO );
 
-            //Make the max number of operations configurable            
-            _operationQueue->add( new MakeSceneOp(rejectionFiles[i]->getNode(), msv, false));         
+            //Make the max number of operations configurable
+            _operationQueue->add( new MakeSceneOp(rejectionFiles[i]->getNode(), msv, false));
         }
     }
 }
@@ -511,8 +511,8 @@ static OpenThreads::Mutex s_statsMutex;
 
 osg::Node*
 MakeSceneVisitor::makeNode(PointList& points)
-{    
-    //Update the stats    
+{
+    //Update the stats
     {
         OpenThreads::ScopedLock< OpenThreads::Mutex> statsMutex(s_statsMutex);
         s_numPoints += points.size();
@@ -533,7 +533,7 @@ MakeSceneVisitor::makeNode(PointList& points)
 
     osg::Vec3Array* verts = new osg::Vec3Array();
     verts->reserve(points.size());
-    geometry->setVertexArray( verts );    
+    geometry->setVertexArray( verts );
 
     osg::Vec4ubArray* colors = new osg::Vec4ubArray();
     colors->reserve(points.size());
@@ -542,7 +542,7 @@ MakeSceneVisitor::makeNode(PointList& points)
 
 
     while (points.size() > 0)
-    {                 
+    {
         osg::Vec3 position = points.front().position - anchor;
         verts->push_back(position);
         osg::Vec4ub color = points.front().color;
@@ -558,13 +558,13 @@ MakeSceneVisitor::makeNode(PointList& points)
     osg::MatrixTransform* mt = new osg::MatrixTransform;
     mt->setMatrix(osg::Matrixd::translate(anchor));
     mt->addChild(geode);
-    return mt;    
+    return mt;
 }
 
 std::string MakeSceneVisitor::createRejectionFile( OctreeNode& node)
 {
     std::stringstream ss;
-    ss << "R_" << node.getID().level << "_" 
+    ss << "R_" << node.getID().level << "_"
         << node.getID().x << "_"
         << node.getID().y << "_"
         << node.getID().z << ".spawar_points";
@@ -575,7 +575,7 @@ std::string MakeSceneVisitor::createURI( OctreeNode& node)
 {
     std::stringstream ss;
     ss << _prefix
-        << node.getID().level << "_" 
+        << node.getID().level << "_"
         << node.getID().x << "_"
         << node.getID().y << "_"
         << node.getID().z << "." << _ext;
@@ -594,7 +594,7 @@ void
 MakeSceneOp::operator ()(osg::Object *)
 {
     {
-        _node->accept( _visitor);     
+        _node->accept( _visitor);
     }
 }
 
@@ -607,7 +607,7 @@ PointSource* createPointSource( const std::vector< std::string > &filenames )
     else
     {
         return new CompositePointSource(filenames);
-    } 
+    }
 }
 
 int main(int argc, char** argv)
@@ -624,11 +624,11 @@ int main(int argc, char** argv)
     arguments.getApplicationUsage()->addCommandLineOption("--outerMaxLevel <number>","outer octree max level, default is 11.");
     arguments.getApplicationUsage()->addCommandLineOption("--radiusFactor <number>","factor to set the final radius of a node, default is 5.");
     arguments.getApplicationUsage()->addCommandLineOption("--directory <directory> or -d <directory>","Specify a directory of files to load.");
-    arguments.getApplicationUsage()->addCommandLineOption("--filter <filter>","The extension to use to filter files out if loading files from a directory.  'pts' for example");    
+    arguments.getApplicationUsage()->addCommandLineOption("--filter <filter>","The extension to use to filter files out if loading files from a directory.  'pts' for example");
     arguments.getApplicationUsage()->addCommandLineOption("--ext    <extension>","The extension to use, default is ive");
-    arguments.getApplicationUsage()->addCommandLineOption("--prefix <prefix>","The prefix to use for the filenames ");    
-    arguments.getApplicationUsage()->addCommandLineOption("--threads <number>","The number of threads to use, default is the number of CPUs on the system");        
-    arguments.getApplicationUsage()->addCommandLineOption("--disableVBO","Disable the use of vertex buffer objects.  Defaults to false.");        
+    arguments.getApplicationUsage()->addCommandLineOption("--prefix <prefix>","The prefix to use for the filenames ");
+    arguments.getApplicationUsage()->addCommandLineOption("--threads <number>","The number of threads to use, default is the number of CPUs on the system");
+    arguments.getApplicationUsage()->addCommandLineOption("--disableVBO","Disable the use of vertex buffer objects.  Defaults to false.");
 
     unsigned int helpType = 0;
     if ((helpType = arguments.readHelpType()))
@@ -709,7 +709,7 @@ int main(int argc, char** argv)
     {
         arguments.writeErrorMessages(std::cout);
         return 1;
-    } 
+    }
 
     if (filenames.empty())
     {
@@ -721,14 +721,14 @@ int main(int argc, char** argv)
     {
         osg::notify(osg::NOTICE) << "Processing file " << i << " : " << filenames[i] << std::endl;
     }
-    
-    osg::ref_ptr< PointSource> pointSource = createPointSource( filenames );     
+
+    osg::ref_ptr< PointSource> pointSource = createPointSource( filenames );
     if (!pointSource.valid())
     {
         OSG_NOTICE << "Unable to create a point source from the given filenames." << std::endl;
         return 1;
     }
-    osg::ref_ptr< PointCursor > cursor = pointSource->createPointCursor();   
+    osg::ref_ptr< PointCursor > cursor = pointSource->createPointCursor();
 
     osg::Timer_t startTime = osg::Timer::instance()->tick();
     {
@@ -741,13 +741,13 @@ int main(int argc, char** argv)
         {
             bb.expandBy( p.position );
             numPoints++;
-        }        
+        }
 
         // Expand the bounding box a little bit to help combat precision errors
 
         osg::Vec3d buffer(10.0, 10.0, 10.0);
         bb._min -= buffer;
-        bb._max += buffer;       
+        bb._max += buffer;
 
         s_progress.setTotal( numPoints );
         osg::notify(osg::NOTICE) << "Read " << numPoints << " points, bounding box is " << bb._min << " to " << bb._max << std::endl;
@@ -811,14 +811,14 @@ int main(int argc, char** argv)
     seconds -= (hours * 3600);
     double minutes = floor(seconds / 60.0);
     seconds -= (minutes * 60);
-    
+
     osg::notify(osg::NOTICE) << "Completed in " << hours << " hours " << minutes << " min " << seconds << " s" << std::endl;
     OSG_NOTICE << "Points processed= " << s_numPoints << std::endl;
-    OSG_NOTICE << "Min size " << s_minSize << std::endl;               
-    OSG_NOTICE << "Max size " << s_maxSize << std::endl;  
+    OSG_NOTICE << "Min size " << s_minSize << std::endl;
+    OSG_NOTICE << "Max size " << s_maxSize << std::endl;
     OSG_NOTICE << "Avg size " << (double)s_numPoints / (double)s_numNodes << std::endl;
 
 
 
-    return 0;   
+    return 0;
 }

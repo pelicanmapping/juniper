@@ -1,20 +1,20 @@
 /* -*-c++-*- */
 /* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
-* Copyright 2010-2011 Pelican Ventures, Inc.
-* http://wush.net/trac/juniper
+* Copyright 2010-2017 Pelican Mapping
+* Pelican Mapping CONFIDENTIAL
+* Copyright (c) 2010-2017 [Pelican Mapping], All Rights Reserved.
 *
-* osgEarth is free software; you can redistribute it and/or modify
-* it under the terms of the GNU Lesser General Public License as published by
-* the Free Software Foundation; either version 2 of the License, or
-* (at your option) any later version.
+* NOTICE:  All information contained herein is, and remains the property of Pelican Mapping. The intellectual and technical concepts contained
+* herein are proprietary to Pelican Mapping and may be covered by U.S. and Foreign Patents, patents in process, and are protected by trade secret or copyright law.
+* Dissemination of this information or reproduction of this material is strictly forbidden unless prior written permission is obtained
+* from Pelican Mapping.  Access to the source code contained herein is hereby forbidden to anyone except current Pelican Mapping employees, managers or contractors who have executed
+* Confidentiality and Non-disclosure agreements explicitly covering such access.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
-*
-* You should have received a copy of the GNU Lesser General Public License
-* along with this program.  If not, see <http://www.gnu.org/licenses/>
+* The copyright notice above does not evidence any actual or intended publication or disclosure  of  this source code, which includes
+* information that is confidential and/or proprietary, and is a trade secret, of Pelican Mapping.   ANY REPRODUCTION, MODIFICATION, DISTRIBUTION, PUBLIC  PERFORMANCE,
+* OR PUBLIC DISPLAY OF OR THROUGH USE  OF THIS  SOURCE CODE  WITHOUT  THE EXPRESS WRITTEN CONSENT OF PELICAN MAPPING IS STRICTLY PROHIBITED, AND IN VIOLATION OF APPLICABLE
+* LAWS AND INTERNATIONAL TREATIES.  THE RECEIPT OR POSSESSION OF  THIS SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY ANY RIGHTS
+* TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
 */
 #include <osgDB/ReadFile>
 #include <osgDB/FileUtils>
@@ -104,15 +104,15 @@ public:
         bool readLine = false;
         while (in.good())
         {
-            //Read a line from the file            
-            getline(in, line);            
+            //Read a line from the file
+            getline(in, line);
             StringVector ized;
-            izer.tokenize(line, ized);                                   
+            izer.tokenize(line, ized);
 
 
             if (ized.size() == 20)
-            {           
-                INSReading reading;                
+            {
+                INSReading reading;
                 reading._utcSeconds = as<double>(ized[0], 0.0);
                 reading._velocity.x() = as<double>(ized[1], 0.0);
                 reading._velocity.y() = as<double>(ized[2], 0.0);
@@ -132,19 +132,19 @@ public:
                 reading._yawRate = as<double>(ized[16], 0.0);
                 reading._rollRateFilt = as<double>(ized[17], 0.0);
                 reading._pitchRateFilt = as<double>(ized[18], 0.0);
-                reading._yawRateFilt = as<double>(ized[19], 0.0);                
+                reading._yawRateFilt = as<double>(ized[19], 0.0);
 
                 //if (reading._utcSeconds - prevTime > 3)
                 //if (prevLat != reading._latRadians || prevLon != reading._lonRadians || prevAlt != reading._alt)
                 {
                     //OE_NOTICE << std::setprecision(20) << reading._latRadians << ", " << reading._lonRadians << ", " << reading._alt << std::endl;
                     readings.push_back( reading );
-                    prevTime = reading._utcSeconds;                
+                    prevTime = reading._utcSeconds;
                     prevLat = reading._latRadians;
-                    prevLon = reading._lonRadians;                
+                    prevLon = reading._lonRadians;
                     prevAlt = reading._alt;
 
-                }                           
+                }
                 read++;
             }
 
@@ -155,7 +155,7 @@ public:
 };
 
 osg::Node* makeINSNode(INSReadings& readings)
-{   
+{
     osg::Geometry* geometry = new osg::Geometry;
     osg::Vec3Array* verts =new osg::Vec3Array;
     verts->reserve(readings.size());
@@ -199,7 +199,7 @@ bool loadNeptecLidar(const std::string& filename, GeoPointList& readings)
 
     //Read the first line of the file, it's the header.
     std::string line;
-    
+
     osgEarth::StringTokenizer izer( "," );
 
     int read = 0;
@@ -209,18 +209,18 @@ bool loadNeptecLidar(const std::string& filename, GeoPointList& readings)
     bool readLine = false;
     while (in.good())
     {
-        //Read a line from the file            
-        getline(in, line);            
+        //Read a line from the file
+        getline(in, line);
         StringVector ized;
-        izer.tokenize(line, ized);                                   
+        izer.tokenize(line, ized);
 
         if (ized.size() == 3)
-        {           
+        {
             double lat = as<double>(ized[0], 0.0);
             double lon = as<double>(ized[1], 0.0);
             double alt = as<double>(ized[2], 0.0);
 
-            if (alt < -1000 || alt > 100) continue;            
+            if (alt < -1000 || alt > 100) continue;
 
             readings.push_back( GeoPoint(wgs84, lon, lat, alt));
 
@@ -236,7 +236,7 @@ bool loadNeptecLidar(const std::string& filename, GeoPointList& readings)
 
 void writeLLA(const std::string& filename, GeoPointList& readings)
 {
-    std::ofstream fout; 
+    std::ofstream fout;
     fout.open(filename, std::ios::binary | std::ios::out);
     for (GeoPointList::iterator itr = readings.begin(); itr != readings.end(); ++itr)
     {
@@ -250,7 +250,7 @@ void writeLLA(const std::string& filename, GeoPointList& readings)
 void readLLA(const std::string& filename, GeoPointList& readings)
 {
     osg::Timer_t start = osg::Timer::instance()->tick();
-    std::ifstream fout; 
+    std::ifstream fout;
     fout.open(filename, std::ios::binary | std::ios::in);
     const osgEarth::SpatialReference* wgs84 = osgEarth::SpatialReference::create("wgs84");
     double lon, lat, alt;
@@ -269,7 +269,7 @@ void readLLA(const std::string& filename, GeoPointList& readings)
 
 void convertCSVtoLLA(const std::string& directory)
 {
-    osgDB::DirectoryContents neptecFiles = osgDB::getDirectoryContents(directory);    
+    osgDB::DirectoryContents neptecFiles = osgDB::getDirectoryContents(directory);
     for( osgDB::DirectoryContents::const_iterator f = neptecFiles.begin(); f != neptecFiles.end(); ++f )
     {
         if ( f->compare(".") == 0 || f->compare("..") == 0 )
@@ -288,7 +288,7 @@ void convertCSVtoLLA(const std::string& directory)
             OE_NOTICE << "Writing to " << out << std::endl;
             writeLLA(out, neptecPoints);
         }
-    }    
+    }
 }
 
 
@@ -356,8 +356,8 @@ osg::Sequence* loadSession(const std::string& neptecDir, unsigned int maxFiles)
     }
     neptecGroup->setInterval(osg::Sequence::LOOP, 0, -1);
     neptecGroup->setDuration(1.0f, -1);
-    neptecGroup->setMode(osg::Sequence::START);    
-    return neptecGroup;    
+    neptecGroup->setMode(osg::Sequence::START);
+    return neptecGroup;
 }
 
 osg::Node* loadSessionLLA(const std::string& neptecDir, unsigned int maxFiles, double timePerFrame)
@@ -366,7 +366,7 @@ osg::Node* loadSessionLLA(const std::string& neptecDir, unsigned int maxFiles, d
     osg::Sequence* neptecGroup = new osg::Sequence();
 
     std::vector< std::string > filenames;
-    
+
 
     osgDB::DirectoryContents neptecFiles = osgDB::getDirectoryContents(neptecDir);
     for( osgDB::DirectoryContents::const_iterator f = neptecFiles.begin(); f != neptecFiles.end(); ++f )
@@ -378,9 +378,9 @@ osg::Node* loadSessionLLA(const std::string& neptecDir, unsigned int maxFiles, d
         std::string ext = osgDB::getFileExtension(filepath);
         if (ext == "lla" && osgDB::fileType(filepath) == osgDB::REGULAR_FILE)
         {
-            filenames.push_back( filepath );            
+            filenames.push_back( filepath );
         }
-    }    
+    }
 
 
 
@@ -396,8 +396,8 @@ osg::Node* loadSessionLLA(const std::string& neptecDir, unsigned int maxFiles, d
         if (neptecPoints.size() > 10)
         {
             OE_NOTICE << "Read " << neptecPoints.size() << std::endl;
-            neptecGroup->addChild(makeNepticNode(neptecPoints, osg::Vec4(1,0,1,1)));        
-            neptecGroup->setTime(neptecGroup->getNumChildren()-1, timePerFrame);            
+            neptecGroup->addChild(makeNepticNode(neptecPoints, osg::Vec4(1,0,1,1)));
+            neptecGroup->setTime(neptecGroup->getNumChildren()-1, timePerFrame);
             numRead++;
             if (numRead == maxFiles)
             {
@@ -410,7 +410,7 @@ osg::Node* loadSessionLLA(const std::string& neptecDir, unsigned int maxFiles, d
     neptecGroup->setDuration(1.0f, -1);
     neptecGroup->setMode(osg::Sequence::START);
     OE_NOTICE << "Number of frames " << neptecGroup->getNumChildren() << std::endl;
-    return neptecGroup;    
+    return neptecGroup;
 }
 
 osg::Node* loadSessionLLAFull(const std::string& neptecDir, unsigned int maxFiles)
@@ -418,7 +418,7 @@ osg::Node* loadSessionLLAFull(const std::string& neptecDir, unsigned int maxFile
     unsigned int numRead = 0;
 
     std::vector< std::string > filenames;
-  
+
     osgDB::DirectoryContents neptecFiles = osgDB::getDirectoryContents(neptecDir);
     for( osgDB::DirectoryContents::const_iterator f = neptecFiles.begin(); f != neptecFiles.end(); ++f )
     {
@@ -429,14 +429,14 @@ osg::Node* loadSessionLLAFull(const std::string& neptecDir, unsigned int maxFile
         std::string ext = osgDB::getFileExtension(filepath);
         if (ext == "lla" && osgDB::fileType(filepath) == osgDB::REGULAR_FILE)
         {
-            filenames.push_back( filepath );            
+            filenames.push_back( filepath );
         }
-    }    
+    }
 
 
 
-    
-    
+
+
     OE_NOTICE << "Loading " << filenames.size() << std::endl;
     std::sort(filenames.begin(), filenames.end());
 
@@ -444,13 +444,13 @@ osg::Node* loadSessionLLAFull(const std::string& neptecDir, unsigned int maxFile
     for (unsigned int i = 0; i < filenames.size(); i++)
     {
         std::string filename = filenames[i];
-        OE_NOTICE << "Loading " << numRead << " " << filename << std::endl;        
+        OE_NOTICE << "Loading " << numRead << " " << filename << std::endl;
         readLLA(filename, neptecPoints);
         numRead++;
         if (numRead == maxFiles)
         {
             break;
-        }        
+        }
     }
 
     return makeNepticNode(neptecPoints, osg::Vec4(1,1,1,1));
@@ -465,25 +465,25 @@ osg::AnimationPath* createPath( INSReadings& readings, osgEarth::MapNode* mapNod
 
     ElevationQuery   query(mapNode->getMap());
     for (INSReadings::iterator itr = readings.begin(); itr != readings.end(); ++itr)
-    {       
+    {
         osgEarth::GeoPoint map(wgs84, osg::RadiansToDegrees(itr->_lonRadians), osg::RadiansToDegrees(itr->_latRadians), itr->_alt);
         double elevation;
         osg::Vec3d world;
         map.toWorld(world);
         osg::Matrixd local2world;
-        map.createLocalToWorld( local2world );  
-        
-        double pitch = itr->_pitch;        
+        map.createLocalToWorld( local2world );
+
+        double pitch = itr->_pitch;
         double heading = itr->_heading;
-        double roll = itr->_roll;      
+        double roll = itr->_roll;
         double platAZ = itr->_platAZ;
 
 
         osg::Quat pitchTo90(osg::DegreesToRadians(90.0), osg::Vec3(1,0,0));
         osg::Quat ori =
         osg::Quat(roll, osg::Vec3(0,1,0)) * // roll
-        osg::Quat(pitch, osg::Vec3(1,0,0)) * //pitch        
-        osg::Quat(heading, osg::Vec3(0,0,-1));                
+        osg::Quat(pitch, osg::Vec3(1,0,0)) * //pitch
+        osg::Quat(heading, osg::Vec3(0,0,-1));
 
         osg::Quat rot = pitchTo90 * ori * local2world.getRotate();
 
@@ -491,7 +491,7 @@ osg::AnimationPath* createPath( INSReadings& readings, osgEarth::MapNode* mapNod
         if (time >= 0.0)
         {
             path->insert(time, osg::AnimationPath::ControlPoint(world, rot));
-        }       
+        }
     }
     return path;
 }
@@ -509,7 +509,7 @@ struct PointSizeHandler : public ControlEventHandler
 {
     PointSizeHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
     void onValueChanged( Control* control, float value )
-    {        
+    {
         _pointCloud->setPointSize(value);
         OSG_NOTICE << "Point size " << value << std::endl;
     }
@@ -520,7 +520,7 @@ struct MaxIntensityHandler : public ControlEventHandler
 {
     MaxIntensityHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
     void onValueChanged( Control* control, float value )
-    {        
+    {
         _pointCloud->setMaxIntensity(value);
         OSG_NOTICE << "Max Intensity " << value << std::endl;
     }
@@ -532,7 +532,7 @@ struct MinHeightHandler : public ControlEventHandler
 {
     MinHeightHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
     void onValueChanged( Control* control, float value )
-    {        
+    {
         _pointCloud->setMinHeight(value);
         OSG_NOTICE << "Min Height " << value << std::endl;
     }
@@ -550,7 +550,7 @@ struct FOVHandler : public ControlEventHandler
     }
 
     void onValueChanged( Control* control, float value )
-    {        
+    {
         fov = value;
         OSG_NOTICE << "fov " << fov << std::endl;
     }
@@ -564,7 +564,7 @@ _uniform(uniform)
     }
 
     void onValueChanged( Control* control, float value )
-    {                
+    {
         _uniform->set(value);
     }
 
@@ -577,7 +577,7 @@ struct MaxHeightHandler : public ControlEventHandler
 {
     MaxHeightHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
     void onValueChanged( Control* control, float value )
-    {        
+    {
         _pointCloud->setMaxHeight(value);
         OSG_NOTICE << "Max Height " << value << std::endl;
     }
@@ -589,7 +589,7 @@ struct HazeDistanceHandler : public ControlEventHandler
 {
     HazeDistanceHandler( PointCloudDecorator* pointCloud ) : _pointCloud(pointCloud) { }
     void onValueChanged( Control* control, float value )
-    {        
+    {
         _pointCloud->setHazeDistance(value);
         OSG_NOTICE << "Haze distance " << value << std::endl;
     }
@@ -660,7 +660,7 @@ virtual void selected(const Point& point)
         << "RGBA: " << (int)point.color.r() << ", " << (int)point.color.g() << ", " << (int)point.color.b() << ", " << (int)point.color.a() << std::endl
         << "Return: " << (int)point.returnNumber << std::endl;
 
-    s_status->setText( buf.str() );     
+    s_status->setText( buf.str() );
 
 }
 
@@ -721,8 +721,8 @@ struct AutoPointSizeHandler : public ControlEventHandler
 };
 
 
-static const char *vertSource = 
-        "varying vec4 texCoord0;\n"   
+static const char *vertSource =
+        "varying vec4 texCoord0;\n"
         "void main()"
         "{\n"
         "    texCoord0 = gl_MultiTexCoord0;\n"
@@ -731,7 +731,7 @@ static const char *vertSource =
         "}\n";
 
     static const char* fragSource =
-        "varying vec4 texCoord0;\n"   
+        "varying vec4 texCoord0;\n"
         "uniform sampler2D texture_unit;\n"
         "uniform float opacity;\n"
         "uniform float slider;\n"
@@ -749,11 +749,11 @@ osg::Node* createVideoHUD(osg::Image* image, float alpha = 1.0)
     osg::Camera* hudCamera = new osg::Camera;
     hudCamera->setReferenceFrame(osg::Transform::ABSOLUTE_RF);
     hudCamera->setProjectionMatrix(osg::Matrix::ortho2D(0.0, 1.0, 0.0, 1.0));
-    hudCamera->setViewMatrix(osg::Matrix::identity());    
+    hudCamera->setViewMatrix(osg::Matrix::identity());
     hudCamera->setClearMask(GL_DEPTH_BUFFER_BIT);
 
-    //hudCamera->setRenderOrder(osg::Camera::NESTED_RENDER, -10);    
-    hudCamera->setRenderOrder(osg::Camera::POST_RENDER);    
+    //hudCamera->setRenderOrder(osg::Camera::NESTED_RENDER, -10);
+    hudCamera->setRenderOrder(osg::Camera::POST_RENDER);
     hudCamera->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
     hudCamera->getOrCreateStateSet()->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
     hudCamera->getOrCreateStateSet()->setMode(GL_BLEND, osg::StateAttribute::ON);
@@ -772,7 +772,7 @@ osg::Node* createVideoHUD(osg::Image* image, float alpha = 1.0)
 
     osg::Vec2Array* texCoords = new osg::Vec2Array;
 
-    bool flip = image->getOrigin()==osg::Image::TOP_LEFT;    
+    bool flip = image->getOrigin()==osg::Image::TOP_LEFT;
     texCoords->push_back(osg::Vec2(0.0f, flip? 1.0f: 0.0f));
     texCoords->push_back(osg::Vec2(1.0f, flip? 1.0f: 0.0f));
     texCoords->push_back(osg::Vec2(1.0f, flip? 0.0f: 1.0f));
@@ -787,7 +787,7 @@ osg::Node* createVideoHUD(osg::Image* image, float alpha = 1.0)
     osg::Texture2D* texture = new osg::Texture2D(image);
     texture->setResizeNonPowerOfTwoHint(false);
     texture->setFilter(osg::Texture2D::MIN_FILTER, osg::Texture2D::LINEAR_MIPMAP_LINEAR);
-    texture->setFilter(osg::Texture2D::MAG_FILTER, osg::Texture2D::LINEAR);    
+    texture->setFilter(osg::Texture2D::MAG_FILTER, osg::Texture2D::LINEAR);
     geometry->getOrCreateStateSet()->setTextureAttributeAndModes(0, texture, osg::StateAttribute::ON);
 
     geometry->addPrimitiveSet(new osg::DrawArrays(GL_QUADS, 0, verts->size()));
@@ -797,11 +797,11 @@ osg::Node* createVideoHUD(osg::Image* image, float alpha = 1.0)
     program->addShader(new osg::Shader(osg::Shader::FRAGMENT, fragSource));
     geometry->getOrCreateStateSet()->setAttributeAndModes(program, osg::StateAttribute::ON);
     geometry->getOrCreateStateSet()->addUniform(new osg::Uniform("texture_unit", 0));
-            
+
     hudCamera->addChild( geometry );
 
     return hudCamera;
-        
+
 }
 
 
@@ -825,7 +825,7 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root, osg::Node* video
         pointSlider->setBackColor( Color::Gray );
         pointSlider->setHeight( 12 );
         pointSlider->setHorizFill( true, 200 );
-        pointSlider->addEventHandler( new PointSizeHandler(s_pointCloud));   
+        pointSlider->addEventHandler( new PointSizeHandler(s_pointCloud));
 
         // Max Intensity
         HBox* maxIntensityBox = container->addControl(new HBox());
@@ -839,7 +839,7 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root, osg::Node* video
         intensitySlider->setBackColor( Color::Gray );
         intensitySlider->setHeight( 12 );
         intensitySlider->setHorizFill( true, 200 );
-        intensitySlider->addEventHandler( new MaxIntensityHandler(s_pointCloud));   
+        intensitySlider->addEventHandler( new MaxIntensityHandler(s_pointCloud));
 
         // Min Height
         HBox* minHeightBox = container->addControl(new HBox());
@@ -852,7 +852,7 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root, osg::Node* video
         minHeightSlider->setBackColor( Color::Gray );
         minHeightSlider->setHeight( 12 );
         minHeightSlider->setHorizFill( true, 200 );
-        minHeightSlider->addEventHandler( new MinHeightHandler(s_pointCloud));   
+        minHeightSlider->addEventHandler( new MinHeightHandler(s_pointCloud));
 
         // Max Height
         HBox* maxHeightBox = container->addControl(new HBox());
@@ -865,7 +865,7 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root, osg::Node* video
         maxHeightSlider->setBackColor( Color::Gray );
         maxHeightSlider->setHeight( 12 );
         maxHeightSlider->setHorizFill( true, 200 );
-        maxHeightSlider->addEventHandler( new MaxHeightHandler(s_pointCloud));   
+        maxHeightSlider->addEventHandler( new MaxHeightHandler(s_pointCloud));
     }
 
     // video slider
@@ -881,7 +881,7 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root, osg::Node* video
         sliderSlider->setBackColor( Color::Gray );
         sliderSlider->setHeight( 12 );
         sliderSlider->setHorizFill( true, 200 );
-        sliderSlider->addEventHandler( new UniformHandler(videoNode->getOrCreateStateSet()->getOrCreateUniform("slider", osg::Uniform::FLOAT)));   
+        sliderSlider->addEventHandler( new UniformHandler(videoNode->getOrCreateStateSet()->getOrCreateUniform("slider", osg::Uniform::FLOAT)));
 
 
         // video opacity
@@ -895,7 +895,7 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root, osg::Node* video
         alphaSlider->setBackColor( Color::Gray );
         alphaSlider->setHeight( 12 );
         alphaSlider->setHorizFill( true, 200 );
-        alphaSlider->addEventHandler( new UniformHandler(videoNode->getOrCreateStateSet()->getOrCreateUniform("opacity", osg::Uniform::FLOAT)));       
+        alphaSlider->addEventHandler( new UniformHandler(videoNode->getOrCreateStateSet()->getOrCreateUniform("opacity", osg::Uniform::FLOAT)));
     }
 
 
@@ -911,7 +911,7 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root, osg::Node* video
     fovSlider->setBackColor( Color::Gray );
     fovSlider->setHeight( 12 );
     fovSlider->setHorizFill( true, 200 );
-    fovSlider->addEventHandler( new FOVHandler());   
+    fovSlider->addEventHandler( new FOVHandler());
 #endif
 
     if (s_pointCloud)
@@ -927,11 +927,11 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root, osg::Node* video
         hazeSlider->setBackColor( Color::Gray );
         hazeSlider->setHeight( 12 );
         hazeSlider->setHorizFill( true, 200 );
-        hazeSlider->addEventHandler( new HazeDistanceHandler(s_pointCloud));   
+        hazeSlider->addEventHandler( new HazeDistanceHandler(s_pointCloud));
 
         // Color mode
-        Grid* toolbar = new Grid();    
-        toolbar->setAbsorbEvents( true );    
+        Grid* toolbar = new Grid();
+        toolbar->setAbsorbEvents( true );
 
         LabelControl* rgb = new LabelControl("RGB");
         rgb->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::RGB));
@@ -943,15 +943,15 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root, osg::Node* video
 
         LabelControl* classifiction = new LabelControl("Classification");
         classifiction->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Classification));
-        toolbar->setControl(2, 0, classifiction);   
+        toolbar->setControl(2, 0, classifiction);
 
         LabelControl* height = new LabelControl("Height");
         height->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Height));
-        toolbar->setControl(3, 0, height);   
+        toolbar->setControl(3, 0, height);
 
         LabelControl* ramp = new LabelControl("Ramp");
         ramp->addEventHandler(new ChangeColorModeHandler(PointCloudDecorator::Ramp));
-        toolbar->setControl(4, 0, ramp);   
+        toolbar->setControl(4, 0, ramp);
 
         container->addChild(toolbar);
 
@@ -1001,11 +1001,11 @@ usage( const std::string& msg )
         << "USAGE: airwolf" << std::endl
         << std::endl
         << "    --video videoFile                   ; The video to load" << std::endl
-        << "    --ins insFile                       ; The INS csv to load" << std::endl        
-        << "    --startTime utcTime                 ; The start time for the INS animation, used to sync with the video" << std::endl        
-        << "    --lodScale                          ; The lod scale to start with" << std::endl        
-        << "    --gradient                          ; The gradient texture to load" << std::endl        
-        << "    --neptec                            ; Load a directory of neptec lla files" << std::endl        
+        << "    --ins insFile                       ; The INS csv to load" << std::endl
+        << "    --startTime utcTime                 ; The start time for the INS animation, used to sync with the video" << std::endl
+        << "    --lodScale                          ; The lod scale to start with" << std::endl
+        << "    --gradient                          ; The gradient texture to load" << std::endl
+        << "    --neptec                            ; Load a directory of neptec lla files" << std::endl
         << "    --neptecFrameTime                   ; The time in seconds to display each neptec lidar frame" << std::endl
         << "    map.earth" << std::endl
         << std::endl;
@@ -1015,7 +1015,7 @@ usage( const std::string& msg )
 
 
 int main(int argc, char** argv)
-{    
+{
     osg::ArgumentParser arguments(&argc,argv);
 
     if (arguments.argc() <= 1)
@@ -1023,9 +1023,9 @@ int main(int argc, char** argv)
         return usage("Please specify a .earth file");
     }
 
-    osgViewer::Viewer viewer(arguments);    
+    osgViewer::Viewer viewer(arguments);
 
-    // Turn on incremental compile operation 
+    // Turn on incremental compile operation
     viewer.setIncrementalCompileOperation(new osgUtil::IncrementalCompileOperation());
 
     viewer.setCameraManipulator( new EarthManipulator());
@@ -1048,7 +1048,7 @@ int main(int argc, char** argv)
     {
         s_pointCloud->getOrCreateStateSet()->setRenderBinDetails(99999, "RenderBin");
 
-        // Load the color ramp gradient.        
+        // Load the color ramp gradient.
         osg::Texture2D* colorRamp = new osg::Texture2D(osgDB::readImageFile(gradient));
         colorRamp->setResizeNonPowerOfTwoHint(false);
         colorRamp->setWrap( osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE );
@@ -1064,7 +1064,7 @@ int main(int argc, char** argv)
     // Preload the ffmpeg plugin.
     std::string ffmpegLib = osgDB::Registry::instance()->createLibraryNameForExtension( "ffmpeg" );
     if ( !ffmpegLib.empty() )
-        osgDB::Registry::instance()->loadLibrary( ffmpegLib );    
+        osgDB::Registry::instance()->loadLibrary( ffmpegLib );
 
     // Load the video file.
     std::string videoFile;
@@ -1078,7 +1078,7 @@ int main(int argc, char** argv)
         video = dynamic_cast< osg::ImageStream*>(osgDB::readImageFile(videoFile));
         if (video.valid())
         {
-            OSG_NOTICE << "Loaded video length=" << video->getLength() << std::endl;        
+            OSG_NOTICE << "Loaded video length=" << video->getLength() << std::endl;
             videoNode = createVideoHUD(video, 0.5f);
             root->addChild( videoNode );
 
@@ -1086,7 +1086,7 @@ int main(int argc, char** argv)
             videoNode->getOrCreateStateSet()->getOrCreateUniform("slider", osg::Uniform::FLOAT)->set(0.0f);
         }
     }
-    
+
 
     buildControls(viewer, root, videoNode);
 
@@ -1100,16 +1100,16 @@ int main(int argc, char** argv)
     viewer.getCamera()->setLODScale(lodScale);
     arguments.read("--lodScale", lodScale);
     OSG_NOTICE << "lodScale=" << lodScale << std::endl;
-      
+
     viewer.getCamera()->setNearFarRatio(0.00002);
 
 
     // Read INS camera path.
     std::string insFile;
-    arguments.read("--ins", insFile);   
+    arguments.read("--ins", insFile);
     INSReadings readings;
     if (!insFile.empty())
-    {        
+    {
         osg::Timer_t startTime = osg::Timer::instance()->tick();
         INSReader::read(insFile, readings);
         osg::Timer_t stopTime = osg::Timer::instance()->tick();
@@ -1143,8 +1143,8 @@ int main(int argc, char** argv)
     {
         osg::AnimationPath* path = createPath( readings, mapNode, simulationStart);
         osgGA::AnimationPathManipulator* apm = new osgGA::AnimationPathManipulator( path );
-        viewer.setCameraManipulator( apm );    
-    }    
+        viewer.setCameraManipulator( apm );
+    }
 
     viewer.setSceneData( root );
 
@@ -1160,17 +1160,17 @@ int main(int argc, char** argv)
         s_frameTime->setText("Frame time " + osgEarth::prettyPrintTime(frameTime));
         if (video)
         {
-            double videoTime = simulationStart + video->getCurrentTime();        
+            double videoTime = simulationStart + video->getCurrentTime();
             s_videoTime->setText("Video time " + osgEarth::prettyPrintTime(videoTime));
             if (osg::absolute(video->getCurrentTime() - viewer.getFrameStamp()->getReferenceTime()) > 1.0)
             {
                 video->seek(viewer.getFrameStamp()->getReferenceTime());
                 OE_NOTICE << "Seeking to " << viewer.getFrameStamp()->getReferenceTime() << std::endl;
-            }        
+            }
         }
         double fovy, ar, znear, zfar;
-        viewer.getCamera()->getProjectionMatrixAsPerspective( fovy, ar, znear, zfar );        
-        viewer.getCamera()->setProjectionMatrixAsPerspective( fov, ar, znear, zfar );         
+        viewer.getCamera()->getProjectionMatrixAsPerspective( fovy, ar, znear, zfar );
+        viewer.getCamera()->setProjectionMatrixAsPerspective( fov, ar, znear, zfar );
 
         viewer.frame();
     }
