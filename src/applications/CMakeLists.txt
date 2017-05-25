@@ -5,7 +5,6 @@ SET(OPENSCENEGRAPH_APPLICATION_DIR ${PROJECT_SOURCE_DIR})
 #OpenThreads, osg, osgDB and osgUtil are included elsewhere.
 SET(TARGET_COMMON_LIBRARIES
     osgJuniper
-    osgJuniperMap
 )
 
 SET(TARGET_DEFAULT_PREFIX "application_")
