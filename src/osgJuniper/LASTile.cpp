@@ -408,7 +408,7 @@ void OctreeCellBuilder::build()
             //OSG_NOTICE << "Processed " << (numAdded + numRejected) << " of " << total << " points. " << (int)(100.0f * (float)numProcessed/(float)total) << "%" << std::endl;
         }        
 
-        if ((_targetNumPoints != 0 && keep()) || count == 0 || _node->getID().z >= _maxLevel)
+        if ((_targetNumPoints != 0 && keep()) || count == 0 || _node->getID().level >= _maxLevel)
         {
             // The point passed, so write it to the output file.
             point->set_x(world.x());
@@ -487,6 +487,7 @@ void OctreeCellBuilder::buildChildren()
             builder.setGeocentric(_geocentric);
             builder.setOperationQueue(_queue);
             builder.setProgress(_progress);
+            builder.setMaxLevel(_maxLevel);
             _queue->add(new BuildCellOperator(builder));
         }
     }        
