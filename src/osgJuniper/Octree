@@ -75,9 +75,6 @@ namespace osgJuniper
         int z;
     };
 
-    class OctreeNodeVisitor;
-
-
     /**
      * A node in the Octree.  Stores points.
      */
@@ -139,10 +136,6 @@ namespace osgJuniper
          */
         const OctreeNodeList getChildren() const { return _children; }
 
-
-        void accept(OctreeNodeVisitor &v);
-        void traverse(OctreeNodeVisitor& v);
-
         /**
          * Creates the given child of the OctreeNode
          */
@@ -169,137 +162,6 @@ namespace osgJuniper
         osg::BoundingBoxd _boundingBox;
         bool _split;
     };
-
-    /**
-     * Visitor that traverses down the Octree.
-     */
-    class OSGJUNIPER_EXPORT OctreeNodeVisitor
-    {
-    public:
-        OctreeNodeVisitor();
-        virtual void apply(OctreeNode& node);
-        void traverse(OctreeNode& node);
-    };
-
-    /**
-     * NodeVisitor that counts all the points in the Octree.
-     */
-    class OSGJUNIPER_EXPORT CountPointsVisitor : public OctreeNodeVisitor
-    {
-    public:
-        CountPointsVisitor();
-        virtual void apply(OctreeNode& node);
-        unsigned int _numPoints;        
-    };
-
-    /**
-     * A NodeVisitor that adds a point to the given Octree
-     */
-    class OSGJUNIPER_EXPORT AddPointVisitor : public OctreeNodeVisitor
-    {
-    public:
-        enum Strategy
-        {
-            //Always accept the point
-            ACCEPT,
-            //Reject the point if it needs to go past the maximum level
-            REJECT
-        };
-
-        AddPointVisitor(const Point& point, unsigned int maxLevel);
-
-        /**
-         *Sets the strategy for the visitor.
-         */
-        void setStrategy(Strategy strategy);
-        /**
-         * Gets the strategy for the visitor.
-         */
-        Strategy getStrategy() const { return _strategy;}
-
-        /**
-         *Sets the maximum level that this visitor should traverse to.
-         */
-        void setMaxLevel(unsigned int maxLevel);
-        /**
-         * Gets the maximum level that this node should traverse to.
-         */
-        unsigned int getMaxLevel() const { return _maxLevel; }
-
-        /**
-         *Gets the point that is to be added.
-         */
-        const Point& getPoint() const { return _point;}
-
-        virtual void apply(OctreeNode& node);
-
-        /**
-         * Gets whether or not the point was added after a call to accept.
-         */
-        bool getPointAdded() const { return _pointAdded;}
-
-    protected:
-        Point _point;
-        Strategy _strategy;
-        unsigned int _maxLevel;
-        bool _pointAdded;
-    };
-
-    /**
-     * Collects all the points in the Octree
-     */
-    class OSGJUNIPER_EXPORT CollectPointsVisitor : public OctreeNodeVisitor
-    {
-    public:
-        CollectPointsVisitor();
-
-        /**
-         * Get whether or not to remove the point from the Octree when it is added to the visitor.
-         */
-        bool getRemove() const;
-
-        /**
-         * Set whether or not to remove the point from the Octree when it is added to the visitor.
-         */
-        void setRemove(bool remove);
-
-        virtual void apply(OctreeNode& node);
-
-        /**
-         * Gets the list of points that were collected.
-         */
-        PointList& getPoints();
-        const PointList& getPoints() const;
-
-    protected:
-        bool _remove;
-        PointList _points;
-    };
-
-    /**
-     * Choose representative points for the Node based on points that are contained in the leaves.
-     */
-    class OSGJUNIPER_EXPORT ChooseRepresentativePointVisitor : public OctreeNodeVisitor
-    {
-    public:
-        ChooseRepresentativePointVisitor();
-        virtual void apply(OctreeNode& node);   
-
-        PointList _points;
-        bool _valid;
-    };
-
-    /**
-     * Visitor used to collect representative points from leaf nodes and apply them to their parent nodes.
-     */
-    class OSGJUNIPER_EXPORT ApplyRepresentativePointVisitor : public OctreeNodeVisitor
-    {
-    public:
-        ApplyRepresentativePointVisitor();
-        virtual void apply(OctreeNode& node);
-    };
-
-
 }
 
 #endif
