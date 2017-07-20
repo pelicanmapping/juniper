@@ -494,6 +494,9 @@ void OctreeCellBuilder::build()
 	writer->setOptions(options);
 	writer->prepare(pointTable);
 	writer->execute(pointTable);
+
+	// Destroy the writer stage, we're done with it.
+	_factory.destroyStage(writer);
 	
 	closeChildWriters();
 	closeReader();
