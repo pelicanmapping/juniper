@@ -574,8 +574,15 @@ void OctreeCellBuilder::initReader()
 void OctreeCellBuilder::closeReader()
 {     
 	PDAL_LOCK;
-	_factory.destroyStage(_readerStage);
-	_readerStage = 0;
+	if (_readerStage)
+	{
+		for (unsigned int i = 0; i < _readerStage->getInputs().size(); i++)
+		{
+			_factory.destroyStage(_readerStage->getInputs()[i]);
+		}
+		delete _readerStage;
+		_readerStage = 0;
+	}
 }
 
 PointWriter* OctreeCellBuilder::getOrCreateWriter(const osg::Vec3d& location)
