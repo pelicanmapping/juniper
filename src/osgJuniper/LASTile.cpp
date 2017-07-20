@@ -379,9 +379,7 @@ void OctreeCellBuilder::build()
 		_node->setBoundingBox(_bounds);
     }
 
-	unsigned int numAdded = 0;
-
-    // Initialize the child arrays.	
+	// Initialize the child arrays.	
     _childWriters.clear();
     _children.clear();
     _outputFiles.clear();
@@ -393,10 +391,6 @@ void OctreeCellBuilder::build()
         _children.push_back(_node->createChild(i));
         _outputFiles.push_back("");
     }
-
-
-	unsigned int total = _totalNumPoints;
-	unsigned int numRejected = 0;
 
 	PointTable pointTable;
 	pointTable.layout()->registerDim(Dimension::Id::X);
@@ -412,7 +406,7 @@ void OctreeCellBuilder::build()
 	// Read all the points
 	StreamCallbackFilter callbackFilter;
 	callbackFilter.setInput(*_readerStage);
-	auto cb = [&](PointRef& point)
+	auto cb = [this, &idx, &view](PointRef& point) mutable
 	{
 		double x = point.getFieldAs<double>(Dimension::Id::X);
 		double y = point.getFieldAs<double>(Dimension::Id::Y);
@@ -432,12 +426,6 @@ void OctreeCellBuilder::build()
 		// See how many points are currently in this cell
 		int count = getPointsInCell(id);
 
-		unsigned int numProcessed = (numAdded + numRejected);
-		if (numProcessed % 100000 == 0)
-		{
-			//OSG_NOTICE << "Processed " << (numAdded + numRejected) << " of " << total << " points. " << (int)(100.0f * (float)numProcessed/(float)total) << "%" << std::endl;
-		}
-
 		if ((_targetNumPoints != 0 && keep()) || count == 0 || _node->getID().level >= _maxLevel)
 		{
 			// The point passed, so include it in the list.
@@ -451,7 +439,6 @@ void OctreeCellBuilder::build()
 			_progress->incrementComplete(1);
 			incrementPointsInCell(id, 1);
 			_numPoints++;
-			numAdded++;
 			idx++;
 		}
 		else
@@ -462,7 +449,6 @@ void OctreeCellBuilder::build()
 			if (writer)
 			{
 				writer->write(point);
-				numRejected++;
 			}
 			else
 			{
@@ -482,21 +468,24 @@ void OctreeCellBuilder::build()
 
 	// Set second argument to 'true' to let factory take ownership of
 	// stage and facilitate clean up.	
-	Stage *writer = _factory.createStage("writers.las");
+	{
+		PDAL_LOCK;
+		Stage *writer = _factory.createStage("writers.las");
 
-	std::string filename = getFilename(_node->getID(), "laz");	
-	osgEarth::makeDirectoryForFile(filename);
+		std::string filename = getFilename(_node->getID(), "laz");
+		osgEarth::makeDirectoryForFile(filename);
 
-	Options options;
-	options.add("filename", filename);
+		Options options;
+		options.add("filename", filename);
 
-	writer->setInput(bufferReader);
-	writer->setOptions(options);
-	writer->prepare(pointTable);
-	writer->execute(pointTable);
+		writer->setInput(bufferReader);
+		writer->setOptions(options);
+		writer->prepare(pointTable);
+		writer->execute(pointTable);
 
-	// Destroy the writer stage, we're done with it.
-	_factory.destroyStage(writer);
+		// Destroy the writer stage, we're done with it.
+		_factory.destroyStage(writer);
+	}
 	
 	closeChildWriters();
 	closeReader();
