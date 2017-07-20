@@ -37,7 +37,6 @@ namespace pdal
 	bool processOne(PointRef& point);
     virtual void done(PointTableRef table);
 
-	// TODO:  Delete
-	osgJuniper::PointReader* _reader;
+	std::shared_ptr< osgJuniper::PointReader> _reader;
   };
 }

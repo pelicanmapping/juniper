@@ -45,7 +45,7 @@ namespace pdal
 
   void PDALPointsReader::ready(PointTableRef)
   {
-	  _reader = new osgJuniper::PointReader(m_filename);
+	  _reader = std::make_shared<PointReader>(m_filename);
   }
 
   point_count_t PDALPointsReader::read(PointViewPtr view, point_count_t count)
@@ -94,7 +94,7 @@ namespace pdal
 
   void PDALPointsReader::done(PointTableRef)
   {
-	  if (_reader) delete _reader;
+	  _reader.reset();
   }
 
 } //namespace pdal
