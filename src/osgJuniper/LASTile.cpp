@@ -26,7 +26,9 @@
 #include <pdal/filters/StreamCallbackFilter.hpp>
 #include <pdal/io/BufferReader.hpp>
 
-static OpenThreads::Mutex stageLock;
+static OpenThreads::Mutex stageMutex;
+
+#define PDAL_LOCK OpenThreads::ScopedLock< OpenThreads::Mutex > lock(stageMutex)
 
 using namespace osgJuniper;
 
@@ -366,6 +368,8 @@ std::string OctreeCellBuilder::getFilename(OctreeId id, const std::string& ext) 
  
 void OctreeCellBuilder::build()
 {        
+	PDAL_LOCK;
+
     initReader();
 
     // If we aren't given a node, assume we are the root
@@ -460,6 +464,10 @@ void OctreeCellBuilder::build()
 				writer->write(point);
 				numRejected++;
 			}
+			else
+			{
+				_progress->incrementComplete(1);
+			}
 		}		
 		return true;
 	};
@@ -473,8 +481,7 @@ void OctreeCellBuilder::build()
 	bufferReader.addView(view);
 
 	// Set second argument to 'true' to let factory take ownership of
-	// stage and facilitate clean up.
-	OpenThreads::ScopedLock< OpenThreads::Mutex > lock(stageLock);
+	// stage and facilitate clean up.	
 	Stage *writer = _factory.createStage("writers.las");
 
 	std::string filename = getFilename(_node->getID(), "laz");	
@@ -522,7 +529,7 @@ void OctreeCellBuilder::buildChildren()
 }
 
 Stage* OctreeCellBuilder::createStageForFile(const std::string& filename) {
-	OpenThreads::ScopedLock< OpenThreads::Mutex > lock(stageLock);
+	PDAL_LOCK;
 
 	std::string driver;
 
@@ -558,13 +565,13 @@ void OctreeCellBuilder::initReader()
 			merged->getInputs().push_back(stage);
 		}
 	}
-	_readerStage = merged;
+	_readerStage = merged;	
 }
 
 void OctreeCellBuilder::closeReader()
 {     
-	OpenThreads::ScopedLock< OpenThreads::Mutex > lock(stageLock);
-	_factory.destroyStage(_readerStage);
+	PDAL_LOCK;
+	//_factory.destroyStage(_readerStage);
 	_readerStage = 0;
 }
 
