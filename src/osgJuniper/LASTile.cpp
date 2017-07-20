@@ -571,7 +571,7 @@ void OctreeCellBuilder::initReader()
 void OctreeCellBuilder::closeReader()
 {     
 	PDAL_LOCK;
-	//_factory.destroyStage(_readerStage);
+	_factory.destroyStage(_readerStage);
 	_readerStage = 0;
 }
 
