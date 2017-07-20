@@ -148,14 +148,15 @@ _label(label)
         // Assume the point is in geocentric
         osgEarth::SpatialReference* wgs84 = osgEarth::SpatialReference::create("epsg:4326");
         osgEarth::GeoPoint geoPoint;
-        geoPoint.fromWorld(wgs84, point.position);
+		osg::Vec3d world(point.x, point.y, point.z);
+        geoPoint.fromWorld(wgs84, world);
         LatLongFormatter formatter;
         formatter.setPrecision(8);
         std::stringstream buf;
         buf << "Location: " << formatter.format(geoPoint) << ", " << geoPoint.z() << std::endl
             << "Classification: " << classificationToString(point.classification) << std::endl
             << "Intensity: " << point.intensity << std::endl
-            << "RGBA: " << (int)point.color.r() << ", " << (int)point.color.g() << ", " << (int)point.color.b() << ", " << (int)point.color.a() << std::endl
+            << "RGBA: " << point.r << ", " << point.g << ", " << point.b << ", " << point.a << std::endl
             << "Return: " << (int)point.returnNumber << std::endl;
 
         s_status->setText( buf.str() );

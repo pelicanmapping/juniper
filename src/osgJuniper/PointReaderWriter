@@ -16,53 +16,61 @@
 * LAWS AND INTERNATIONAL TREATIES.  THE RECEIPT OR POSSESSION OF  THIS SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY ANY RIGHTS
 * TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
 */
-#ifndef OSGJUNIPER_SPTNODE
-#define OSGJUNIPER_SPTNODE 1
+
+#ifndef OSGJUNIPER_POINTREADERWRITER
+#define OSGJUNIPER_POINTREADERWRITER 1
 
 #include <osgJuniper/Common>
-#include <osg/Geode>
-#include <osg/Geometry>
+#include <fstream>
+
+#include <pdal/PointRef.hpp>
+#include <pdal/Reader.hpp>
+
 #include <osgJuniper/Point>
 
 namespace osgJuniper
 {
-    /**
-     * Experimental class that implements the Sequential Point Tree algorithm as described in 
-     * http://www.vis.uni-stuttgart.de/~dachsbcn/download/spt.pdf
-     */
-    class OSGJUNIPER_EXPORT SPTNode : public osg::Geode
-    {
-    public:
-        SPTNode();
-        void setPoints( PointList &points );
+	using namespace pdal;
 
-        void setRadiusFactor( float radiusFactor );
-        float getRadiusFactor() const;
+	class OSGJUNIPER_EXPORT PointReader
+	{
+	public:
+		PointReader(const std::string& filename);
+		~PointReader();
 
-        void setEnabled( bool enabled);
-        bool getEnabled() const;
+		bool read(Point& point);
 
-        unsigned int getMaxVerts() const;
-        void setMaxVerts(unsigned int maxVerts);
+		bool hasMore() const;
 
+		void reset();
 
-        virtual void traverse(osg::NodeVisitor &nv);
-
-    protected:
-        float _radiusFactor;
-        osg::Geometry *_geometry;
-        osg::Vec3Array* _verts;
-        osg::Vec4ubArray* _colors;
-        osg::Vec3Array* _normals;
-        typedef std::map< float, int> RangeMap;
-        RangeMap _rangeMap;
-        osg::DrawArrays* _drawArrays;
-        bool _enabled;
-        unsigned int _maxVerts;
-    };
-
-} // namespace osgJuniper
-
-#endif // OSGJUNIPER_SPTNODE
+	protected:
+		std::string _filename;
+		std::ifstream _in;
+	};
 
 
+	class OSGJUNIPER_EXPORT PointWriter
+	{
+	public:
+		PointWriter(const std::string& filename);
+		~PointWriter();
+
+		void write(pdal::PointRef& point);
+
+		void close();
+
+		const std::string& getFilename() const;
+
+
+	protected:
+		std::string _filename;
+		std::ofstream _out;
+	};
+
+
+	
+}
+
+
+#endif

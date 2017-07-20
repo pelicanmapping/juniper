@@ -41,17 +41,20 @@ namespace osgJuniper
     class OSGJUNIPER_EXPORT Point
     {
     public:
-        Point();
-        Point(const osg::Vec3d& position, const osg::Vec3& normal, const osg::Vec4ub &color);
+        Point();        
 
-        osg::Vec3d position;
-        osg::Vec4ub color;
-        osg::Vec3 normal;    
-        float minRange;
-        float size;        
-        unsigned short intensity;
-        unsigned char classification;
-        unsigned char returnNumber;
+		double x;
+		double y;
+		double z;
+
+		int r;
+		int g;
+		int b;
+		int a;
+
+		unsigned short intensity;
+		unsigned char classification;
+		unsigned char returnNumber;        
     };
 
     typedef std::list< Point > PointList;    

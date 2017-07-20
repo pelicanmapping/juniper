@@ -42,12 +42,12 @@ int main(int argc, char** argv)
     if (!directory.empty())
     {
         //Load the filenames from a directory
-        std::vector< std::string > contents = Utils::getFilesFromDirectory(directory, "laz");
+        std::vector< std::string > contents = osgJuniper::Utils::getFilesFromDirectory(directory, "laz");
         for (unsigned int i = 0; i < contents.size(); i++)
         {
             filenames.push_back(contents[i]);
         }
-        contents = Utils::getFilesFromDirectory(directory, "las");
+        contents = osgJuniper::Utils::getFilesFromDirectory(directory, "las");
         for (unsigned int i = 0; i < contents.size(); i++)
         {
             filenames.push_back(contents[i]);

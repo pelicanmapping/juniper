@@ -218,8 +218,13 @@ void IdentifyPointHandler::select(float x, float y, osgViewer::View* viewer)
 
         // Notify any callbacks of the point selection.
         Point point;
-        point.position = world;
-        point.color = prevColor;
+		point.x = world.x();
+		point.y = world.y();
+		point.z = world.z();
+		point.r = prevColor.r() * 255;
+		point.g = prevColor.g() * 255;
+		point.b = prevColor.b() * 255;
+		point.a = prevColor.a() * 255;
         point.classification = data.x();
         point.returnNumber = data.y();
         point.intensity = data.z();

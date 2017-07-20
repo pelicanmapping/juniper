@@ -20,13 +20,20 @@
 #include <osgEarth/FileUtils>
 #include <osgEarth/Random>
 #include <osgEarth/GeoData>
+#include <osgDB/FileNameUtils>
 
-#include "lasreader.hpp"
-#include "laswriter.hpp"
+#include <pdal/filters/MergeFilter.hpp>
+#include <pdal/filters/StreamCallbackFilter.hpp>
+#include <pdal/io/BufferReader.hpp>
 
+static OpenThreads::Mutex stageLock;
 
 using namespace osgJuniper;
 
+using namespace pdal;
+using namespace std;
+
+static pdal::StageFactory _factory;
 
 Progress::Progress():
 _complete(0),
@@ -81,32 +88,37 @@ float Progress::getPercentComplete()
 class BuildCellOperator : public osg::Operation
 {
 public:
-    BuildCellOperator(const OctreeCellBuilder& builder):
+    BuildCellOperator(OctreeCellBuilder* builder):
       _builder(builder)
       {
       }
 
       void operator()(osg::Object* object)
       {
-          _builder.build();
-          _builder.buildChildren();
+		  if (_builder.valid())
+		  {
+			  _builder->build();
+			  _builder->buildChildren();
+		  }
+		  else
+		  {
+			  OSG_NOTICE << "No builder?" << std::endl;
+		  }
       }
 
-      OctreeCellBuilder _builder;
+      osg::ref_ptr< OctreeCellBuilder > _builder;
 };
 
 OctreeCellBuilder::OctreeCellBuilder():
 _innerLevel(6),
     _maxLevel(8),
     _targetNumPoints(0),
-    _writer(0),
-    _reader(0),
-    _writeHeader(0),
-    _writeQuantizer(0),
     _numPoints(0),
     _deleteInputs(false),
     _fraction(1.0),
-    _geocentric(false)
+    _geocentric(false),
+	_totalNumPoints(0),
+	_readerStage(0)
 {
 }
 
@@ -193,16 +205,8 @@ static osgEarth::Random random;
 
 bool OctreeCellBuilder::keep()
 {
-    if (_numPoints >= _targetNumPoints) return false;
-
-    if (_fraction >= 1.0) return true;
-    if (_fraction <= 0.0) return false;
-
-    //double f = random.next();
-
-    float f = (float)rand()/(float)RAND_MAX;
-    //OSG_NOTICE << "f=" << f << " fraction=" << _fraction << std::endl;
-    return f <= _fraction;    
+    if (_numPoints >= _targetNumPoints) return false;    
+	return true;
 }
 
 osgEarth::SpatialReference* OctreeCellBuilder::getSourceSRS() const
@@ -253,10 +257,10 @@ osg::Vec3d OctreeCellBuilder::reprojectPoint(const osg::Vec3d& input)
     return input;
 }
 
-std::string OctreeCellBuilder::getFilename(OctreeId id) const
+std::string OctreeCellBuilder::getFilename(OctreeId id, const std::string& ext) const
 {
     std::stringstream buf;
-    buf << "tile_" << id.level << "_" << id.z << "_" << id.x << "_" << id.y << ".laz";    
+    buf << "tile_" << id.level << "_" << id.z << "_" << id.x << "_" << id.y << "." << ext;    
     return buf.str();
 }
 
@@ -291,8 +295,55 @@ std::string OctreeCellBuilder::getFilename(OctreeId id) const
      _progress = progress;
  }
 
+ void OctreeCellBuilder::computeMetaData()
+ {
+	 _totalNumPoints = 0;
+	 _bounds.init();
+
+	 double minX = DBL_MAX;
+	 double minY = DBL_MAX;
+	 double minZ = DBL_MAX;
+	 double maxX = -DBL_MAX;
+	 double maxY = -DBL_MAX;
+	 double maxZ = -DBL_MAX;
+
+	 unsigned int total = 0;
+	 for (unsigned int i = 0; i < _inputFiles.size(); i++)
+	 {
+		 // Create a reader stage for the file.
+		 Stage* reader = createStageForFile(_inputFiles[i]);
+
+		 // Do a quick preview on the file to get the input.
+		 QuickInfo info = reader->preview();
+		 if (info.m_valid)
+		 {
+			 _totalNumPoints += info.m_pointCount;
+
+			 if (minX > info.m_bounds.minx) minX = info.m_bounds.minx;
+			 if (minY > info.m_bounds.miny) minY = info.m_bounds.miny;
+			 if (minZ > info.m_bounds.minz) minZ = info.m_bounds.miny;
+
+			 if (maxX < info.m_bounds.maxx) maxX = info.m_bounds.maxx;
+			 if (maxY < info.m_bounds.maxy) maxY = info.m_bounds.maxy;
+			 if (maxZ < info.m_bounds.maxz) maxZ = info.m_bounds.maxy;
+		 }
+	 }
+
+	 _bounds = osg::BoundingBoxd(minX, minY, minZ, maxX, maxY, maxZ);
+
+	 double width = _bounds.xMax() - _bounds.xMin();
+	 double height = _bounds.zMax() - _bounds.zMin();
+	 double depth = _bounds.yMax() - _bounds.yMin();
+	 double max = osg::maximum(osg::maximum(width, height), depth);
+	 _bounds.xMax() = _bounds.xMin() + max;
+	 _bounds.yMax() = _bounds.yMin() + max;
+	 _bounds.zMax() = _bounds.zMin() + max;
+}
+
  void OctreeCellBuilder::buildRoot(unsigned int numThreads)
- {     
+ {   	 
+	 computeMetaData();
+	 
      // This is the root builder.
      // Initialize an operations queue
      _queue = new osg::OperationQueue;
@@ -300,20 +351,8 @@ std::string OctreeCellBuilder::getFilename(OctreeId id) const
      // Initialize the progress
      _progress = new Progress();
 
-     // Open up all the files to get the total number of points
-     LASreadOpener lasreadopener;
-     for (unsigned int i = 0; i < _inputFiles.size(); i++)
-     {
-         lasreadopener.add_file_name(_inputFiles[i].c_str());
-     }
-     lasreadopener.set_merged(TRUE);
-     lasreadopener.set_populate_header(TRUE);
-
-     LASreader *reader = lasreadopener.open();   
-     _progress->setTotal(reader->header.number_of_point_records);
-     reader->close();
-     delete reader;
-
+	 _progress->setTotal(_totalNumPoints);
+	 
      initThreads(numThreads);
 
      build();
@@ -323,11 +362,7 @@ std::string OctreeCellBuilder::getFilename(OctreeId id) const
      {        
          OpenThreads::Thread::microSleep(5 * 1000 * 1000);
      }
-
-
  }
-
-
  
 void OctreeCellBuilder::build()
 {        
@@ -336,135 +371,128 @@ void OctreeCellBuilder::build()
     // If we aren't given a node, assume we are the root
     if (!_node.valid())
     {
-        osg::BoundingBoxd bounds(_reader->header.min_x, _reader->header.min_y,_reader->header.min_z,
-                                 _reader->header.max_x, _reader->header.max_y, _reader->header.max_z);
-        double width = bounds.xMax() - bounds.xMin();
-        double height = bounds.zMax() -bounds.zMin();
-        double depth = bounds.yMax() - bounds.yMin();
-        double max = osg::maximum(osg::maximum(width, height), depth);
-        bounds.xMax() = bounds.xMin() + max;
-        bounds.yMax() = bounds.yMin() + max;
-        bounds.zMax() = bounds.zMin() + max;
-        _node = new OctreeNode();
-        _node->setBoundingBox(bounds);
-        /*
-        OSG_NOTICE << "BoundingBox " << bounds.xMin() << ", " << bounds.yMin() << ", " << bounds.zMin() << std::endl
-                                     << bounds.xMax() << ", " << bounds.yMax() << ", " << bounds.zMax() << std::endl;
-                                     */
-
+		_node = new OctreeNode();
+		_node->setBoundingBox(_bounds);
     }
 
-    //OSG_NOTICE << "Building cell " << _node->getID().level << ": " << _node->getID().x << ", " << _node->getID().y << ", " << _node->getID().z << "  with " << _reader->header.number_of_point_records << std::endl;
+	unsigned int numAdded = 0;
 
-    unsigned int numAdded = 0;
-
-    // Initialize the main writer for this cell.
-    initWriter();            
-
-    // Initialize the child arrays.
+    // Initialize the child arrays.	
     _childWriters.clear();
     _children.clear();
     _outputFiles.clear();
 
     // Initialize the octree children and set their writers to NULL
     for (unsigned int i = 0; i < 8; i++)
-    {
+    {		
         _childWriters.push_back(0);
         _children.push_back(_node->createChild(i));
         _outputFiles.push_back("");
     }
 
-    LASpoint* point = new LASpoint;
-    //point->init(&_reader->header, _reader->header.point_data_format, _reader->header.point_data_record_length);
-    point->init(_writeQuantizer, _reader->header.point_data_format, _reader->header.point_data_record_length);
 
-    unsigned int total = _reader->header.number_of_point_records;            
-    unsigned int numRejected = 0;
+	unsigned int total = _totalNumPoints;
+	unsigned int numRejected = 0;
 
-    // Compute the ratio if we're targetting a certain number of points.
-    float fraction = (float)_targetNumPoints/(float)total;
-    setFraction(fraction);
-    //OSG_NOTICE << "Keeping " << _fraction << " of " << total << " points for an output of " << (int)(fraction * (float)total) << " points " << std::endl;
-    //OSG_NOTICE << "NumPoints=" << _numPoints << " total=" << total << " target=" << _targetNumPoints << " fraction=" << _fraction << std::endl;
+	PointTable pointTable;
+	pointTable.layout()->registerDim(Dimension::Id::X);
+	pointTable.layout()->registerDim(Dimension::Id::Y);
+	pointTable.layout()->registerDim(Dimension::Id::Z);
+	pointTable.layout()->registerDim(Dimension::Id::Red);
+	pointTable.layout()->registerDim(Dimension::Id::Green);
+	pointTable.layout()->registerDim(Dimension::Id::Blue);
+	PointViewPtr view(new PointView(pointTable));
 
-    // Read all the points
-    while (_reader->read_point())
-    {
-        // Reproject the point
-        osg::Vec3d location(_reader->point.get_x(), _reader->point.get_y(), _reader->point.get_z());
-        osg::Vec3d world = reprojectPoint(location);
+	int idx = 0;
+	
+	// Read all the points
+	StreamCallbackFilter callbackFilter;
+	callbackFilter.setInput(*_readerStage);
+	auto cb = [&](PointRef& point)
+	{
+		double x = point.getFieldAs<double>(Dimension::Id::X);
+		double y = point.getFieldAs<double>(Dimension::Id::Y);
+		double z = point.getFieldAs<double>(Dimension::Id::Z);		
 
-        *point = _reader->point;            
+		// Reproject the point
+		osg::Vec3d location(x, y, z);
+		osg::Vec3d world = reprojectPoint(location);
 
-        // Figure out what cell this point should go in.
-        OctreeId id = _node->getID(location, _innerLevel);
+		point.setField(Dimension::Id::X, world.x());
+		point.setField(Dimension::Id::Y, world.y());
+		point.setField(Dimension::Id::Z, world.z());
 
-        // See how many points are currently in this cell
-        int count = getPointsInCell(id);
+		// Figure out what cell this point should go in.
+		OctreeId id = _node->getID(location, _innerLevel);
 
-        unsigned int numProcessed = (numAdded + numRejected);
-        if (numProcessed % 100000 == 0)
-        {
-            //OSG_NOTICE << "Processed " << (numAdded + numRejected) << " of " << total << " points. " << (int)(100.0f * (float)numProcessed/(float)total) << "%" << std::endl;
-        }        
+		// See how many points are currently in this cell
+		int count = getPointsInCell(id);
 
-        if ((_targetNumPoints != 0 && keep()) || count == 0 || _node->getID().level >= _maxLevel)
-        {
-            // The point passed, so write it to the output file.
-            point->set_x(world.x());
-            point->set_y(world.y());
-            point->set_z(world.z());
-            _writer->write_point(point);
-            _writer->update_inventory(point);
-            _progress->incrementComplete(1);
-            incrementPointsInCell(id, 1);
-            _numPoints++;
-            numAdded++;
-        }
-        else
-        {
-            // The point didn't pass, so write it to one of the output files.                
-            LASwriter* writer = getOrCreateWriter(location);
-            if (!writer)
-            {             
-                point->set_x(world.x());
-                point->set_y(world.y());
-                point->set_z(world.z());
-                _writer->write_point(point);
-                _writer->update_inventory(point);                            
-                incrementPointsInCell(id, 1);        
-                _numPoints++;
-                numAdded++;
-                _progress->incrementComplete(1);
-            }
-            else
-            {
-                writer->write_point(point);
-                writer->update_inventory(point);                            
-                numRejected++;
-            }                                                
-        }
-    }        
+		unsigned int numProcessed = (numAdded + numRejected);
+		if (numProcessed % 100000 == 0)
+		{
+			//OSG_NOTICE << "Processed " << (numAdded + numRejected) << " of " << total << " points. " << (int)(100.0f * (float)numProcessed/(float)total) << "%" << std::endl;
+		}
 
-    delete point;
+		if ((_targetNumPoints != 0 && keep()) || count == 0 || _node->getID().level >= _maxLevel)
+		{
+			// The point passed, so include it in the list.
+			view->setField(pdal::Dimension::Id::X, idx, point.getFieldAs<double>(pdal::Dimension::Id::X));
+			view->setField(pdal::Dimension::Id::Y, idx, point.getFieldAs<double>(pdal::Dimension::Id::Y));
+			view->setField(pdal::Dimension::Id::Z, idx, point.getFieldAs<double>(pdal::Dimension::Id::Z));
+			
+			view->setField(pdal::Dimension::Id::Red, idx, point.getFieldAs<int>(pdal::Dimension::Id::Red));
+			view->setField(pdal::Dimension::Id::Green, idx, point.getFieldAs<int>(pdal::Dimension::Id::Green));
+			view->setField(pdal::Dimension::Id::Blue, idx, point.getFieldAs<int>(pdal::Dimension::Id::Blue));
+			_progress->incrementComplete(1);
+			incrementPointsInCell(id, 1);
+			_numPoints++;
+			numAdded++;
+			idx++;
+		}
+		else
+		{
 
-    closeChildWriters();
-    closeReader();
+			// The point didn't pass, so write it to one of the output files.                
+			PointWriter* writer= getOrCreateWriter(location);
+			if (writer)
+			{
+				writer->write(point);
+				numRejected++;
+			}
+		}		
+		return true;
+	};
+	callbackFilter.setCallback(cb);
 
-    /*
-    OSG_NOTICE << "Points added in pass = " << numAdded << std::endl;
-    OSG_NOTICE << "Total number of points " << _numPoints << std::endl;
-    OSG_NOTICE << "Remaining points " << numRejected << std::endl;      
-    */
+	FixedPointTable fixed(1000);
+	callbackFilter.prepare(fixed);
+	callbackFilter.execute(fixed);	
 
+	BufferReader bufferReader;
+	bufferReader.addView(view);
 
-    // We keep the main writer open until the bitter end.
-    closeWriter();
+	// Set second argument to 'true' to let factory take ownership of
+	// stage and facilitate clean up.
+	OpenThreads::ScopedLock< OpenThreads::Mutex > lock(stageLock);
+	Stage *writer = _factory.createStage("writers.las");
 
-    // Delete any inputs
-    deleteInputs();
+	std::string filename = getFilename(_node->getID(), "laz");	
+	osgEarth::makeDirectoryForFile(filename);
 
-    //OSG_NOTICE << _numPoints << " generated for node " << _node->getID().level << ": " << _node->getID().x << ", " << _node->getID().y << ", " << _node->getID().z << std::endl;
+	Options options;
+	options.add("filename", filename);
+
+	writer->setInput(bufferReader);
+	writer->setOptions(options);
+	writer->prepare(pointTable);
+	writer->execute(pointTable);
+	
+	closeChildWriters();
+	closeReader();
+
+	// Delete any inputs
+	deleteInputs();
 }
 
 void OctreeCellBuilder::buildChildren()
@@ -475,91 +503,72 @@ void OctreeCellBuilder::buildChildren()
         if (!_outputFiles[i].empty())
         {
             osg::ref_ptr< OctreeNode > node = _children[i];                
-            OctreeCellBuilder builder;
+			osg::ref_ptr< OctreeCellBuilder >  builder = new OctreeCellBuilder;
             // Copy settings from parent
-            builder.setTargetNumPoints(_targetNumPoints);
-            builder.setInnerLevel(_innerLevel);
-            builder.setNode(node.get());         
-            builder.getInputFiles().push_back(_outputFiles[i]);
-            builder.setDeleteInputs(true);
-            builder.setSourceSRS(_srcSRS.get());
-            builder.setDestSRS(_destSRS.get());
-            builder.setGeocentric(_geocentric);
-            builder.setOperationQueue(_queue);
-            builder.setProgress(_progress);
-            builder.setMaxLevel(_maxLevel);
+            builder->setTargetNumPoints(_targetNumPoints);
+            builder->setInnerLevel(_innerLevel);
+            builder->setNode(node.get());
+            builder->getInputFiles().push_back(_outputFiles[i]);
+            builder->setDeleteInputs(true);
+            builder->setSourceSRS(_srcSRS.get());
+            builder->setDestSRS(_destSRS.get());
+            builder->setGeocentric(_geocentric);
+            builder->setOperationQueue(_queue);
+            builder->setProgress(_progress);
+            builder->setMaxLevel(_maxLevel);
             _queue->add(new BuildCellOperator(builder));
         }
     }        
 }
 
-void OctreeCellBuilder::initWriter()
-{
-    // Only open the writer once.
-    if (!_writer)
-    {
-        _writeHeader = new LASheader();
-        *_writeHeader = _reader->header;
+Stage* OctreeCellBuilder::createStageForFile(const std::string& filename) {
+	OpenThreads::ScopedLock< OpenThreads::Mutex > lock(stageLock);
 
-        _writeQuantizer = new LASquantizer();
-        *_writeQuantizer = *_writeHeader;
+	std::string driver;
 
-        // Generate a new quantizer for the output writer
-        if (_srcSRS.valid() && _destSRS.valid())
-        {            
-            osg::Vec3d midPoint((_reader->header.min_x+_reader->header.max_x)/2.0,
-                (_reader->header.min_y+_reader->header.max_y)/2.0,
-                (_reader->header.min_z+_reader->header.max_z)/2.0);
-
-            double precision = 0.1;
-            if ((_destSRS->isGeodetic() || _destSRS->isGeographic()) && !_geocentric)
-            {
-                precision = 1e-7;
-            }
-
-            osg::Vec3d center = reprojectPoint(midPoint);    
-            _writeQuantizer->x_scale_factor = precision;
-            _writeQuantizer->y_scale_factor = precision;
-            _writeQuantizer->z_scale_factor = precision;
-            _writeQuantizer->x_offset = ((I64)((center.x()/_writeQuantizer->x_scale_factor)/10000000))*10000000*_writeQuantizer->x_scale_factor;
-            _writeQuantizer->y_offset = ((I64)((center.y()/_writeQuantizer->y_scale_factor)/10000000))*10000000*_writeQuantizer->y_scale_factor;
-            _writeQuantizer->z_offset = ((I64)((center.z()/_writeQuantizer->z_scale_factor)/10000000))*10000000*_writeQuantizer->z_scale_factor;
-
-            *_writeHeader = *_writeQuantizer;
-        }
-
-        LASwriteOpener opener;
-        std::string filename = getFilename(_node->getID());            
-        opener.set_file_name(filename.c_str());            
-        osgEarth::makeDirectoryForFile(filename);
-        //_writer = opener.open(&_reader->header);
-        _writer = opener.open(_writeHeader);
-    }
+	if (osgDB::getFileExtension(filename) == "points")
+	{
+		driver = "readers.points";
+	}
+	else
+	{
+		driver = _factory.inferReaderDriver(filename);
+	}
+	Stage* reader = _factory.createStage(driver);
+	if (reader) {
+		Options opt;
+		opt.add("filename", filename);
+		reader->setOptions(opt);
+	}
+	else {
+		OSG_WARN << "No reader for " << filename << std::endl;
+	}	
+	return reader;
 }
 
 void OctreeCellBuilder::initReader()
 {        
-    // Open up the reader for the input files
-    LASreadOpener lasreadopener;
-    for (unsigned int i = 0; i < _inputFiles.size(); i++)
-    {
-        lasreadopener.add_file_name(_inputFiles[i].c_str());
-    }
-
-    lasreadopener.set_merged(TRUE);
-    lasreadopener.set_populate_header(TRUE);
-
-    _reader = lasreadopener.open();        
+	// Create a merge filter
+	MergeFilter *merged = new MergeFilter();
+	for (unsigned int i = 0; i < _inputFiles.size(); i++)
+	{
+		Stage* stage = createStageForFile(_inputFiles[i]);
+		if (stage)
+		{
+			merged->getInputs().push_back(stage);
+		}
+	}
+	_readerStage = merged;
 }
 
 void OctreeCellBuilder::closeReader()
-{        
-    _reader->close();
-    delete _reader;   
-    _reader = 0;
+{     
+	OpenThreads::ScopedLock< OpenThreads::Mutex > lock(stageLock);
+	_factory.destroyStage(_readerStage);
+	_readerStage = 0;
 }
 
-LASwriter* OctreeCellBuilder::getOrCreateWriter(const osg::Vec3d& location)
+PointWriter* OctreeCellBuilder::getOrCreateWriter(const osg::Vec3d& location)
 {
     int child = -1;
     for (unsigned int i = 0; i < 8; i++)
@@ -579,45 +588,26 @@ LASwriter* OctreeCellBuilder::getOrCreateWriter(const osg::Vec3d& location)
 
     if (!_childWriters[child])
     {
-        LASwriteOpener opener;
         // Generate a temporay file for the child.
-        std::string filename = getFilename(_children[child]->getID());
+        std::string filename = getFilename(_children[child]->getID(), "points");
         filename = osgEarth::getTempName("", filename);            
         osgEarth::makeDirectoryForFile(filename);
-        opener.set_file_name(filename.c_str());            
-        _childWriters[child] = opener.open(&_reader->header);
+
+		_childWriters[child] = new PointWriter(filename);
         _outputFiles[child] = filename;
     }
-    return _childWriters[child];
+	return _childWriters[child];
 }
 
 void OctreeCellBuilder::closeChildWriters()
 {
-    for (unsigned int i = 0; i < 8; i++)
+	for (unsigned int i = 0; i < 8; i++)
     {            
         if (_childWriters[i])
         {
-            _childWriters[i]->update_header(&_reader->header, TRUE);
-            _childWriters[i]->close();
-            delete _childWriters[i];   
+            _childWriters[i]->close();            
             _childWriters[i] = 0;
         }
-    }
-}
-
-void OctreeCellBuilder::closeWriter()
-{
-    if (_writer)
-    {
-        //_writer->update_header(&_reader->header, TRUE);
-        _writer->update_header(_writeHeader, TRUE);
-        _writer->close();
-        delete _writer;
-        _writer = 0;
-        /*
-        if (_writeHeader) delete _writeHeader;
-        if (_writeQuantizer) delete _writeQuantizer;
-        */
     }
 }
 
@@ -646,7 +636,6 @@ void OctreeCellBuilder::deleteInputs()
     {
         for (unsigned int i = 0; i < _inputFiles.size(); i++)
         {
-            //OSG_NOTICE << "Deleting " << _inputFiles[i] << std::endl;
             unlink(_inputFiles[i].c_str());
         }
     }

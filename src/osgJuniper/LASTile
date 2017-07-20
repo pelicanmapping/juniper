@@ -25,13 +25,15 @@
 #include <osg/Referenced>
 #include <osg/OperationThread>
 
-class LASreader;
-class LASwriter;
-class LASheader;
-class LASquantizer;
+#include <pdal/StageFactory.hpp>
+
+#include <osgJuniper/PointReaderWriter>
+
+#include <memory>
 
 namespace osgJuniper
 {
+	using namespace std;
     class OSGJUNIPER_EXPORT Progress : public osg::Referenced
     {
     public:
@@ -60,7 +62,7 @@ namespace osgJuniper
     /**
     * Class used to build the output of an octree from a series of input files.
     */
-    class OSGJUNIPER_EXPORT OctreeCellBuilder
+    class OSGJUNIPER_EXPORT OctreeCellBuilder : public osg::Referenced
     {
     public:
         OctreeCellBuilder();
@@ -107,13 +109,11 @@ namespace osgJuniper
         void build();
         void buildChildren();
 
-        void initWriter();
-
-        void initReader();
+		void initReader();
 
         void closeReader();
-
-        LASwriter* getOrCreateWriter(const osg::Vec3d& location);
+      
+		PointWriter* getOrCreateWriter(const osg::Vec3d& location);
 
         float getFraction() const;
         void setFraction(float fraction);
@@ -121,8 +121,6 @@ namespace osgJuniper
         bool keep();
 
         void closeChildWriters();
-
-        void closeWriter();
 
         unsigned int getPointsInCell(const OctreeId& id);
 
@@ -132,7 +130,7 @@ namespace osgJuniper
 
         osg::Vec3d reprojectPoint(const osg::Vec3d& input);
 
-        std::string getFilename(OctreeId id) const;
+        std::string getFilename(OctreeId id, const std::string& ext) const;
 
         osg::OperationQueue* getOperationQueue() const;
         void setOperationQueue(osg::OperationQueue* queue);
@@ -143,25 +141,29 @@ namespace osgJuniper
         void setProgress(Progress* progress);
 
     private:
-        LASreader* _reader;
+        void computeMetaData();
 
-        LASwriter* _writer;
-        LASheader* _writeHeader;
-        LASquantizer* _writeQuantizer;
+		pdal::Stage* createStageForFile(const std::string& filename);
 
+		pdal::Stage* _readerStage;
 
         osg::ref_ptr< OctreeNode > _node;
         unsigned int _innerLevel;
         unsigned int _maxLevel;
         unsigned int _targetNumPoints;
+
         std::vector<std::string> _inputFiles;
         std::vector<std::string> _outputFiles;
 
         typedef std::map<OctreeId, unsigned int> CellCount;
         CellCount _cellCount;
-        unsigned int _numPoints;
+        
+		unsigned int _numPoints;
+		unsigned int _totalNumPoints;
 
-        std::vector<LASwriter*> _childWriters;
+		osg::BoundingBoxd _bounds;
+
+        std::vector<PointWriter* > _childWriters;
         std::vector<osg::ref_ptr<OctreeNode>> _children;
 
         bool _deleteInputs;
@@ -175,7 +177,7 @@ namespace osgJuniper
         osg::ref_ptr< osg::OperationQueue > _queue;
         std::vector< osg::ref_ptr< osg::OperationsThread > > _threads;
 
-        osg::ref_ptr< Progress > _progress;
+        osg::ref_ptr< Progress > _progress;		
     };
 }
 

@@ -23,22 +23,17 @@
 using namespace osgJuniper;
 
 /****************************************************************************/
-Point::Point():
-size(1.0),
-classification(0),
-intensity(0),
-returnNumber(0)
-{
-}
-
-Point::Point(const osg::Vec3d& position, const osg::Vec3& normal, const osg::Vec4ub &color):
-position(position),
-normal(normal),
-color(color),
-size(1.0),
-classification(0),
-intensity(0),
-returnNumber(0)
+Point::Point() :
+	x(0.0),
+	y(0.0),
+	z(0.0),
+	r(0.0),
+	g(0.0),
+	b(0.0),
+	a(0.0),
+	classification(0),
+	intensity(0),
+	returnNumber(0)
 {
 }
 

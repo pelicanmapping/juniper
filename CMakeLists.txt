@@ -127,7 +127,7 @@ SET(CMAKE_DEBUG_POSTFIX  "d")
 
 FIND_PACKAGE(OSG)
 FIND_PACKAGE(OSGEARTH)
-FIND_PACKAGE(LASTOOLS)
+FIND_PACKAGE(PDAL 1.5.0 REQUIRED CONFIG)
 
 ################################################################################
 # Create bin and lib directories if required
