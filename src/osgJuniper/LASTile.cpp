@@ -315,19 +315,22 @@ std::string OctreeCellBuilder::getFilename(OctreeId id, const std::string& ext) 
 		 // Create a reader stage for the file.
 		 Stage* reader = createStageForFile(_inputFiles[i]);
 
-		 // Do a quick preview on the file to get the input.
-		 QuickInfo info = reader->preview();
-		 if (info.m_valid)
+		 // Do a quick preview on the file to get the input.		 
 		 {
-			 _totalNumPoints += info.m_pointCount;
+			 PDAL_LOCK;
+			 QuickInfo info = reader->preview();
+			 if (info.m_valid)
+			 {
+				 _totalNumPoints += info.m_pointCount;
 
-			 if (minX > info.m_bounds.minx) minX = info.m_bounds.minx;
-			 if (minY > info.m_bounds.miny) minY = info.m_bounds.miny;
-			 if (minZ > info.m_bounds.minz) minZ = info.m_bounds.miny;
+				 if (minX > info.m_bounds.minx) minX = info.m_bounds.minx;
+				 if (minY > info.m_bounds.miny) minY = info.m_bounds.miny;
+				 if (minZ > info.m_bounds.minz) minZ = info.m_bounds.miny;
 
-			 if (maxX < info.m_bounds.maxx) maxX = info.m_bounds.maxx;
-			 if (maxY < info.m_bounds.maxy) maxY = info.m_bounds.maxy;
-			 if (maxZ < info.m_bounds.maxz) maxZ = info.m_bounds.maxy;
+				 if (maxX < info.m_bounds.maxx) maxX = info.m_bounds.maxx;
+				 if (maxY < info.m_bounds.maxy) maxY = info.m_bounds.maxy;
+				 if (maxZ < info.m_bounds.maxz) maxZ = info.m_bounds.maxy;
+			 }
 		 }
 	 }
 
@@ -367,9 +370,7 @@ std::string OctreeCellBuilder::getFilename(OctreeId id, const std::string& ext) 
  }
  
 void OctreeCellBuilder::build()
-{        
-	PDAL_LOCK;
-
+{        	
     initReader();
 
     // If we aren't given a node, assume we are the root
@@ -460,7 +461,7 @@ void OctreeCellBuilder::build()
 	callbackFilter.setCallback(cb);
 
 	FixedPointTable fixed(1000);
-	callbackFilter.prepare(fixed);
+	{PDAL_LOCK; callbackFilter.prepare(fixed); }
 	callbackFilter.execute(fixed);	
 
 	BufferReader bufferReader;
@@ -480,7 +481,7 @@ void OctreeCellBuilder::build()
 
 		writer->setInput(bufferReader);
 		writer->setOptions(options);
-		writer->prepare(pointTable);
+		{ PDAL_LOCK; writer->prepare(pointTable); }
 		writer->execute(pointTable);
 
 		// Destroy the writer stage, we're done with it.
