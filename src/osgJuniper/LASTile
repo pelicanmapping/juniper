@@ -26,6 +26,7 @@
 #include <osg/OperationThread>
 
 #include <pdal/StageFactory.hpp>
+#include <pdal/PipelineManager.hpp>
 
 #include <osgJuniper/PointReaderWriter>
 
@@ -146,6 +147,8 @@ namespace osgJuniper
 		pdal::Stage* createStageForFile(const std::string& filename);
 
 		pdal::Stage* _readerStage;
+
+		std::vector< std::shared_ptr< PipelineManager > > _pipelines;
 
         osg::ref_ptr< OctreeNode > _node;
         unsigned int _innerLevel;

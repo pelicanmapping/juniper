@@ -449,48 +449,48 @@ void OctreeCellBuilder::build()
 		point.setField(Dimension::Id::Y, world.y());
 		point.setField(Dimension::Id::Z, world.z());
 
-		// Figure out what cell this point should go in.
-		OctreeId id = _node->getID(location, _innerLevel);
+// Figure out what cell this point should go in.
+OctreeId id = _node->getID(location, _innerLevel);
 
-		// See how many points are currently in this cell
-		int count = getPointsInCell(id);
+// See how many points are currently in this cell
+int count = getPointsInCell(id);
 
-		if ((_targetNumPoints != 0 && keep()) || count == 0 || _node->getID().level >= _maxLevel)
-		{
-			// The point passed, so include it in the list.
-			view->setField(pdal::Dimension::Id::X, idx, point.getFieldAs<double>(pdal::Dimension::Id::X));
-			view->setField(pdal::Dimension::Id::Y, idx, point.getFieldAs<double>(pdal::Dimension::Id::Y));
-			view->setField(pdal::Dimension::Id::Z, idx, point.getFieldAs<double>(pdal::Dimension::Id::Z));
-			
-			view->setField(pdal::Dimension::Id::Red, idx, point.getFieldAs<int>(pdal::Dimension::Id::Red));
-			view->setField(pdal::Dimension::Id::Green, idx, point.getFieldAs<int>(pdal::Dimension::Id::Green));
-			view->setField(pdal::Dimension::Id::Blue, idx, point.getFieldAs<int>(pdal::Dimension::Id::Blue));
-			_progress->incrementComplete(1);
-			incrementPointsInCell(id, 1);
-			_numPoints++;
-			idx++;
-		}
-		else
-		{
+if ((_targetNumPoints != 0 && keep()) || count == 0 || _node->getID().level >= _maxLevel)
+{
+	// The point passed, so include it in the list.
+	view->setField(pdal::Dimension::Id::X, idx, point.getFieldAs<double>(pdal::Dimension::Id::X));
+	view->setField(pdal::Dimension::Id::Y, idx, point.getFieldAs<double>(pdal::Dimension::Id::Y));
+	view->setField(pdal::Dimension::Id::Z, idx, point.getFieldAs<double>(pdal::Dimension::Id::Z));
 
-			// The point didn't pass, so write it to one of the output files.                
-			PointWriter* writer= getOrCreateWriter(location);
-			if (writer)
-			{
-				writer->write(point);
-			}
-			else
-			{
-				_progress->incrementComplete(1);
-			}
-		}		
-		return true;
+	view->setField(pdal::Dimension::Id::Red, idx, point.getFieldAs<int>(pdal::Dimension::Id::Red));
+	view->setField(pdal::Dimension::Id::Green, idx, point.getFieldAs<int>(pdal::Dimension::Id::Green));
+	view->setField(pdal::Dimension::Id::Blue, idx, point.getFieldAs<int>(pdal::Dimension::Id::Blue));
+	_progress->incrementComplete(1);
+	incrementPointsInCell(id, 1);
+	_numPoints++;
+	idx++;
+}
+else
+{
+
+	// The point didn't pass, so write it to one of the output files.                
+	PointWriter* writer = getOrCreateWriter(location);
+	if (writer)
+	{
+		writer->write(point);
+	}
+	else
+	{
+		_progress->incrementComplete(1);
+	}
+}
+return true;
 	};
 	callbackFilter.setCallback(cb);
 
 	FixedPointTable fixed(1000);
 	{PDAL_LOCK; callbackFilter.prepare(fixed); }
-	callbackFilter.execute(fixed);	
+	callbackFilter.execute(fixed);
 
 	BufferReader bufferReader;
 	bufferReader.addView(view);
@@ -511,7 +511,7 @@ void OctreeCellBuilder::build()
 
 	// Destroy the writer stage, we're done with it.
 	{PDAL_LOCK; _factory.destroyStage(writer); }
-	
+
 	closeChildWriters();
 	closeReader();
 
@@ -521,43 +521,55 @@ void OctreeCellBuilder::build()
 
 void OctreeCellBuilder::buildChildren()
 {
-    // Build any of the child nodes that have an output file.
-    for (unsigned int i = 0; i < 8; i++)
-    {
-        if (!_outputFiles[i].empty())
-        {
-            osg::ref_ptr< OctreeNode > node = _children[i];                
+	// Build any of the child nodes that have an output file.
+	for (unsigned int i = 0; i < 8; i++)
+	{
+		if (!_outputFiles[i].empty())
+		{
+			osg::ref_ptr< OctreeNode > node = _children[i];
 			osg::ref_ptr< OctreeCellBuilder >  builder = new OctreeCellBuilder;
-            // Copy settings from parent
-            builder->setTargetNumPoints(_targetNumPoints);
-            builder->setInnerLevel(_innerLevel);
-            builder->setNode(node.get());
-            builder->getInputFiles().push_back(_outputFiles[i]);
-            builder->setDeleteInputs(true);
-            builder->setSourceSRS(_srcSRS.get());
-            builder->setDestSRS(_destSRS.get());
-            builder->setGeocentric(_geocentric);
-            builder->setOperationQueue(_queue);
-            builder->setProgress(_progress);
-            builder->setMaxLevel(_maxLevel);
-            _queue->add(new BuildCellOperator(builder));
-        }
-    }        
+			// Copy settings from parent
+			builder->setTargetNumPoints(_targetNumPoints);
+			builder->setInnerLevel(_innerLevel);
+			builder->setNode(node.get());
+			builder->getInputFiles().push_back(_outputFiles[i]);
+			builder->setDeleteInputs(true);
+			builder->setSourceSRS(_srcSRS.get());
+			builder->setDestSRS(_destSRS.get());
+			builder->setGeocentric(_geocentric);
+			builder->setOperationQueue(_queue);
+			builder->setProgress(_progress);
+			builder->setMaxLevel(_maxLevel);
+			_queue->add(new BuildCellOperator(builder));
+		}
+	}
 }
 
 Stage* OctreeCellBuilder::createStageForFile(const std::string& filename) {
 	PDAL_LOCK;
 
-	std::string driver = PDALUtils::inferReaderDriver(filename);
-	Stage* reader = _factory.createStage(driver);
-	if (reader) {
-		Options opt;
-		opt.add("filename", filename);
-		reader->setOptions(opt);
+	Stage* reader = 0;
+
+	if (osgDB::getFileExtension(filename) == "json")
+	{		
+		std::shared_ptr< PipelineManager> pipeline = std::make_shared<PipelineManager>();
+		_pipelines.push_back(pipeline);
+		pipeline->readPipeline(filename);
+		reader = pipeline->getStage();
+    }
+	else
+	{
+		std::string driver = PDALUtils::inferReaderDriver(filename);
+		reader = _factory.createStage(driver);
+		if (reader) {
+			Options opt;
+			opt.add("filename", filename);
+			reader->setOptions(opt);
+		}
+		else {
+			OSG_WARN << "No reader for " << filename << std::endl;
+		}
 	}
-	else {
-		OSG_WARN << "No reader for " << filename << std::endl;
-	}	
 	return reader;
 }
 
