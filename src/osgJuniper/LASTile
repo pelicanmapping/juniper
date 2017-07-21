@@ -163,8 +163,8 @@ namespace osgJuniper
 
 		osg::BoundingBoxd _bounds;
 
-        std::vector<PointWriter* > _childWriters;
-        std::vector<osg::ref_ptr<OctreeNode>> _children;
+        std::vector< PointWriter* > _childWriters;
+        std::vector< osg::ref_ptr<OctreeNode> > _children;
 
         bool _deleteInputs;
 

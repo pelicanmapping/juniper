@@ -206,7 +206,7 @@ void OctreeCellBuilder::setFraction(float fraction)
     _fraction = osg::clampBetween(fraction, 0.0f, 1.0f);
 }
 
-static osgEarth::Random random;
+static osgEarth::Random osgearth_random;
 
 bool OctreeCellBuilder::keep()
 {

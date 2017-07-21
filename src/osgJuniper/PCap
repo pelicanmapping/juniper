@@ -63,7 +63,7 @@ typedef struct pcaprec_hdr_s {
 #define MAX_PACKET_LENGTH	65536
 
 typedef struct __PACKET__ {
-    __int64		timestamp;
+    int64_t		timestamp;
     guint32		nBytes;
     char		Bytes[MAX_PACKET_LENGTH];
 } PACKET;   
