@@ -328,11 +328,39 @@ std::string OctreeCellBuilder::getFilename(OctreeId id, const std::string& ext) 
 
 				 if (minX > info.m_bounds.minx) minX = info.m_bounds.minx;
 				 if (minY > info.m_bounds.miny) minY = info.m_bounds.miny;
-				 if (minZ > info.m_bounds.minz) minZ = info.m_bounds.miny;
+				 if (minZ > info.m_bounds.minz) minZ = info.m_bounds.minz;
 
 				 if (maxX < info.m_bounds.maxx) maxX = info.m_bounds.maxx;
 				 if (maxY < info.m_bounds.maxy) maxY = info.m_bounds.maxy;
-				 if (maxZ < info.m_bounds.maxz) maxZ = info.m_bounds.maxy;
+				 if (maxZ < info.m_bounds.maxz) maxZ = info.m_bounds.maxz;
+			 }
+			 else
+			 {
+				 std::cout << "Computing metadata from file" << std::endl;
+				 // We have to read all the points to compute the metadata
+				 StreamCallbackFilter callbackFilter;
+				 callbackFilter.setInput(*reader);
+				 auto cb = [&](PointRef& point) mutable
+				 {
+					 _totalNumPoints++;
+					 double x = point.getFieldAs<double>(pdal::Dimension::Id::X);
+					 double y = point.getFieldAs<double>(pdal::Dimension::Id::Y);
+					 double z = point.getFieldAs<double>(pdal::Dimension::Id::Z);
+
+					 if (minX > x) minX = x;
+					 if (minY > y) minY = y;
+					 if (minZ > z) minZ = z;
+
+					 if (maxX < x) maxX = x;
+					 if (maxY < y) maxY = y;
+					 if (maxZ < z) maxZ = z;
+					 return true;
+
+				 };
+				 callbackFilter.setCallback(cb);
+				 FixedPointTable fixed(1000);
+				 {PDAL_LOCK; callbackFilter.prepare(fixed); }
+				 callbackFilter.execute(fixed);
 			 }
 		 }
 	 }
@@ -529,9 +557,9 @@ Stage* OctreeCellBuilder::createStageForFile(const std::string& filename) {
 	{
 		driver = "readers.points";
 	}
-	else
+	else if (osgDB::getFileExtension(filename) == "f32")
 	{
-		driver = _factory.inferReaderDriver(filename);
+		driver = "readers.f32";
 	}
 	Stage* reader = _factory.createStage(driver);
 	if (reader) {
