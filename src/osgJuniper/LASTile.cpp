@@ -467,26 +467,22 @@ void OctreeCellBuilder::build()
 	BufferReader bufferReader;
 	bufferReader.addView(view);
 
-	// Set second argument to 'true' to let factory take ownership of
-	// stage and facilitate clean up.	
-	{
-		PDAL_LOCK;
-		Stage *writer = _factory.createStage("writers.las");
+	Stage *writer = 0;
+	{PDAL_LOCK; writer = _factory.createStage("writers.las"); }
 
-		std::string filename = getFilename(_node->getID(), "laz");
-		osgEarth::makeDirectoryForFile(filename);
+	std::string filename = getFilename(_node->getID(), "laz");
+	osgEarth::makeDirectoryForFile(filename);
 
-		Options options;
-		options.add("filename", filename);
+	Options options;
+	options.add("filename", filename);
 
-		writer->setInput(bufferReader);
-		writer->setOptions(options);
-		{ PDAL_LOCK; writer->prepare(pointTable); }
-		writer->execute(pointTable);
+	writer->setInput(bufferReader);
+	writer->setOptions(options);
+	{ PDAL_LOCK; writer->prepare(pointTable); }
+	writer->execute(pointTable);
 
-		// Destroy the writer stage, we're done with it.
-		_factory.destroyStage(writer);
-	}
+	// Destroy the writer stage, we're done with it.
+	{PDAL_LOCK; _factory.destroyStage(writer); }
 	
 	closeChildWriters();
 	closeReader();
