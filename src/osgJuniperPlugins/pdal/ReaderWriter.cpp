@@ -145,6 +145,8 @@ public:
 	PDALReaderWriter()
     {
 		supportsExtension( "pdal", className());
+		supportsExtension( "las", className());
+		supportsExtension( "laz", className());
     }
 
     virtual const char* className()
@@ -157,10 +159,19 @@ public:
         if ( !acceptsExtension( osgDB::getLowerCaseFileExtension( location ) ) )
             return ReadResult::FILE_NOT_HANDLED;   
 
-		std::string filename = osgDB::getNameLessExtension(location);		
+		std::string filename = location;
+		if (osgDB::getFileExtension(location) == "pdal")
+		{
+			filename = osgDB::getNameLessExtension(location);
+		}
 
 		StageFactory factory;
-		std::string driver = StageFactory::inferReaderDriver(filename);		
+		std::string driver = factory.inferReaderDriver(filename);
+
+		if (driver.empty())
+		{
+			return ReadResult::FILE_NOT_HANDLED;
+		}
 
 		Stage* stage = 0;
 		{PDAL_LOCK; stage = factory.createStage(driver); }
