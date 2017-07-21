@@ -17,6 +17,7 @@
 * TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
 */
 #include <osgJuniper/LASTile>
+#include <osgJuniper/PDALUtils>
 #include <osgEarth/FileUtils>
 #include <osgEarth/Random>
 #include <osgEarth/GeoData>
@@ -104,10 +105,6 @@ public:
 		  {
 			  _builder->build();
 			  _builder->buildChildren();
-		  }
-		  else
-		  {
-			  OSG_NOTICE << "No builder?" << std::endl;
 		  }
       }
 
@@ -551,16 +548,7 @@ void OctreeCellBuilder::buildChildren()
 Stage* OctreeCellBuilder::createStageForFile(const std::string& filename) {
 	PDAL_LOCK;
 
-	std::string driver;
-
-	if (osgDB::getFileExtension(filename) == "points")
-	{
-		driver = "readers.points";
-	}
-	else if (osgDB::getFileExtension(filename) == "f32")
-	{
-		driver = "readers.f32";
-	}
+	std::string driver = PDALUtils::inferReaderDriver(filename);
 	Stage* reader = _factory.createStage(driver);
 	if (reader) {
 		Options opt;

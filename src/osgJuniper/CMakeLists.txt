@@ -31,6 +31,7 @@ SET(LIB_PUBLIC_HEADERS
     LASTile
     Octree
     PCap
+    PDALUtils
     Point
     PointReaderWriter
     PointCloud
@@ -50,6 +51,7 @@ ADD_LIBRARY(${LIB_NAME} SHARED
     LASTile.cpp
     Octree.cpp
     PCap.cpp
+    PDALUtils.cpp
     Point.cpp
     PointReaderWriter.cpp
     PointCloud.cpp

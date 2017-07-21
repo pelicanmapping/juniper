@@ -30,8 +30,10 @@
 #include <pdal/PointTable.hpp>
 #include <pdal/PipelineExecutor.hpp>
 
+#include <osgJuniper/PDALUtils>
 
 using namespace pdal;
+using namespace osgJuniper;
 
 namespace
 {
@@ -173,7 +175,7 @@ public:
 		std::string driver = options ? options->getPluginStringData("pdal.driver") : "";
 		if (driver.empty())
 		{
-			driver = factory.inferReaderDriver(filename);
+			driver = PDALUtils::inferReaderDriver(filename);
 		}		
 
 		if (driver.empty() && osgDB::getFileExtension(filename) == "json")
