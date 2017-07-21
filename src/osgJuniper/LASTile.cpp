@@ -26,9 +26,12 @@
 #include <pdal/filters/StreamCallbackFilter.hpp>
 #include <pdal/io/BufferReader.hpp>
 
-static OpenThreads::Mutex stageMutex;
+namespace
+{
+	static OpenThreads::Mutex pdalMutex;
+}
 
-#define PDAL_LOCK OpenThreads::ScopedLock< OpenThreads::Mutex > lock(stageMutex)
+#define PDAL_LOCK OpenThreads::ScopedLock< OpenThreads::Mutex > lock(pdalMutex)
 
 using namespace osgJuniper;
 
