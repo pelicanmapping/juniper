@@ -91,7 +91,7 @@ osg::Geometry* makeGeometry(osg::Vec3Array* points, osg::Vec4Array* colors, unsi
 }
 
 bool
-computeCoords(guint16 laserNum, vls_firing_t* data, CalibrationDB* calibrationDB, osg::Vec3& pos, osg::Vec3& pointLoc)
+computeCoords(guint16 laserNum, vls_firing_t* data, CalibrationDB* calibrationDB, const osg::Vec3& pos, osg::Vec3& pointLoc)
 {
     //Precompute the rotation values to speed things up
     static double rotCosTable[VLS_NUM_ROT_ANGLES];

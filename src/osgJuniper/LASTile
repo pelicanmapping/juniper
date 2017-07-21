@@ -162,7 +162,7 @@ namespace osgJuniper
         unsigned int _numPoints;
 
         std::vector<LASwriter*> _childWriters;
-        std::vector<osg::ref_ptr<OctreeNode>> _children;
+        std::vector<osg::ref_ptr<OctreeNode> > _children;
 
         bool _deleteInputs;
 
