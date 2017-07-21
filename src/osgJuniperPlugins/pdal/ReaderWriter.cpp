@@ -150,9 +150,6 @@ public:
 	PDALReaderWriter()
     {
 		supportsExtension( "pdal", className());
-		supportsExtension( "las", className());
-		supportsExtension( "laz", className());
-		supportsExtension( "json", className());
     }
 
     virtual const char* className()
@@ -162,9 +159,6 @@ public:
 
 	virtual ReadResult readNode( const std::string& location, const osgDB::ReaderWriter::Options* options ) const
     {
-        if ( !acceptsExtension( osgDB::getLowerCaseFileExtension( location ) ) )
-            return ReadResult::FILE_NOT_HANDLED;   
-
 		std::string filename = location;
 		if (osgDB::getFileExtension(location) == "pdal")
 		{
