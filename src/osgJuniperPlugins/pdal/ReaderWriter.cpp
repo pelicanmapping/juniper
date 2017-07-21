@@ -28,6 +28,8 @@
 
 #include <pdal/StageFactory.hpp>
 #include <pdal/PointTable.hpp>
+#include <pdal/PipelineExecutor.hpp>
+
 
 using namespace pdal;
 
@@ -39,7 +41,8 @@ namespace
 #define PDAL_LOCK OpenThreads::ScopedLock< OpenThreads::Mutex > lock(pdalMutex)
 
 osg::Node* makeNode(PointViewPtr view, const osgDB::ReaderWriter::Options* options)
-{    
+{   
+	OSG_NOTICE << "Making node with " << view->size() << " points " << std::endl;
     osg::Vec3d anchor;
     bool first = true;
 
@@ -147,6 +150,7 @@ public:
 		supportsExtension( "pdal", className());
 		supportsExtension( "las", className());
 		supportsExtension( "laz", className());
+		supportsExtension( "json", className());
     }
 
     virtual const char* className()
@@ -166,27 +170,48 @@ public:
 		}
 
 		StageFactory factory;
-		std::string driver = factory.inferReaderDriver(filename);
+		std::string driver = options ? options->getPluginStringData("pdal.driver") : "";
+		if (driver.empty())
+		{
+			driver = factory.inferReaderDriver(filename);
+		}		
 
+		if (driver.empty() && osgDB::getFileExtension(filename) == "json")
+		{
+			driver = "pipeline";
+		}
+		
 		if (driver.empty())
 		{
 			return ReadResult::FILE_NOT_HANDLED;
 		}
 
 		Stage* stage = 0;
-		{PDAL_LOCK; stage = factory.createStage(driver); }
-		if (stage)
+
+		PipelineManager pipeline;
+		
+		if (driver == "pipeline")
+		{			
+			pipeline.readPipeline(filename);			
+			stage = pipeline.getStage();
+		}
+		else
 		{
+			PDAL_LOCK;
+			stage = factory.createStage(driver);
 			pdal::Options opt;
 			opt.add("filename", filename);
 			stage->setOptions(opt);
+		}
 
+		if (stage)
+		{			
 			pdal::PointTable table;
 			{ PDAL_LOCK;  stage->prepare(table); }
 
 			pdal::PointViewSet point_view_set = stage->execute(table);
 			pdal::PointViewPtr point_view = *point_view_set.begin();
-					
+
 			return makeNode(point_view, options);
 		}
 		return ReadResult::ERROR_IN_READING_FILE;
