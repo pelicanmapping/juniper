@@ -103,7 +103,7 @@ public:
               }
           }
           
-          LASPointCursor::~LASPointCursor()
+          ~LASPointCursor()
           {
               if (_reader)
               {
