@@ -34,7 +34,7 @@ public:
     {
         supportsExtension( "lastile", className() );
 
-        osgDB::Registry::instance()->addFileExtensionAlias("laz", "las");
+        osgDB::Registry::instance()->addFileExtensionAlias("laz", "pdal");
     }
 
     virtual const char* className()
