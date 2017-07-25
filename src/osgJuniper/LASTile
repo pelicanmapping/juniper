@@ -114,7 +114,7 @@ namespace osgJuniper
 
         void closeReader();
       
-		PointWriter* getOrCreateWriter(const osg::Vec3d& location);
+		std::shared_ptr<PointWriter> getOrCreateWriter(const osg::Vec3d& location);
 
         float getFraction() const;
         void setFraction(float fraction);
@@ -166,7 +166,7 @@ namespace osgJuniper
 
 		osg::BoundingBoxd _bounds;
 
-        std::vector< PointWriter* > _childWriters;
+        std::vector< std::shared_ptr< PointWriter> > _childWriters;
         std::vector< osg::ref_ptr<OctreeNode> > _children;
 
         bool _deleteInputs;

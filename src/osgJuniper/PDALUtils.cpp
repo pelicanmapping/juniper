@@ -45,4 +45,11 @@ std::string PDALUtils::inferReaderDriver(const std::string& filename)
 	return factory.inferReaderDriver(filename);
 }
 
+OpenThreads::ReentrantMutex& PDALUtils::getPDALMutex()
+{
+	static OpenThreads::ReentrantMutex _pdal_mutex;
+	return _pdal_mutex;
+}
+
+
 

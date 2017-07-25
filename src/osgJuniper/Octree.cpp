@@ -77,13 +77,20 @@ OctreeNode::getID(const osg::Vec3d& point, unsigned int level) const
     return OctreeId(level, tileX, tileY, tileZ);
 }
 
-OctreeNode* OctreeNode::createChild(const OctreeId& id)
+
+unsigned int OctreeNode::getDimensions(unsigned int level) const
 {
-    unsigned int dim = 1;
-    for (unsigned int i = 0; i < id.level; i++)
-    {
-        dim *= 2;
-    }
+	unsigned int dim = 1;
+	for (unsigned int i = 0; i < level; i++)
+	{
+		dim *= 2;
+	}
+	return dim;
+}
+
+OctreeNode* OctreeNode::createChild(const OctreeId& id)
+{    
+	unsigned int dim = getDimensions(id.level);
 
     double width  = getWidth() / (double)dim;
     double height = getHeight() / (double)dim;

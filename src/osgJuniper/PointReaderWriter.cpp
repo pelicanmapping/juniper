@@ -97,13 +97,39 @@ void PointWriter::close()
 	if (_out.is_open()) _out.close();
 }
 
-void PointWriter::write(pdal::PointRef& point)
+void PointWriter::write(const Point& point)
 {
 	if (!_out.is_open())
 	{
-		_out.open(_filename.c_str(), std::ios::out | std::ios::binary);
+		_out.open(_filename.c_str(), std::ios::out | std::ios::binary | std::ios::app);
+		if (!_out.is_open())
+		{
+			std::cout << "Failed to open " << _filename << std::endl;
+		}
 	}
 
+	double position[3] = { point.x, point.y, point.z };
+	int color[3] = { point.r, point.g, point.b };
+
+	// Position
+	_out.write((char*)position, sizeof(double) * 3);
+	_out.write((char*)color, sizeof(int) * 3);
+
+	/*
+	// Position
+	_out.write((char*)&point.x, sizeof(double));
+	_out.write((char*)&point.y, sizeof(double));
+	_out.write((char*)&point.z, sizeof(double));
+
+	// Color
+	_out.write((char*)&point.r, sizeof(int));
+	_out.write((char*)&point.g, sizeof(int));
+	_out.write((char*)&point.b, sizeof(int));
+	*/
+}
+
+void PointWriter::write(pdal::PointRef& point)
+{	
 	double x = point.getFieldAs<double>(pdal::Dimension::Id::X);
 	double y = point.getFieldAs<double>(pdal::Dimension::Id::Y);
 	double z = point.getFieldAs<double>(pdal::Dimension::Id::Z);
@@ -112,15 +138,29 @@ void PointWriter::write(pdal::PointRef& point)
 	int g = point.getFieldAs<int>(pdal::Dimension::Id::Green);
 	int b = point.getFieldAs<int>(pdal::Dimension::Id::Blue);
 
-	// Position
-	_out.write((char*)&x, sizeof(double));
-	_out.write((char*)&y, sizeof(double));
-	_out.write((char*)&z, sizeof(double));
+	Point p;
+	p.x = x;
+	p.y = y;
+	p.z = z;
+	p.r = r;
+	p.g = g;
+	p.b = b;
+	write(p);
+}
 
-	// Color
-	_out.write((char*)&r, sizeof(int));
-	_out.write((char*)&g, sizeof(int));
-	_out.write((char*)&b, sizeof(int));
+
+void PointWriter::write(const PointList& points)
+{
+	if (!_out.is_open())
+	{
+		_out.open(_filename.c_str(), std::ios::out | std::ios::binary | std::ios::app);
+		if (!_out.is_open())
+		{
+			std::cout << "Failed to open " << _filename << std::endl;
+		}
+	}
+
+	_out.write((char*)&points.begin(), sizeof(Point) * points.size());	
 }
 
 

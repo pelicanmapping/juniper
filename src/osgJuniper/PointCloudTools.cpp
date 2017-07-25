@@ -221,6 +221,7 @@ void IdentifyPointHandler::select(float x, float y, osgViewer::View* viewer)
 		point.x = world.x();
 		point.y = world.y();
 		point.z = world.z();
+		/*
 		point.r = prevColor.r() * 255;
 		point.g = prevColor.g() * 255;
 		point.b = prevColor.b() * 255;
@@ -228,6 +229,7 @@ void IdentifyPointHandler::select(float x, float y, osgViewer::View* viewer)
         point.classification = data.x();
         point.returnNumber = data.y();
         point.intensity = data.z();
+		*/
         for( Callbacks::iterator i = _callbacks.begin(); i != _callbacks.end(); ++i )
             i->get()->selected(point);        
     }

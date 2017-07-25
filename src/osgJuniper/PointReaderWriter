@@ -57,6 +57,8 @@ namespace osgJuniper
 		~PointWriter();
 
 		void write(pdal::PointRef& point);
+		void write(const Point& point);
+		void write(const PointList& points);
 
 		void close();
 

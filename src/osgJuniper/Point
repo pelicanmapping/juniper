@@ -49,7 +49,7 @@ namespace osgJuniper
 
 		int r;
 		int g;
-		int b;
+		int b;		
 		int a;
 
 		unsigned short intensity;
@@ -57,7 +57,7 @@ namespace osgJuniper
 		unsigned char returnNumber;        
     };
 
-    typedef std::list< Point > PointList;    
+    typedef std::vector< Point > PointList;    
 
     /**
      * A cursor that lets you iterate over points from a PointSource

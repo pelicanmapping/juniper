@@ -25,6 +25,8 @@
 
 #include <pdal/StageFactory.hpp>
 
+#include <OpenThreads/ReentrantMutex>
+
 
 namespace osgJuniper
 {
@@ -35,7 +37,13 @@ namespace osgJuniper
 	public:
 		static void mapExtensionToDriver(const std::string& extension, const std::string& driver);
 		static std::string inferReaderDriver(const std::string& filename);		
+
+		static OpenThreads::ReentrantMutex& getPDALMutex();
 	};
+
+#define PDAL_SCOPED_LOCK \
+    OpenThreads::ScopedLock<OpenThreads::ReentrantMutex> _slock( PDALUtils::getPDALMutex() )\
+
 }
 
 #endif

@@ -151,7 +151,8 @@ namespace osgJuniper
         double getDepth() const;
 
         OctreeId getID(const osg::Vec3d& point, unsigned int level) const;        
-               
+
+		unsigned int getDimensions(unsigned int level) const;              
 
     protected:       
 

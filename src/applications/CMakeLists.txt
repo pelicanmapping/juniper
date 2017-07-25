@@ -12,3 +12,5 @@ SET(TARGET_DEFAULT_LABEL_PREFIX "Sample")
 
 ADD_SUBDIRECTORY(osgjuniper_pointcloudtools)
 ADD_SUBDIRECTORY(osgjuniper_lastile)
+ADD_SUBDIRECTORY(osgjuniper_lastile2)
+ADD_SUBDIRECTORY(osgjuniper_lassplit)

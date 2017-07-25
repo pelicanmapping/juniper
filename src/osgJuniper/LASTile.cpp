@@ -32,8 +32,6 @@ namespace
 	static OpenThreads::Mutex pdalMutex;
 }
 
-#define PDAL_LOCK OpenThreads::ScopedLock< OpenThreads::Mutex > lock(pdalMutex)
-
 using namespace osgJuniper;
 
 using namespace pdal;
@@ -317,7 +315,7 @@ std::string OctreeCellBuilder::getFilename(OctreeId id, const std::string& ext) 
 
 		 // Do a quick preview on the file to get the input.		 
 		 {
-			 PDAL_LOCK;
+			 PDAL_SCOPED_LOCK;
 			 QuickInfo info = reader->preview();
 			 if (info.m_valid)
 			 {
@@ -356,7 +354,7 @@ std::string OctreeCellBuilder::getFilename(OctreeId id, const std::string& ext) 
 				 };
 				 callbackFilter.setCallback(cb);
 				 FixedPointTable fixed(1000);
-				 {PDAL_LOCK; callbackFilter.prepare(fixed); }
+				 {PDAL_SCOPED_LOCK; callbackFilter.prepare(fixed); }
 				 callbackFilter.execute(fixed);
 			 }
 		 }
@@ -474,7 +472,7 @@ else
 {
 
 	// The point didn't pass, so write it to one of the output files.                
-	PointWriter* writer = getOrCreateWriter(location);
+	std::shared_ptr< PointWriter > writer = getOrCreateWriter(location);
 	if (writer)
 	{
 		writer->write(point);
@@ -489,14 +487,14 @@ return true;
 	callbackFilter.setCallback(cb);
 
 	FixedPointTable fixed(1000);
-	{PDAL_LOCK; callbackFilter.prepare(fixed); }
+	{PDAL_SCOPED_LOCK; callbackFilter.prepare(fixed); }
 	callbackFilter.execute(fixed);
 
 	BufferReader bufferReader;
 	bufferReader.addView(view);
 
 	Stage *writer = 0;
-	{PDAL_LOCK; writer = _factory.createStage("writers.las"); }
+	{PDAL_SCOPED_LOCK; writer = _factory.createStage("writers.las"); }
 
 	std::string filename = getFilename(_node->getID(), "laz");
 	osgEarth::makeDirectoryForFile(filename);
@@ -506,11 +504,11 @@ return true;
 
 	writer->setInput(bufferReader);
 	writer->setOptions(options);
-	{ PDAL_LOCK; writer->prepare(pointTable); }
+	{ PDAL_SCOPED_LOCK; writer->prepare(pointTable); }
 	writer->execute(pointTable);
 
 	// Destroy the writer stage, we're done with it.
-	{PDAL_LOCK; _factory.destroyStage(writer); }
+	{PDAL_SCOPED_LOCK; _factory.destroyStage(writer); }
 
 	closeChildWriters();
 	closeReader();
@@ -546,7 +544,7 @@ void OctreeCellBuilder::buildChildren()
 }
 
 Stage* OctreeCellBuilder::createStageForFile(const std::string& filename) {
-	PDAL_LOCK;
+	PDAL_SCOPED_LOCK;
 
 	Stage* reader = 0;
 
@@ -590,7 +588,7 @@ void OctreeCellBuilder::initReader()
 
 void OctreeCellBuilder::closeReader()
 {     
-	PDAL_LOCK;
+	PDAL_SCOPED_LOCK;
 	if (_readerStage)
 	{
 		for (unsigned int i = 0; i < _readerStage->getInputs().size(); i++)
@@ -602,7 +600,7 @@ void OctreeCellBuilder::closeReader()
 	}
 }
 
-PointWriter* OctreeCellBuilder::getOrCreateWriter(const osg::Vec3d& location)
+std::shared_ptr< PointWriter >OctreeCellBuilder::getOrCreateWriter(const osg::Vec3d& location)
 {
     int child = -1;
     for (unsigned int i = 0; i < 8; i++)
@@ -627,7 +625,7 @@ PointWriter* OctreeCellBuilder::getOrCreateWriter(const osg::Vec3d& location)
         filename = osgEarth::getTempName("", filename);            
         osgEarth::makeDirectoryForFile(filename);
 
-		_childWriters[child] = new PointWriter(filename);
+		_childWriters[child] = std::make_shared< PointWriter >(filename);
         _outputFiles[child] = filename;
     }
 	return _childWriters[child];
@@ -639,7 +637,6 @@ void OctreeCellBuilder::closeChildWriters()
     {            
         if (_childWriters[i])
         {
-            _childWriters[i]->close();            
             _childWriters[i] = 0;
         }
     }
