@@ -97,6 +97,11 @@ namespace osgJuniper
          */
         OctreeId getParentID() const;
 
+		/**
+		* Gets the parent id for the given OctreeId
+		*/		
+		static OctreeId getParentID(const OctreeId& id);
+
         /**
          * Gets the BoundingBox for this OctreeNode
          */

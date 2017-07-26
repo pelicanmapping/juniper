@@ -109,12 +109,20 @@ OctreeNode* OctreeNode::createChild(const OctreeId& id)
         
 OctreeId OctreeNode::getParentID() const
 {    
-    unsigned int level = _id.level -1;
-    unsigned int x = _id.x / 2;
-    unsigned int y = _id.y / 2;
-    unsigned int z = _id.z / 2;
-    return OctreeId(level, x, y, z);
+	return getParentID(_id);
+}
 
+OctreeId OctreeNode::getParentID(const OctreeId& id)
+{
+	unsigned int level = id.level - 1;
+	unsigned int x = id.x / 2;
+	unsigned int y = id.y / 2;
+	unsigned int z = id.z / 2;
+	/*
+	OSG_NOTICE << "Parent of " << id.level << ", " << " (" << id.x << ", " << id.y << ", " << id.z << ") is " 
+		       << level << ", " << " (" << x << ", " << y << ", " << z << ")" << std::endl;
+			   */
+	return OctreeId(level, x, y, z);
 }
 
 OctreeNode*

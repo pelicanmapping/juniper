@@ -102,6 +102,57 @@ void writePointsToLaz(const PointList& points, const std::string& filename)
 	{PDAL_SCOPED_LOCK; _factory.destroyStage(writer); }
 }
 
+void readPointsFromLAZ(PointList& points, const std::string& filename)
+{
+	points.clear();
+	if (osgDB::fileExists(filename))
+	{
+		Stage* stage = 0;
+		{
+			PDAL_SCOPED_LOCK;
+			stage = _factory.createStage("readers.las");
+			pdal::Options opt;
+			opt.add("filename", filename);
+			stage->setOptions(opt);
+		}
+
+		if (stage)
+		{
+			pdal::PointTable table;
+			{ PDAL_SCOPED_LOCK;  stage->prepare(table); }
+
+			pdal::PointViewSet point_view_set = stage->execute(table);
+			pdal::PointViewPtr point_view = *point_view_set.begin();
+
+			for (unsigned int i = 0; i < point_view->size(); i++)
+			{
+				PointRef point(point_view->point(i));
+				Point p;
+				p.x = point.getFieldAs<double>(pdal::Dimension::Id::X);
+				p.y = point.getFieldAs<double>(pdal::Dimension::Id::Y);
+				p.z = point.getFieldAs<double>(pdal::Dimension::Id::Z);
+				p.r = point.getFieldAs<int>(pdal::Dimension::Id::Red);
+				p.g = point.getFieldAs<int>(pdal::Dimension::Id::Green);
+				p.b = point.getFieldAs<int>(pdal::Dimension::Id::Blue);
+				points.push_back(p);
+			}
+		}
+	}
+	if (points.size() > 0)
+	{
+		OSG_NOTICE << "Read " << points.size() << " from " << filename << std::endl;
+	}
+}
+
+void appendPointsToLaz(const PointList& points, const std::string& filename)
+{
+	PointList pts;
+	readPointsFromLAZ(pts, filename);
+	pts.insert(pts.end(), points.begin(), points.end());
+	writePointsToLaz(pts, filename);
+}
+
+
 
 class OctreeCell
 {
@@ -115,12 +166,14 @@ public:
 	{
 		if (!points.empty())
 		{
+			/*
 			PointWriter writer(filename);
 			for (PointList::iterator itr = points.begin(); itr != points.end(); ++itr)
 			{
 				writer.write(*itr);
 			}
-			//writePointsToLaz(points, filename);
+			*/
+			appendPointsToLaz(points, filename);
 		}
 	}
 
@@ -232,7 +285,7 @@ std::shared_ptr< OctreeCell > Splitter::getOrCreateCell(const OctreeId& id)
 	}
 
 	// Generate a temporay file for the child.
-	std::string filename = getFilename(id, "points");
+	std::string filename = getFilename(id, "laz");
 	osgEarth::makeDirectoryForFile(filename);
 
 	std::shared_ptr< OctreeCell > cell = std::make_shared<OctreeCell>(filename);
