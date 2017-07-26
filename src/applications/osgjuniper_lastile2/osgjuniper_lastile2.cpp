@@ -95,7 +95,6 @@ void writePointsToLaz(const PointList& points, const std::string& filename)
 void readPointsFromLAZ(PointList& points, const std::string& filename)
 {
 	points.clear();
-	OSG_NOTICE << "Reading LAZ file " << filename << std::endl;
 	if (osgDB::fileExists(filename))
 	{
 		Stage* stage = 0;
@@ -115,8 +114,6 @@ void readPointsFromLAZ(PointList& points, const std::string& filename)
 			pdal::PointViewSet point_view_set = stage->execute(table);
 			pdal::PointViewPtr point_view = *point_view_set.begin();
 
-			OSG_NOTICE << " Read " << point_view->size() << " from " << filename << std::endl;
-
 			for (unsigned int i = 0; i < point_view->size(); i++)
 			{
 				PointRef point(point_view->point(i));
@@ -131,11 +128,25 @@ void readPointsFromLAZ(PointList& points, const std::string& filename)
 			}
 		}
 	}
-	else
-	{
-		OSG_NOTICE << filename << " does not exist" << std::endl;
-	}
 }
+
+
+class TileIndex;
+
+class BuildCellOperator : public osg::Operation
+{
+public:
+	BuildCellOperator(TileIndex *index, const OctreeId& id) :
+		_index(index),
+		_id(id)
+	{
+	}
+
+	void operator()(osg::Object* object);
+
+	OctreeId _id;
+	TileIndex* _index;
+};
 
 class TileIndex
 {	
@@ -150,7 +161,7 @@ public:
 		_tiles.insert(id);
 	}
 
-	void scan(const std::string& directory)
+	void scan(const std::string& directory, unsigned int startLevel)
 	{
 		_tiles.clear();
 
@@ -177,8 +188,7 @@ public:
 				*/
 				int level = osgEarth::as<int>(tized[2], 0);
 
-				// TODO:  Remove
-				if (level == 7)
+				if (level == startLevel)
 				{
 					int z = osgEarth::as<int>(tized[3], 0);
 					int x = osgEarth::as<int>(tized[4], 0);
@@ -190,7 +200,7 @@ public:
 		OSG_NOTICE << "Found " << _tiles.size() << std::endl;
 	}
 
-	void buildParents(unsigned int level)
+	void buildParents(unsigned int level, unsigned int numThreads)
 	{
 		std::set< OctreeId > ids;
 		for (auto itr = _tiles.begin(); itr != _tiles.end(); ++itr)
@@ -204,15 +214,34 @@ public:
 
 		OSG_NOTICE << "Building " << ids.size() << " for level " << level << std::endl;
 
+
+		osg::ref_ptr< osg::OperationQueue > queue = new osg::OperationQueue;
+		std::vector< osg::ref_ptr< osg::OperationsThread > > threads;
+		for (unsigned int i = 0; i < numThreads; i++)
+		{
+			osg::OperationsThread* thread = new osg::OperationsThread();
+			thread->setOperationQueue(queue.get());
+			thread->start();
+			threads.push_back(thread);
+		}
+
+		// Add all the operations
 		for (auto itr = ids.begin(); itr != ids.end(); ++itr)
 		{
-			build(*itr);
+			osg::ref_ptr< BuildCellOperator> buildCell = new BuildCellOperator(this, *itr);
+			queue->add(buildCell.get());
 		}
+
+		// Wait for all operations to be done.
+		while (!queue->empty())
+		{
+			OpenThreads::Thread::YieldCurrentThread();
+		}
+		OSG_NOTICE << "Done building level " << level << std::endl;
 	}
 
 	void build(const OctreeId &id)
 	{
-		OSG_NOTICE << "Building " << id.level << ", " << id.x << ", " << id.y << ", " << id.z << std::endl;
 		osg::ref_ptr< OctreeNode > node = _root->createChild(id);
 		node->split();
 
@@ -225,8 +254,6 @@ public:
 			readPointsFromLAZ(pts, filename);
 			points.insert(points.end(), pts.begin(), pts.end());
 		}
-
-		OSG_NOTICE << "Read " << points.size() << " from children" << std::endl;
 
 		if (!points.empty())
 		{
@@ -244,120 +271,28 @@ public:
 					innerCells.insert(cell);
 				}
 			}
-			/*
-
-			for (PointList::iterator itr = points.begin(); itr != points.end(); ++itr)
-			{
-				keepers.push_back(*itr);
-			}
-			*/
-
 
 			if (!keepers.empty())
 			{				
-				std::string tileFilename = getFilename(id, "laz");
-				OSG_NOTICE << "Writing " << keepers.size() << " to " << tileFilename << std::endl;
+				std::string tileFilename = getFilename(id, "laz");				
 				writePointsToLaz(keepers, tileFilename);
+
+				OpenThreads::ScopedLock< OpenThreads::Mutex > lock(_tilesMutex);
 				_tiles.insert(id);
 			}
 		}
 	}
 
+	OpenThreads::Mutex _tilesMutex;
 	std::set< OctreeId > _tiles;
 	osg::ref_ptr< OctreeNode > _root;
 };
 
-// You could autoscan points at this point and only pick things that you know you actually might use.
-class PointDatabase : public osg::Referenced
+
+void BuildCellOperator::operator()(osg::Object* object)
 {
-public:
-	PointDatabase()
-	{
-		std::vector< std::string > filenames;
-
-		std::string directory = ".";
-
-		// Load all the point readers		
-		std::vector< std::string > contents = osgJuniper::Utils::getFilesFromDirectory(directory, "points");
-		for (unsigned int i = 0; i < contents.size(); i++)
-		{
-			filenames.push_back(contents[i]);
-		}
-		
-		for (unsigned int i= 0; i < filenames.size(); i++)
-		{
-			_filenames.push_back(filenames[i]);
-		}
-
-		std::cout << "Readers " << _filenames.size() << std::endl;
-	}
-
-	void build()
-	{
-		PointTable pointTable;
-		pointTable.layout()->registerDim(Dimension::Id::X);
-		pointTable.layout()->registerDim(Dimension::Id::Y);
-		pointTable.layout()->registerDim(Dimension::Id::Z);
-		pointTable.layout()->registerDim(Dimension::Id::Red);
-		pointTable.layout()->registerDim(Dimension::Id::Green);
-		pointTable.layout()->registerDim(Dimension::Id::Blue);
-		PointViewPtr view(new PointView(pointTable));
-
-		int idx = 0;
-
-		for (unsigned int i = 0; i < _filenames.size(); i++)
-		{
-			PointReader reader(_filenames[i]);
-
-			int maxPoints = 1;
-			int numRead = 0;
-
-			while (reader.hasMore() && numRead < maxPoints)
-			{
-				Point point;
-				reader.read(point);
-				// The point passed, so include it in the list.
-				view->setField(pdal::Dimension::Id::X, idx, point.x);
-				view->setField(pdal::Dimension::Id::Y, idx, point.y);
-				view->setField(pdal::Dimension::Id::Z, idx, point.z);
-
-				view->setField(pdal::Dimension::Id::Red, idx, point.r);
-				view->setField(pdal::Dimension::Id::Green, idx, point.g);
-				view->setField(pdal::Dimension::Id::Blue, idx, point.b);
-				idx++;
-				numRead++;
-			}			
-		}
-
-
-		BufferReader bufferReader;
-		bufferReader.addView(view);
-
-		OSG_NOTICE << "View size " << view->size() << std::endl;
-
-		Stage *writer = 0;
-		{PDAL_SCOPED_LOCK; writer = _factory.createStage("writers.las"); }
-
-		std::string filename = "tile_0_0_0_0.laz";
-		osgEarth::makeDirectoryForFile(filename);
-
-		Options options;
-		options.add("filename", filename);
-
-		writer->setInput(bufferReader);
-		writer->setOptions(options);
-		{ PDAL_SCOPED_LOCK; writer->prepare(pointTable); }
-		writer->execute(pointTable);
-
-		// Destroy the writer stage, we're done with it.
-		{PDAL_SCOPED_LOCK; _factory.destroyStage(writer); }
-	}	
-	
-	std::vector< std::string > _filenames;
-};
-
-
-
+	_index->build(_id);
+}
 
 int main(int argc, char** argv)
 {
@@ -366,8 +301,17 @@ int main(int argc, char** argv)
 
     osg::ArgumentParser arguments(&argc,argv);	
 
-    int level = 8;
-    arguments.read("--level", level);
+	int level;
+	if (!arguments.read("--level", level))
+	{
+		OSG_NOTICE << "Please specify a level to build up from" << std::endl;
+		return -1;
+	}
+
+	// Initialize the threads
+	unsigned int numThreads = OpenThreads::GetNumberOfProcessors();
+	arguments.read("--threads", numThreads);
+	OSG_NOTICE << "Num threads " << numThreads << std::endl;
 
 	// Read the metadata file produced by the splitter
 	double minX, minY, minZ, maxX, maxY, maxZ;
@@ -376,25 +320,16 @@ int main(int argc, char** argv)
 	std::cout << "Bounds " << minX << " " << minY << " " << minZ << " to " 
 		<< maxX << " " << maxY << " " << maxZ << std::endl;
 	
-    // Initialize the threads
-    unsigned int numThreads = OpenThreads::GetNumberOfProcessors();
-    arguments.read("--threads", numThreads);
-
-
 	osg::ref_ptr< OctreeNode > root = new OctreeNode();
 	root->setBoundingBox(osg::BoundingBoxd(minX, minY, minZ, maxX, maxY, maxZ));	
-	/*
-	osg::ref_ptr< PointDatabase > db = new PointDatabase;
-	db->build();
-	*/
 
 	TileIndex index(root);
-	index.scan(".");
+	index.scan(".", level);
 
-	for (int i = 7; i > 0; i--)
+	for (int i = level; i > 0; i--)
 	{
 		OSG_NOTICE << "Building parents for " << i << std::endl;
-		index.buildParents(i);
+		index.buildParents(i, numThreads);
 	}
 
 	osg::Timer_t endTime = osg::Timer::instance()->tick();
