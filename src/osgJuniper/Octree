@@ -43,7 +43,14 @@ namespace osgJuniper
     class OSGJUNIPER_EXPORT OctreeId
     {
     public:
-        OctreeId();         
+		OctreeId():
+			level(-1),
+			x(-1),
+			y(-1),
+			z(-1)
+		{
+		}
+
         OctreeId(int in_level, int in_x, int in_y, int in_z);
 
         bool operator == (const OctreeId& rhs) const        
