@@ -146,10 +146,30 @@ void readPointsFromLAZ(PointList& points, const std::string& filename)
 
 void appendPointsToLaz(const PointList& points, const std::string& filename)
 {
+#if 1
 	PointList pts;
 	readPointsFromLAZ(pts, filename);
 	pts.insert(pts.end(), points.begin(), points.end());
 	writePointsToLaz(pts, filename);
+#else
+	unsigned int index = 0;
+	std::string name = osgDB::getNameLessExtension(filename);
+	std::string ext = osgDB::getFileExtension(filename);
+	while (true)
+
+	{
+		std::stringstream buf;
+		buf << name << "." << index << "." << ext;
+		std::string fn = buf.str();
+		if (!osgDB::fileExists(fn))
+		{
+			OSG_NOTICE << "Writing to " << fn << std::endl;
+			writePointsToLaz(points, fn);
+			break;
+		}
+		index++;
+	}
+#endif
 }
 
 
@@ -190,6 +210,8 @@ public:
 	Splitter();
 	~Splitter();
 
+	void setFilterID(const OctreeId& id) { _filterID = id; }
+
 	void split();
 
 	std::vector<std::string>& getInputFiles();
@@ -224,6 +246,8 @@ protected:
 	pdal::Stage* _readerStage;
 
 	osg::ref_ptr< OctreeNode > _node;
+
+	OctreeId _filterID;
 };
 
 Splitter::Splitter():
@@ -296,7 +320,7 @@ std::shared_ptr< OctreeCell > Splitter::getOrCreateCell(const OctreeId& id)
 void Splitter::split()
 {
 	// First compute the metadata.
-	computeMetaData();
+	computeMetaData();	
 
 	// Initialize the reader
 	initReader();
@@ -314,6 +338,12 @@ void Splitter::split()
 	_node = new OctreeNode();
 	_node->setBoundingBox(_bounds);
 
+	osg::ref_ptr< OctreeNode > filterNode;
+	if (_filterID.valid())
+	{
+		filterNode = _node->createChild(_filterID);
+	}
+
 	int complete = 0;
 
 	// Read all the points
@@ -324,6 +354,16 @@ void Splitter::split()
 		double x = point.getFieldAs<double>(Dimension::Id::X);
 		double y = point.getFieldAs<double>(Dimension::Id::Y);
 		double z = point.getFieldAs<double>(Dimension::Id::Z);
+
+		if (filterNode.valid() && !filterNode->getBoundingBox().contains(osg::Vec3d(x,y,z)))
+		{
+			complete++;
+			if (complete % 10000 == 0)
+			{
+				OSG_NOTICE << "Completed " << complete << " of " << _totalNumPoints << std::endl;
+			}
+			return false;
+		}
 
 		OctreeId childId = _node->getID(osg::Vec3d(x, y, z), _level);
 
@@ -339,7 +379,7 @@ void Splitter::split()
 		p.b = point.getFieldAs<int>(Dimension::Id::Blue);
 		cell->points.push_back(p);
 		_activePoints++;
-		if (_activePoints >= 10000000)
+		if (_activePoints >= 50000000)
 		{
 			OSG_NOTICE << "Writing" << std::endl;
 			_cells.clear();
@@ -355,7 +395,7 @@ void Splitter::split()
 	};
 	callbackFilter.setCallback(cb);
 
-	FixedPointTable fixed(100000);
+	FixedPointTable fixed(1000);
 	{PDAL_SCOPED_LOCK; callbackFilter.prepare(fixed); }
 	callbackFilter.execute(fixed);
 
@@ -497,6 +537,12 @@ int main(int argc, char** argv)
     unsigned int level = 8;
     arguments.read("--level", level);
 
+	int filterLevel = -1;
+	int filterX = -1;
+	int filterY = -1;
+	int filterZ = -1;
+	arguments.read("--filter", filterLevel, filterZ, filterX, filterY);
+
     // Initialize the threads
     unsigned int numThreads = OpenThreads::GetNumberOfProcessors();
     arguments.read("--threads", numThreads);
@@ -525,6 +571,7 @@ int main(int argc, char** argv)
         OSG_NOTICE << "Processing filenames " << filenames[i] << std::endl;
     }
 	splitter.setLevel(level);
+    splitter.setFilterID(OctreeId(filterLevel, filterX, filterY, filterZ));	
 	splitter.split();
 
     osg::Timer_t endTime = osg::Timer::instance()->tick();
