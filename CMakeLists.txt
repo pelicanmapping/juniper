@@ -59,6 +59,7 @@ IF(CMAKE_SYSTEM MATCHES IRIX)
 ENDIF(CMAKE_SYSTEM MATCHES IRIX)
 
 FIND_PACKAGE(OpenGL)
+FIND_PACKAGE(RocksDB)
 
 IF(UNIX)
     # Not sure what this will do on Cygwin and Msys
