@@ -136,9 +136,10 @@ class TileIndex;
 class BuildCellOperator : public osg::Operation
 {
 public:
-	BuildCellOperator(TileIndex *index, const OctreeId& id) :
+	BuildCellOperator(TileIndex *index, const OctreeId& id, unsigned int innerLevel) :
 		_index(index),
-		_id(id)
+		_id(id),
+		_innerLevel(innerLevel)
 	{
 	}
 
@@ -146,6 +147,7 @@ public:
 
 	OctreeId _id;
 	TileIndex* _index;
+	unsigned int _innerLevel;
 };
 
 class TileIndex
@@ -200,7 +202,7 @@ public:
 		OSG_NOTICE << "Found " << _tiles.size() << std::endl;
 	}
 
-	void buildParents(unsigned int level, unsigned int numThreads)
+	void buildParents(unsigned int level, unsigned int innerLevel, unsigned int numThreads)
 	{
 		std::set< OctreeId > ids;
 		for (auto itr = _tiles.begin(); itr != _tiles.end(); ++itr)
@@ -228,7 +230,7 @@ public:
 		// Add all the operations
 		for (auto itr = ids.begin(); itr != ids.end(); ++itr)
 		{
-			osg::ref_ptr< BuildCellOperator> buildCell = new BuildCellOperator(this, *itr);
+			osg::ref_ptr< BuildCellOperator> buildCell = new BuildCellOperator(this, *itr, innerLevel);
 			queue->add(buildCell.get());
 		}
 
@@ -240,7 +242,7 @@ public:
 		OSG_NOTICE << "Done building level " << level << std::endl;
 	}
 
-	void build(const OctreeId &id)
+	void build(const OctreeId &id, unsigned int innerLevel)
 	{
 		osg::ref_ptr< OctreeNode > node = _root->createChild(id);
 		node->split();
@@ -261,7 +263,6 @@ public:
 
 			std::set< OctreeId > innerCells;
 
-			unsigned int innerLevel = 6;
 			for (PointList::iterator itr = points.begin(); itr != points.end(); ++itr)
 			{
 				OctreeId cell = node->getID(osg::Vec3d(itr->x, itr->y, itr->z), innerLevel);
@@ -291,7 +292,7 @@ public:
 
 void BuildCellOperator::operator()(osg::Object* object)
 {
-	_index->build(_id);
+	_index->build(_id, _innerLevel);
 }
 
 int main(int argc, char** argv)
@@ -307,6 +308,10 @@ int main(int argc, char** argv)
 		OSG_NOTICE << "Please specify a level to build up from" << std::endl;
 		return -1;
 	}
+
+	int innerLevel = 6;
+	arguments.read("--innerLevel", innerLevel);
+
 
 	// Initialize the threads
 	unsigned int numThreads = OpenThreads::GetNumberOfProcessors();
@@ -329,7 +334,7 @@ int main(int argc, char** argv)
 	for (int i = level; i > 0; i--)
 	{
 		OSG_NOTICE << "Building parents for " << i << std::endl;
-		index.buildParents(i, numThreads);
+		index.buildParents(i, innerLevel, numThreads);
 	}
 
 	osg::Timer_t endTime = osg::Timer::instance()->tick();
