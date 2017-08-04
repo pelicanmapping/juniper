@@ -146,33 +146,11 @@ void readPointsFromLAZ(PointList& points, const std::string& filename)
 
 void appendPointsToLaz(const PointList& points, const std::string& filename)
 {
-#if 1
 	PointList pts;
 	readPointsFromLAZ(pts, filename);
 	pts.insert(pts.end(), points.begin(), points.end());
 	writePointsToLaz(pts, filename);
-#else
-	unsigned int index = 0;
-	std::string name = osgDB::getNameLessExtension(filename);
-	std::string ext = osgDB::getFileExtension(filename);
-	while (true)
-
-	{
-		std::stringstream buf;
-		buf << name << "." << index << "." << ext;
-		std::string fn = buf.str();
-		if (!osgDB::fileExists(fn))
-		{
-			OSG_NOTICE << "Writing to " << fn << std::endl;
-			writePointsToLaz(points, fn);
-			break;
-		}
-		index++;
-	}
-#endif
 }
-
-
 
 class OctreeCell
 {
@@ -186,13 +164,6 @@ public:
 	{
 		if (!points.empty())
 		{
-			/*
-			PointWriter writer(filename);
-			for (PointList::iterator itr = points.begin(); itr != points.end(); ++itr)
-			{
-				writer.write(*itr);
-			}
-			*/
 			appendPointsToLaz(points, filename);
 		}
 	}
@@ -235,10 +206,6 @@ protected:
 	unsigned int _level;
 	std::vector<std::string> _inputFiles;
 
-	//std::shared_ptr<PointWriter> getOrCreateWriter(const OctreeId& id);
-	//typedef std::map < OctreeId, std::shared_ptr< PointWriter> > OctreeToWriterMap;
-	//OctreeToWriterMap _writers;
-
 	typedef std::map < OctreeId, std::shared_ptr< OctreeCell> > OctreeToCellMap;
 	OctreeToCellMap _cells;
 	std::shared_ptr<OctreeCell> getOrCreateCell(const OctreeId& id);
@@ -273,32 +240,6 @@ std::string Splitter::getFilename(OctreeId id, const std::string& ext) const
 	buf << "tile_" << id.level << "_" << id.z << "_" << id.x << "_" << id.y << "." << ext;
 	return buf.str();
 }
-
-
-/*
-std::shared_ptr< PointWriter > Splitter::getOrCreateWriter(const OctreeId& id)
-{
-	OctreeToWriterMap::iterator itr = _writers.find(id);
-	if (itr != _writers.end())
-	{
-		return itr->second;
-	}
-
-	if (_writers.size() > 4500)
-	{
-		_writers.clear();
-	}
-
-	// Generate a temporay file for the child.
-	std::string filename = getFilename(id, "points");	
-	osgEarth::makeDirectoryForFile(filename);
-
-	std::shared_ptr< PointWriter > writer = std::make_shared<PointWriter>(filename);
-	_writers[id] = writer;
-	std::cout << "We have " << _writers.size() << " writers " << std::endl;
-	return writer;
-}
-*/
 
 std::shared_ptr< OctreeCell > Splitter::getOrCreateCell(const OctreeId& id)
 {
@@ -474,9 +415,11 @@ void Splitter::computeMetaData()
 	double height = _bounds.zMax() - _bounds.zMin();
 	double depth = _bounds.yMax() - _bounds.yMin();
 	double max = osg::maximum(osg::maximum(width, height), depth);
-	_bounds.xMax() = _bounds.xMin() + max;
-	_bounds.yMax() = _bounds.yMin() + max;
-	_bounds.zMax() = _bounds.zMin() + max;
+	double halfMax = max / 2.0;
+
+	osg::Vec3d center = _bounds.center();
+
+	_bounds = osg::BoundingBox(center - osg::Vec3d(halfMax, halfMax, halfMax), center + osg::Vec3d(halfMax, halfMax, halfMax));
 }
 
 void Splitter::initReader()
