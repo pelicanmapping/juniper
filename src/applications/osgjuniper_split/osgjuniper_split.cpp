@@ -195,6 +195,18 @@ public:
 	void initReader();
 	void closeReader();
 
+	OctreeNode* getOctreeNode() const { return _node.get(); }
+
+	const osg::BoundingBoxd& getBounds() const
+	{
+		return _bounds;
+	}
+
+	unsigned int getTotalNumPoints() const
+	{
+		return _totalNumPoints;
+	}
+
 protected:
 
 	std::string getFilename(OctreeId id, const std::string& ext) const;
@@ -265,19 +277,6 @@ void Splitter::split()
 
 	// Initialize the reader
 	initReader();
-
-	// Write out some metadata
-	std::ofstream out("metadata.txt");
-	out << std::setprecision(8) << _bounds.xMin() << " " << _bounds.yMin() << " " << _bounds.zMin() << " " << _bounds.xMax() << " " << _bounds.yMax() << " " << _bounds.zMax();
-	out.close();
-	
-	OSG_NOTICE << "points=" << _totalNumPoints << std::endl
-		<< " bounds " << _bounds.xMin() << ", " << _bounds.yMin() << ", " << _bounds.zMin() << " to "
-		<< _bounds.xMax() << ", " << _bounds.yMax() << ", " << _bounds.zMax() << std::endl;
-
-	// Create the root OctreeNode
-	_node = new OctreeNode();
-	_node->setBoundingBox(_bounds);
 
 	osg::ref_ptr< OctreeNode > filterNode;
 	if (_filterID.valid())
@@ -420,6 +419,19 @@ void Splitter::computeMetaData()
 	osg::Vec3d center = _bounds.center();
 
 	_bounds = osg::BoundingBox(center - osg::Vec3d(halfMax, halfMax, halfMax), center + osg::Vec3d(halfMax, halfMax, halfMax));
+
+	// Create the root OctreeNode
+	_node = new OctreeNode();
+	_node->setBoundingBox(_bounds);
+
+	// Write out some metadata
+	std::ofstream out("metadata.txt");
+	out << std::setprecision(8) << _bounds.xMin() << " " << _bounds.yMin() << " " << _bounds.zMin() << " " << _bounds.xMax() << " " << _bounds.yMax() << " " << _bounds.zMax();
+	out.close();
+
+	OSG_NOTICE << "points=" << _totalNumPoints << std::endl
+		<< " bounds " << _bounds.xMin() << ", " << _bounds.yMin() << ", " << _bounds.zMin() << " to "
+		<< _bounds.xMax() << ", " << _bounds.yMax() << ", " << _bounds.zMax() << std::endl;
 }
 
 void Splitter::initReader()
@@ -451,6 +463,13 @@ void Splitter::closeReader()
 	}
 }
 
+
+void call_from_thread(Splitter& splitter)
+{
+	splitter.split();
+}
+
+
 int main(int argc, char** argv)
 {
 	_setmaxstdio(5000);
@@ -480,12 +499,6 @@ int main(int argc, char** argv)
     unsigned int level = 8;
     arguments.read("--level", level);
 
-	int filterLevel = -1;
-	int filterX = -1;
-	int filterY = -1;
-	int filterZ = -1;
-	arguments.read("--filter", filterLevel, filterZ, filterX, filterY);
-
     // Initialize the threads
     unsigned int numThreads = OpenThreads::GetNumberOfProcessors();
     arguments.read("--threads", numThreads);
@@ -506,7 +519,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-
+	// Create a top level splitter to compute the metadata.
 	Splitter splitter;
     for (unsigned int i = 0; i < filenames.size(); i++)
     {
@@ -514,8 +527,29 @@ int main(int argc, char** argv)
         OSG_NOTICE << "Processing filenames " << filenames[i] << std::endl;
     }
 	splitter.setLevel(level);
-    splitter.setFilterID(OctreeId(filterLevel, filterX, filterY, filterZ));	
-	splitter.split();
+	splitter.computeMetaData();
+
+
+	// Make a splitter per thread
+	std::vector< std::thread > threads;
+	std::vector< Splitter > splitters;
+	osg::ref_ptr< OctreeNode > node = splitter.getOctreeNode();
+	for (unsigned int i = 0; i < 8; i++)
+	{		
+		Splitter s;
+		s.getInputFiles().insert(s.getInputFiles().begin(), splitter.getInputFiles().begin(), splitter.getInputFiles().end());
+		s.setLevel(level);
+		osg::ref_ptr< OctreeNode > childNode = node->createChild(i);
+		s.setFilterID(childNode->getID());
+		threads.push_back(std::thread(call_from_thread, s));
+		splitters.push_back(s);
+	}
+
+	// Wait for all the threads to finish.
+	for (unsigned int i = 0; i < threads.size(); i++)
+	{
+		threads[i].join();
+	}
 
     osg::Timer_t endTime = osg::Timer::instance()->tick();
 
