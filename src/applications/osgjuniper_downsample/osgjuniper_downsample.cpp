@@ -58,16 +58,17 @@ void writePointsToLaz(const PointList& points, const std::string& filename)
 
 	int idx = 0;
 
-	for (unsigned int i = 0; i < points.size(); i++)
+	for (PointList::const_iterator itr = points.begin(); itr != points.end(); ++itr)
 	{
+		const Point& point = *itr;
 		// The point passed, so include it in the list.
-		view->setField(pdal::Dimension::Id::X, idx, points[i].x);
-		view->setField(pdal::Dimension::Id::Y, idx, points[i].y);
-		view->setField(pdal::Dimension::Id::Z, idx, points[i].z);
+		view->setField(pdal::Dimension::Id::X, idx, point.x);
+		view->setField(pdal::Dimension::Id::Y, idx, point.y);
+		view->setField(pdal::Dimension::Id::Z, idx, point.z);
 
-		view->setField(pdal::Dimension::Id::Red, idx, points[i].r);
-		view->setField(pdal::Dimension::Id::Green, idx, points[i].g);
-		view->setField(pdal::Dimension::Id::Blue, idx, points[i].b);
+		view->setField(pdal::Dimension::Id::Red, idx, point.r);
+		view->setField(pdal::Dimension::Id::Green, idx, point.g);
+		view->setField(pdal::Dimension::Id::Blue, idx, point.b);
 		idx++;
 	}
 

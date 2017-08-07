@@ -57,7 +57,7 @@ namespace osgJuniper
 		unsigned char returnNumber;        
     };
 
-    typedef std::vector< Point > PointList;    
+    typedef std::list< Point > PointList;    
 
     /**
      * A cursor that lets you iterate over points from a PointSource
