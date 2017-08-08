@@ -23,9 +23,32 @@
 #include <osgJuniper/Common>
 #include <osgJuniper/OctreeId>
 #include <osgJuniper/Point>
+#include <set>
 
 namespace osgJuniper
 {
+	class OSGJUNIPER_EXPORT KeyQuery
+	{
+	public:
+		KeyQuery();
+
+		KeyQuery(int minLevel, int maxLevel,
+			     int minX, int maxX,
+			     int minY, int maxY,
+			     int minZ, int maxZ);
+
+		int _minLevel;
+		int _maxLevel;
+
+		int _minX;
+		int _minY;
+		int _minZ;
+
+		int _maxX;
+		int _maxY;
+		int _maxZ;
+	};
+
 	/**
 	* A PointTileStore is an abstraction for an object that stores a hierarchical database of points, stored by OctreeId
 	*/
@@ -36,6 +59,8 @@ namespace osgJuniper
 
 		virtual bool get(const OctreeId& id, PointList& points) = 0;
 		virtual void set(const OctreeId& id, PointList& points, bool append) = 0;
+
+		virtual void queryKeys(const KeyQuery& query, std::set< OctreeId >& keys) = 0;
 	};
 }
 

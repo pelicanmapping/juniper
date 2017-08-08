@@ -24,3 +24,30 @@ using namespace osgJuniper;
 PointTileStore::PointTileStore()
 {
 }
+
+KeyQuery::KeyQuery():
+	_minLevel(-1),
+	_maxLevel(-1),
+	_minX(-1),
+	_maxX(-1),
+	_minY(-1),
+	_maxY(-1),
+	_minZ(-1),
+	_maxZ(-1)
+{
+}
+
+KeyQuery::KeyQuery(int minLevel, int maxLevel,
+	int minX, int maxX,
+	int minY, int maxY,
+	int minZ, int maxZ):
+	_minLevel(minLevel),
+	_maxLevel(maxLevel),
+	_minX(minX),
+	_maxX(maxX),
+	_minY(minY),
+	_maxY(maxY),
+	_minZ(minZ),
+	_maxZ(maxZ)
+{
+}

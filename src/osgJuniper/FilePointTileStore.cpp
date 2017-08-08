@@ -18,10 +18,12 @@
 */
 #include <osgJuniper/FilePointTileStore>
 #include <osgJuniper/PDALUtils>
+#include <osgJuniper/Utils>
 
 #include <osgDB/FileNameUtils>
 #include <osgDB/FileUtils>
 #include <osgEarth/FileUtils>
+#include <osgEarth/StringUtils>
 
 using namespace osgJuniper;
 
@@ -65,4 +67,43 @@ void FilePointTileStore::set(const OctreeId& id, PointList& points, bool append)
 	{
 		PDALUtils::writePointsToLaz(points, filename);
 	}
+}
+
+void FilePointTileStore::queryKeys(const KeyQuery& query, std::set< OctreeId >& keys)
+{
+	keys.clear();
+
+	std::vector< std::string > filenames;
+
+	std::vector< std::string > contents = osgJuniper::Utils::getFilesFromDirectory(_path, "laz");
+	for (unsigned int i = 0; i < contents.size(); i++)
+	{
+		std::string filename = contents[i];
+
+		osgEarth::StringTokenizer tok("_.");
+		osgEarth::StringVector tized;
+		tok.tokenize(filename, tized);
+
+		if (tized.size() == 7)
+		{
+			int level = osgEarth::as<int>(tized[2], 0);
+			int z = osgEarth::as<int>(tized[3], 0);
+			int x = osgEarth::as<int>(tized[4], 0);
+			int y = osgEarth::as<int>(tized[5], 0);
+
+			if (
+				(query._minLevel < 0 || level >= query._minLevel) &&
+				(query._maxLevel < 0 || level <= query._maxLevel) &&
+				(query._minX < 0 || x >= query._minX) &&
+				(query._maxX < 0 || x <= query._maxX) &&
+				(query._minY < 0 || y >= query._minY) &&
+				(query._maxY < 0 || y <= query._maxY) &&
+				(query._minZ < 0 || z >= query._minZ) &&
+				(query._maxZ < 0 || z <= query._maxZ)
+				)
+			{				
+				keys.insert(OctreeId(level, x, y, z));
+			}
+		}
+	}	
 }

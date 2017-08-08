@@ -65,35 +65,10 @@ public:
 		_tiles.insert(id);
 	}
 
-	void scan(const std::string& directory, unsigned int startLevel)
+	void scan(unsigned int startLevel)
 	{
 		_tiles.clear();
-
-		std::vector< std::string > filenames;		
-
-		// Load all the point readers		
-		std::vector< std::string > contents = osgJuniper::Utils::getFilesFromDirectory(directory, "laz");
-		for (unsigned int i = 0; i < contents.size(); i++)
-		{
-			std::string filename = contents[i];
-
-			osgEarth::StringTokenizer tok("_.");
-			osgEarth::StringVector tized;
-			tok.tokenize(filename, tized);
-
-			if (tized.size() == 7)
-			{
-				int level = osgEarth::as<int>(tized[2], 0);
-
-				if (level == startLevel)
-				{
-					int z = osgEarth::as<int>(tized[3], 0);
-					int x = osgEarth::as<int>(tized[4], 0);
-					int y = osgEarth::as<int>(tized[5], 0);
-					_tiles.insert(OctreeId(level, x, y, z));
-				}
-			}
-		}
+		_tileStore->queryKeys(KeyQuery(startLevel, startLevel, -1, -1, -1, -1, -1, -1), _tiles);
 		OSG_NOTICE << "Found " << _tiles.size() << std::endl;
 	}
 
@@ -224,7 +199,7 @@ int main(int argc, char** argv)
 	osg::ref_ptr< PointTileStore > tileStore = new FilePointTileStore(".");
 
 	TileIndex index(root, tileStore.get());
-	index.scan(".", level);
+	index.scan(level);
 
 	for (int i = level; i > 0; i--)
 	{
