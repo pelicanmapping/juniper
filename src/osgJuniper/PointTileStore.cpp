@@ -16,37 +16,11 @@
 * LAWS AND INTERNATIONAL TREATIES.  THE RECEIPT OR POSSESSION OF  THIS SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY ANY RIGHTS
 * TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
 */
+#include <osgJuniper/PointTileStore>
 
-#ifndef OSGJUNIPER_PDALUTILS
-#define OSGJUNIPER_PDALUTILS 1
+using namespace osgJuniper;
 
-#include <osgJuniper/Common>
-#include <map>
-#include <pdal/StageFactory.hpp>
-#include <OpenThreads/ReentrantMutex>
-#include <osgJuniper/Point>
-
-
-namespace osgJuniper
+/****************************************************************************/
+PointTileStore::PointTileStore()
 {
-	typedef std::map< std::string, std::string> ExtensionToDriverMap;
-
-	class OSGJUNIPER_EXPORT PDALUtils
-	{
-	public:
-		static void mapExtensionToDriver(const std::string& extension, const std::string& driver);
-		static std::string inferReaderDriver(const std::string& filename);		
-
-		static void writePointsToLaz(const PointList& points, const std::string& filename);
-		static void readPointsFromLAZ(PointList& points, const std::string& filename);
-		static void appendPointsToLaz(const PointList& points, const std::string& filename);
-
-		static OpenThreads::ReentrantMutex& getPDALMutex();
-	};
-
-#define PDAL_SCOPED_LOCK \
-    OpenThreads::ScopedLock<OpenThreads::ReentrantMutex> _slock( PDALUtils::getPDALMutex() )\
-
 }
-
-#endif

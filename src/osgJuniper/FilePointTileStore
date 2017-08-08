@@ -17,36 +17,32 @@
 * TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
 */
 
-#ifndef OSGJUNIPER_PDALUTILS
-#define OSGJUNIPER_PDALUTILS 1
+#ifndef OSGJUNIPER_FILEPOINTTILESTORE
+#define OSGJUNIPER_FILEPOINTTILESTORE 1
 
 #include <osgJuniper/Common>
-#include <map>
-#include <pdal/StageFactory.hpp>
-#include <OpenThreads/ReentrantMutex>
-#include <osgJuniper/Point>
-
+#include <osgJuniper/PointTileStore>
 
 namespace osgJuniper
 {
-	typedef std::map< std::string, std::string> ExtensionToDriverMap;
-
-	class OSGJUNIPER_EXPORT PDALUtils
+	/**
+	* A PointTileStore that stores the points in the file system
+	*/
+	class OSGJUNIPER_EXPORT FilePointTileStore : public PointTileStore
 	{
 	public:
-		static void mapExtensionToDriver(const std::string& extension, const std::string& driver);
-		static std::string inferReaderDriver(const std::string& filename);		
+		FilePointTileStore(const std::string& path);
 
-		static void writePointsToLaz(const PointList& points, const std::string& filename);
-		static void readPointsFromLAZ(PointList& points, const std::string& filename);
-		static void appendPointsToLaz(const PointList& points, const std::string& filename);
+		virtual bool get(const OctreeId& id, PointList& points);
+		virtual void set(const OctreeId& id, PointList& points, bool append);
 
-		static OpenThreads::ReentrantMutex& getPDALMutex();
+		const std::string& getPath() const;
+
+	protected:
+
+		std::string getFilename(const OctreeId& id);
+		std::string _path;
 	};
-
-#define PDAL_SCOPED_LOCK \
-    OpenThreads::ScopedLock<OpenThreads::ReentrantMutex> _slock( PDALUtils::getPDALMutex() )\
-
 }
 
 #endif

@@ -17,36 +17,33 @@
 * TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
 */
 
-#ifndef OSGJUNIPER_PDALUTILS
-#define OSGJUNIPER_PDALUTILS 1
+
+#ifndef OSGJUNIPER_OCTREEID
+#define OSGJUNIPER_OCTREEID 1
 
 #include <osgJuniper/Common>
-#include <map>
-#include <pdal/StageFactory.hpp>
-#include <OpenThreads/ReentrantMutex>
-#include <osgJuniper/Point>
 
-
-namespace osgJuniper
+/**
+* A unique id for a cell in an Octree
+*/
+class OSGJUNIPER_EXPORT OctreeId
 {
-	typedef std::map< std::string, std::string> ExtensionToDriverMap;
+public:
+	OctreeId();
+    OctreeId(int in_level, int in_x, int in_y, int in_z);
 
-	class OSGJUNIPER_EXPORT PDALUtils
-	{
-	public:
-		static void mapExtensionToDriver(const std::string& extension, const std::string& driver);
-		static std::string inferReaderDriver(const std::string& filename);		
+	bool operator == (const OctreeId& rhs) const;
 
-		static void writePointsToLaz(const PointList& points, const std::string& filename);
-		static void readPointsFromLAZ(PointList& points, const std::string& filename);
-		static void appendPointsToLaz(const PointList& points, const std::string& filename);
+	bool operator != (const OctreeId& rhs) const;
 
-		static OpenThreads::ReentrantMutex& getPDALMutex();
-	};
+	bool operator < (const OctreeId& rhs) const;
 
-#define PDAL_SCOPED_LOCK \
-    OpenThreads::ScopedLock<OpenThreads::ReentrantMutex> _slock( PDALUtils::getPDALMutex() )\
+	bool valid() const;
 
-}
+    int level;
+    int x;
+    int y;
+    int z;
+};
 
 #endif

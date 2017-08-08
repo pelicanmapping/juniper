@@ -24,126 +24,268 @@
 #include <osgDB/ReadFile>
 #include <osgJuniper/PointCloud>
 #include <osgJuniper/Octree>
+#include <osgEarth/PagedNode>
 
 using namespace osgJuniper;
+
+std::string getFilename(OctreeId id, const std::string& ext)
+{
+	std::stringstream buf;
+	buf << "tile_" << id.level << "_" << id.z << "_" << id.x << "_" << id.y << "." << ext;
+	return buf.str();
+}
+
 
 class LASTileReaderWriter : public osgDB::ReaderWriter
 {
 public:
-    LASTileReaderWriter()
-    {
-        supportsExtension( "lastile", className() );
+	LASTileReaderWriter()
+	{
+		supportsExtension("lastile", className());
 
-        osgDB::Registry::instance()->addFileExtensionAlias("laz", "pdal");
-    }
+		osgDB::Registry::instance()->addFileExtensionAlias("laz", "pdal");
+	}
 
-    virtual const char* className()
-    {
-        return "LAS Tiled Point Reader";
-    }
+	virtual const char* className()
+	{
+		return "LAS Tiled Point Reader";
+	}
 
-    std::string getFilename(OctreeId id, const std::string& ext) const
-    {
-        std::stringstream buf;
-        buf << "tile_" << id.level << "_" << id.z << "_" << id.x << "_" << id.y << "." << ext;    
-        return buf.str();
-    }
+	class PagedOctreeNode : public osgEarth::PagedNode
+	{
+	public:
+		PagedOctreeNode(const std::string& filename, OctreeNode* octree, float rangeFactor) :
+			_filename(filename),
+			_octree(octree)
+		{
+			setRangeFactor(rangeFactor);
+			build();
+			setupPaging();
+		}
+
+		virtual osg::Node* loadChildren()
+		{
+			osg::Group* group = new osg::Group;
+			std::string path = osgDB::getFilePath(_filename);
+			for (unsigned int i = 0; i < 8; ++i)
+			{
+				osg::ref_ptr< OctreeNode > child = _octree->createChild(i);
+				std::string childFilename = osgDB::concatPaths(path, getFilename(child->getID(), "laz"));
+				if (osgDB::fileExists(childFilename))
+				{
+					group->addChild(new PagedOctreeNode(childFilename, child, getRangeFactor()));
+				}
+			}
+			return group;
+		}
+
+		virtual void build()
+		{
+			std::string filename = getFilename(_octree->getID(), "laz");
+			osg::Node* node = osgDB::readNodeFile(filename);
+			if (node)
+			{
+				_attachPoint->addChild(node);
+			}
+		}
 
 
-    virtual ReadResult readNode( const std::string& location, const osgDB::ReaderWriter::Options* options ) const
-    {
-        if ( !acceptsExtension( osgDB::getLowerCaseFileExtension( location ) ) )
-            return ReadResult::FILE_NOT_HANDLED;
+		virtual osg::BoundingSphere getKeyBound() const
+		{
+			return _octree->getBoundingBox();
+		}
 
-        std::string file = osgDB::getNameLessExtension( location );        
-        osg::Node* node = osgDB::readNodeFile( file );
-        if (!node)
-        {
-            return ReadResult::FILE_NOT_FOUND;
-        }
+		virtual bool hasChildren() const
+		{
+			std::string path = osgDB::getFilePath(_filename);
+			bool hasChildren = false;
+			for (unsigned int i = 0; i < 8; ++i)
+			{
+				osg::ref_ptr< OctreeNode > child = _octree->createChild(i);
+				std::string childFilename = osgDB::concatPaths(path, getFilename(child->getID(), "laz"));
+				if (osgDB::fileExists(childFilename))
+				{
+					return true;
+				}
+			}
+			return false;
+		}
 
-        std::string inExt = osgDB::getFileExtension(file);
+		osg::ref_ptr< OctreeNode > _octree;
+		std::string _filename;
+	};
 
-        osg::PagedLOD* plod = new osg::PagedLOD;
-        osg::Vec3d center = node->getBound().center();
-        plod->setRadius(node->getBound().radius());
-        plod->setCenter(center);
-        plod->addChild(node);
-        plod->setRange(0,0,FLT_MAX);
 
-        double radiusFactor = 2.5;
-        std::string ext = "laz";
-        
-        if (options && !options->getOptionString().empty())
-        {
-            std::string radiusFactorStr = options->getPluginStringData("radiusFactor");        
-            if (!radiusFactorStr.empty())
-            {
-                std::istringstream iss(radiusFactorStr);
-                iss >> radiusFactor;
-            }
+	virtual ReadResult readNode(const std::string& location, const osgDB::ReaderWriter::Options* options) const
+	{
+		if (!acceptsExtension(osgDB::getLowerCaseFileExtension(location)))
+			return ReadResult::FILE_NOT_HANDLED;
 
-            std::string outExt = options->getPluginStringData("ext");
-            if (!outExt.empty())
-            {
-                ext = outExt;
-            }
-        }
-               
+		// Read the metadata file produced by the splitter
+		double minX, minY, minZ, maxX, maxY, maxZ;
+		std::ifstream in("metadata.txt");
+		in >> minX >> minY >> minZ >> maxX >> maxY >> maxZ;
+		std::cout << "Bounds " << minX << " " << minY << " " << minZ << " to "
+			<< maxX << " " << maxY << " " << maxZ << std::endl;
 
-        std::string path = osgDB::getFilePath(file);
+		osg::ref_ptr< OctreeNode > root = new OctreeNode();
+		root->setBoundingBox(osg::BoundingBoxd(minX, minY, minZ, maxX, maxY, maxZ));
 
-        // Get the octree tile name.        
-        std::string tileID = osgDB::getNameLessExtension(osgDB::getSimpleFileName(file));
-        unsigned int level, x, y, z;
-        sscanf(tileID.c_str(), "tile_%d_%d_%d_%d", &level, &z, &x, &y);        
+		std::string file = osgDB::getNameLessExtension(location);
 
-        OctreeId id(level, x, y, z);
-        osg::ref_ptr< OctreeNode > octree = new OctreeNode();
-        octree->setId(id);               
-        unsigned int childNum = 1;
+		double radiusFactor = 5.0;
 
-        
-        double childRadius = node->getBound().radius() / 2.0;        
-        for (unsigned int i = 0; i < 8; ++i)
-        {
-            osg::ref_ptr< OctreeNode > child = octree->createChild(i);
-            std::string childFilename = osgDB::concatPaths(path, getFilename(child->getID(), inExt));            
+		std::string inExt = osgDB::getFileExtension(file);
 
-            if (osgDB::fileExists(childFilename) || osgDB::containsServerAddress(childFilename))
-            {
-                //std::string outFilename = osgDB::concatPaths(path, getFilename(child->getID(), ext));
-                std::stringstream buf;
-                buf << path;
-                if (!path.empty())
-                {
-                    buf << "/";
-                }
-                buf << getFilename(child->getID(), ext);
-                std::string outFilename = buf.str();                
-                if (ext == "las" || ext == "laz")
-                {
-                    outFilename += ".lastile";            
-                }                
-                plod->setFileName(childNum, outFilename);
-                plod->setRange(childNum, 0, childRadius * radiusFactor);
-                childNum++;                
-            }            
-        }        
+		std::string ext = "laz";
+		if (options && !options->getOptionString().empty())
+		{
+			std::string radiusFactorStr = options->getPluginStringData("radiusFactor");
+			if (!radiusFactorStr.empty())
+			{
+				std::istringstream iss(radiusFactorStr);
+				iss >> radiusFactor;
+			}
 
-        // If this is the root node go ahead and add a PointCloud decorator to make it look nice.
-        if (id.level == 0 && id.x == 0 && id.y == 0 && id.z == 0)
-        {
-            PointCloudDecorator *decorator = new PointCloudDecorator();
-            decorator->addChild(plod);
-            return decorator;
-        }
-        else
-        {
-            // Just return the PagedLOD.
-            return plod;
-        }
-    }
+			std::string outExt = options->getPluginStringData("ext");
+			if (!outExt.empty())
+			{
+				ext = outExt;
+			}
+		}
+
+
+		return new PagedOctreeNode(file, root, radiusFactor);
+		/*
+
+		std::string file = osgDB::getNameLessExtension( location );
+		std::string path = osgDB::getFilePath(file);
+
+		// Get the octree tile name.
+		std::string tileID = osgDB::getNameLessExtension(osgDB::getSimpleFileName(file));
+		unsigned int level, x, y, z;
+		sscanf(tileID.c_str(), "tile_%d_%d_%d_%d", &level, &z, &x, &y);
+
+		// Create octree cell.
+		OctreeId id(level, x, y, z);
+		osg::ref_ptr< OctreeNode > octree = root->createChild(id);
+
+		double radiusFactor = 2.5;
+
+		std::string inExt = osgDB::getFileExtension(file);
+
+		std::string ext = "laz";
+		if (options && !options->getOptionString().empty())
+		{
+		std::string radiusFactorStr = options->getPluginStringData("radiusFactor");
+		if (!radiusFactorStr.empty())
+		{
+		std::istringstream iss(radiusFactorStr);
+		iss >> radiusFactor;
+		}
+
+		std::string outExt = options->getPluginStringData("ext");
+		if (!outExt.empty())
+		{
+		ext = outExt;
+		}
+		}
+
+		bool hasChildren = false;
+		// Load all of the children for the octree
+		osg::Group* group = new osg::Group;
+		for (unsigned int i = 0; i < 8; ++i)
+		{
+		osg::ref_ptr< OctreeNode > child = octree->createChild(i);
+		std::string childFilename = osgDB::concatPaths(path, getFilename(child->getID(), inExt));
+
+		osg::Node* node = osgDB::readNodeFile(childFilename);
+		if (node)
+		{
+		osg::PagedLOD* plod = new osg::PagedLOD;
+
+		group->addChild(node);
+
+		// Now just quickly see if this node has any children
+		if (!hasChildren)
+		{
+		for (unsigned int j = 0; j < 8; ++j)
+		{
+		osg::ref_ptr< OctreeNode > child2 = octree->createChild(i);
+		std::string childFilename2 = osgDB::concatPaths(path, getFilename(child2->getID(), inExt));
+		if (osgDB::fileExists(childFilename2))
+		{
+		hasChildren = true;
+		break;
+		}
+		}
+		}
+		}
+
+
+
+		// Setup the min and max ranges.
+		float minRange = (float)(octree->getBoundingBox().radius() * radiusFactor);
+
+		// Replace mode, the parent is replaced by its children.
+
+
+		if (hasChildren)
+		{
+		plod->setRange(0, minRange, FLT_MAX);
+		plod->setRange(1, 0, minRange);
+		}
+		else
+		{
+		plod->setRange(0, 0, FLT_MAX);
+		}
+
+
+
+
+		//plod->setRange(1, 0, minRange);
+		/*
+		double childRadius = node->getBound().radius() / 2.0;
+		for (unsigned int i = 0; i < 8; ++i)
+		{
+		osg::ref_ptr< OctreeNode > child = octree->createChild(i);
+		std::string childFilename = osgDB::concatPaths(path, getFilename(child->getID(), inExt));
+
+		if (osgDB::fileExists(childFilename) || osgDB::containsServerAddress(childFilename))
+		{
+		//std::string outFilename = osgDB::concatPaths(path, getFilename(child->getID(), ext));
+		std::stringstream buf;
+		buf << path;
+		if (!path.empty())
+		{
+		buf << "/";
+		}
+		buf << getFilename(child->getID(), ext);
+		std::string outFilename = buf.str();
+		if (ext == "las" || ext == "laz")
+		{
+		outFilename += ".lastile";
+		}
+		plod->setFileName(childNum, outFilename);
+		plod->setRange(childNum, 0, childRadius * radiusFactor);
+		childNum++;
+		}
+		}
+
+		// If this is the root node go ahead and add a PointCloud decorator to make it look nice.
+		if (id.level == 0 && id.x == 0 && id.y == 0 && id.z == 0)
+		{
+		PointCloudDecorator *decorator = new PointCloudDecorator();
+		decorator->addChild(plod);
+		return decorator;
+		}
+		else
+		{
+		// Just return the PagedLOD.
+		return plod;
+		}
+		*/
+	}
 };
 
 REGISTER_OSGPLUGIN(lastile, LASTileReaderWriter)

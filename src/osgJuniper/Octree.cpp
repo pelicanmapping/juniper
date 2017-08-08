@@ -21,15 +21,6 @@
 using namespace osgJuniper;
 
 /****************************************************************************/
-OctreeId::OctreeId(int in_level, int in_x, int in_y, int in_z):
-level(in_level),
-x(in_x),
-y(in_y),
-z(in_z)
-{
-}
-
-/****************************************************************************/
 
 OctreeNode::OctreeNode():
 //Assume root node

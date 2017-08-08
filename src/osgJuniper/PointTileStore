@@ -17,36 +17,26 @@
 * TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
 */
 
-#ifndef OSGJUNIPER_PDALUTILS
-#define OSGJUNIPER_PDALUTILS 1
+#ifndef OSGJUNIPER_POINTTILESTORE
+#define OSGJUNIPER_POINTTILESTORE 1
 
 #include <osgJuniper/Common>
-#include <map>
-#include <pdal/StageFactory.hpp>
-#include <OpenThreads/ReentrantMutex>
+#include <osgJuniper/OctreeId>
 #include <osgJuniper/Point>
-
 
 namespace osgJuniper
 {
-	typedef std::map< std::string, std::string> ExtensionToDriverMap;
-
-	class OSGJUNIPER_EXPORT PDALUtils
+	/**
+	* A PointTileStore is an abstraction for an object that stores a hierarchical database of points, stored by OctreeId
+	*/
+	class OSGJUNIPER_EXPORT PointTileStore : public osg::Referenced
 	{
 	public:
-		static void mapExtensionToDriver(const std::string& extension, const std::string& driver);
-		static std::string inferReaderDriver(const std::string& filename);		
+		PointTileStore();
 
-		static void writePointsToLaz(const PointList& points, const std::string& filename);
-		static void readPointsFromLAZ(PointList& points, const std::string& filename);
-		static void appendPointsToLaz(const PointList& points, const std::string& filename);
-
-		static OpenThreads::ReentrantMutex& getPDALMutex();
+		virtual bool get(const OctreeId& id, PointList& points) = 0;
+		virtual void set(const OctreeId& id, PointList& points, bool append) = 0;
 	};
-
-#define PDAL_SCOPED_LOCK \
-    OpenThreads::ScopedLock<OpenThreads::ReentrantMutex> _slock( PDALUtils::getPDALMutex() )\
-
 }
 
 #endif

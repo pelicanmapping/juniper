@@ -26,16 +26,19 @@ SET(LIB_PUBLIC_HEADERS
     IBR
     IBRCameraNode
     IBRManipulator
+    FilePointTileStore
 	NodeSequence
     Utils
     LASTile
     Octree
+    OctreeId
     PCap
     PDALUtils
     Point
     PointReaderWriter
     PointCloud
     PointCloudTools
+    PointTileStore
     StreamingNode
     Velodyne
 )
@@ -46,16 +49,19 @@ ADD_LIBRARY(${LIB_NAME} SHARED
     IBR.cpp
     IBRCameraNode.cpp
     IBRManipulator.cpp
+    FilePointTileStore.cpp
 	NodeSequence.cpp
     Utils.cpp
     LASTile.cpp
     Octree.cpp
+    OctreeId.cpp
     PCap.cpp
     PDALUtils.cpp
     Point.cpp
     PointReaderWriter.cpp
     PointCloud.cpp
     PointCloudTools.cpp
+    PointTileStore.cpp
     StreamingNode.cpp
     Velodyne.cpp
 )

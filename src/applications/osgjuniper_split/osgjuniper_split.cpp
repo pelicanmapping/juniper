@@ -26,6 +26,7 @@
 #include <iostream>
 #include <osgJuniper/Utils>
 #include <osgJuniper/PDALUtils>
+#include <osgJuniper/FilePointTileStore>
 #include <osgJuniper/PointReaderWriter>
 #include <pdal/io/BufferReader.hpp>
 
@@ -56,121 +57,14 @@ Stage* createStageForFile(const std::string& filename) {
 	return reader;
 }
 
-void writePointsToLaz(const PointList& points, const std::string& filename)
-{
-	PointTable pointTable;
-	pointTable.layout()->registerDim(Dimension::Id::X);
-	pointTable.layout()->registerDim(Dimension::Id::Y);
-	pointTable.layout()->registerDim(Dimension::Id::Z);
-	pointTable.layout()->registerDim(Dimension::Id::Red);
-	pointTable.layout()->registerDim(Dimension::Id::Green);
-	pointTable.layout()->registerDim(Dimension::Id::Blue);
-	PointViewPtr view(new PointView(pointTable));
-
-	int idx = 0;
-
-	for (PointList::const_iterator itr = points.begin(); itr != points.end(); ++itr)
-	{
-		const Point& point = *itr;
-		// The point passed, so include it in the list.
-		view->setField(pdal::Dimension::Id::X, idx, point.x);
-		view->setField(pdal::Dimension::Id::Y, idx, point.y);
-		view->setField(pdal::Dimension::Id::Z, idx, point.z);
-
-		view->setField(pdal::Dimension::Id::Red, idx, point.r);
-		view->setField(pdal::Dimension::Id::Green, idx, point.g);
-		view->setField(pdal::Dimension::Id::Blue, idx, point.b);
-		idx++;
-	}
-
-	BufferReader bufferReader;
-	bufferReader.addView(view);	
-
-	Stage *writer = 0;
-	{PDAL_SCOPED_LOCK; writer = _factory.createStage("writers.las"); }
-
-	osgEarth::makeDirectoryForFile(filename);
-
-	Options options;
-	options.add("filename", filename);
-
-	writer->setInput(bufferReader);
-	writer->setOptions(options);
-	{ PDAL_SCOPED_LOCK; writer->prepare(pointTable); }
-	writer->execute(pointTable);
-
-	// Destroy the writer stage, we're done with it.
-	{PDAL_SCOPED_LOCK; _factory.destroyStage(writer); }
-}
-
-void readPointsFromLAZ(PointList& points, const std::string& filename)
-{
-	points.clear();
-	if (osgDB::fileExists(filename))
-	{
-		Stage* stage = 0;
-		{
-			PDAL_SCOPED_LOCK;
-			stage = _factory.createStage("readers.las");
-			pdal::Options opt;
-			opt.add("filename", filename);
-			stage->setOptions(opt);
-		}
-
-		if (stage)
-		{
-			pdal::PointTable table;
-			{ PDAL_SCOPED_LOCK;  stage->prepare(table); }
-
-			pdal::PointViewSet point_view_set = stage->execute(table);
-			pdal::PointViewPtr point_view = *point_view_set.begin();
-
-			for (unsigned int i = 0; i < point_view->size(); i++)
-			{
-				PointRef point(point_view->point(i));
-				Point p;
-				p.x = point.getFieldAs<double>(pdal::Dimension::Id::X);
-				p.y = point.getFieldAs<double>(pdal::Dimension::Id::Y);
-				p.z = point.getFieldAs<double>(pdal::Dimension::Id::Z);
-				p.r = point.getFieldAs<int>(pdal::Dimension::Id::Red);
-				p.g = point.getFieldAs<int>(pdal::Dimension::Id::Green);
-				p.b = point.getFieldAs<int>(pdal::Dimension::Id::Blue);
-				points.push_back(p);
-			}
-		}
-	}
-	if (points.size() > 0)
-	{
-		OSG_NOTICE << "Read " << points.size() << " from " << filename << std::endl;
-	}
-}
-
-void appendPointsToLaz(const PointList& points, const std::string& filename)
-{
-	PointList pts;
-	readPointsFromLAZ(pts, filename);
-	pts.insert(pts.end(), points.begin(), points.end());
-	writePointsToLaz(pts, filename);
-}
-
 class OctreeCell
 {
 public:
-	OctreeCell(const std::string &filename)		
-	{
-		this->filename = filename;
-	}
-
-	~OctreeCell()
-	{
-		if (!points.empty())
-		{
-			appendPointsToLaz(points, filename);
-		}
+	OctreeCell()
+	{		
 	}
 
 	PointList points;
-	std::string filename;
 };
 
 /**
@@ -181,6 +75,9 @@ class Splitter
 public:
 	Splitter();
 	~Splitter();
+
+	PointTileStore* getTileStore() const { return _tileStore; }
+	void setTileStore(PointTileStore* tileStore) { _tileStore = tileStore; }
 
 	void setFilterID(const OctreeId& id) { _filterID = id; }
 
@@ -210,7 +107,7 @@ public:
 
 protected:
 
-	std::string getFilename(OctreeId id, const std::string& ext) const;
+	void clearCells();
 
 
 	unsigned int _totalNumPoints;
@@ -226,6 +123,8 @@ protected:
 	pdal::Stage* _readerStage;
 
 	osg::ref_ptr< OctreeNode > _node;
+
+	osg::ref_ptr< PointTileStore > _tileStore;
 
 	OctreeId _filterID;
 };
@@ -247,12 +146,6 @@ std::vector<std::string>& Splitter::getInputFiles()
 	return _inputFiles;
 }
 
-std::string Splitter::getFilename(OctreeId id, const std::string& ext) const
-{
-	std::stringstream buf;
-	buf << "tile_" << id.level << "_" << id.z << "_" << id.x << "_" << id.y << "." << ext;
-	return buf.str();
-}
 
 std::shared_ptr< OctreeCell > Splitter::getOrCreateCell(const OctreeId& id)
 {
@@ -262,11 +155,7 @@ std::shared_ptr< OctreeCell > Splitter::getOrCreateCell(const OctreeId& id)
 		return itr->second;
 	}
 
-	// Generate a temporay file for the child.
-	std::string filename = getFilename(id, "laz");
-	osgEarth::makeDirectoryForFile(filename);
-
-	std::shared_ptr< OctreeCell > cell = std::make_shared<OctreeCell>(filename);
+	std::shared_ptr< OctreeCell > cell = std::make_shared<OctreeCell>();
 	_cells[id] = cell;
 	return cell;
 }
@@ -308,8 +197,6 @@ void Splitter::split()
 
 		OctreeId childId = _node->getID(osg::Vec3d(x, y, z), _level);
 
-		//std::shared_ptr< PointWriter > writer = getOrCreateWriter(childId);
-		//writer->write(point);
 		std::shared_ptr< OctreeCell > cell = getOrCreateCell(childId);
 		Point p;
 		p.x = x;
@@ -322,9 +209,7 @@ void Splitter::split()
 		_activePoints++;
 		if (_activePoints >= 50000000)
 		{
-			OSG_NOTICE << "Writing" << std::endl;
-			_cells.clear();
-			_activePoints = 0;
+			clearCells();
 		}
 
 		complete++;
@@ -332,6 +217,7 @@ void Splitter::split()
 		{
 			OSG_NOTICE << "Completed " << complete << " of " << _totalNumPoints << std::endl;
 		}
+
 		return true;
 	};
 	callbackFilter.setCallback(cb);
@@ -340,8 +226,7 @@ void Splitter::split()
 	{PDAL_SCOPED_LOCK; callbackFilter.prepare(fixed); }
 	callbackFilter.execute(fixed);
 
-
-	_cells.clear();
+	clearCells();
 }
 
 void Splitter::computeMetaData()
@@ -402,7 +287,7 @@ void Splitter::computeMetaData()
 
 				};
 				callbackFilter.setCallback(cb);
-				FixedPointTable fixed(1000);
+				FixedPointTable fixed(100);
 				{PDAL_SCOPED_LOCK; callbackFilter.prepare(fixed); }
 				callbackFilter.execute(fixed);
 			}
@@ -433,6 +318,17 @@ void Splitter::computeMetaData()
 	OSG_NOTICE << "points=" << _totalNumPoints << std::endl
 		<< " bounds " << _bounds.xMin() << ", " << _bounds.yMin() << ", " << _bounds.zMin() << " to "
 		<< _bounds.xMax() << ", " << _bounds.yMax() << ", " << _bounds.zMax() << std::endl;
+}
+
+void Splitter::clearCells()
+{
+	OSG_NOTICE << "Writing" << std::endl;
+	for (OctreeToCellMap::iterator itr = _cells.begin(); itr != _cells.end(); ++itr)
+	{
+		_tileStore->set(itr->first, itr->second->points, true);
+	}
+	_cells.clear();
+	_activePoints = 0;
 }
 
 void Splitter::initReader()
@@ -470,7 +366,6 @@ void call_from_thread(Splitter& splitter)
 	splitter.split();
 }
 
-
 int main(int argc, char** argv)
 {
 	_setmaxstdio(5000);
@@ -498,11 +393,7 @@ int main(int argc, char** argv)
     }
 
     unsigned int level = 8;
-    arguments.read("--level", level);
-
-    // Initialize the threads
-    unsigned int numThreads = OpenThreads::GetNumberOfProcessors();
-    arguments.read("--threads", numThreads);
+    arguments.read("--level", level);    
 
 	//Read in the filenames to process
     for(int pos=1;pos<arguments.argc();++pos)
@@ -530,6 +421,7 @@ int main(int argc, char** argv)
 	splitter.setLevel(level);
 	splitter.computeMetaData();
 
+	osg::ref_ptr< PointTileStore > tileStore = new FilePointTileStore(".");
 
 	// Make a splitter per thread
 	std::vector< std::thread > threads;
@@ -538,6 +430,7 @@ int main(int argc, char** argv)
 	for (unsigned int i = 0; i < 8; i++)
 	{		
 		Splitter s;
+		s.setTileStore(tileStore.get());
 		s.getInputFiles().insert(s.getInputFiles().begin(), splitter.getInputFiles().begin(), splitter.getInputFiles().end());
 		s.setLevel(level);
 		osg::ref_ptr< OctreeNode > childNode = node->createChild(i);

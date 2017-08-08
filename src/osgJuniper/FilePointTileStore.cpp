@@ -16,37 +16,53 @@
 * LAWS AND INTERNATIONAL TREATIES.  THE RECEIPT OR POSSESSION OF  THIS SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY ANY RIGHTS
 * TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
 */
+#include <osgJuniper/FilePointTileStore>
+#include <osgJuniper/PDALUtils>
 
-#ifndef OSGJUNIPER_PDALUTILS
-#define OSGJUNIPER_PDALUTILS 1
+#include <osgDB/FileNameUtils>
+#include <osgDB/FileUtils>
+#include <osgEarth/FileUtils>
 
-#include <osgJuniper/Common>
-#include <map>
-#include <pdal/StageFactory.hpp>
-#include <OpenThreads/ReentrantMutex>
-#include <osgJuniper/Point>
+using namespace osgJuniper;
 
-
-namespace osgJuniper
+FilePointTileStore::FilePointTileStore(const std::string& path):
+	_path(path)
 {
-	typedef std::map< std::string, std::string> ExtensionToDriverMap;
-
-	class OSGJUNIPER_EXPORT PDALUtils
-	{
-	public:
-		static void mapExtensionToDriver(const std::string& extension, const std::string& driver);
-		static std::string inferReaderDriver(const std::string& filename);		
-
-		static void writePointsToLaz(const PointList& points, const std::string& filename);
-		static void readPointsFromLAZ(PointList& points, const std::string& filename);
-		static void appendPointsToLaz(const PointList& points, const std::string& filename);
-
-		static OpenThreads::ReentrantMutex& getPDALMutex();
-	};
-
-#define PDAL_SCOPED_LOCK \
-    OpenThreads::ScopedLock<OpenThreads::ReentrantMutex> _slock( PDALUtils::getPDALMutex() )\
-
 }
 
-#endif
+const std::string& FilePointTileStore::getPath() const
+{
+	return _path;
+}
+
+std::string FilePointTileStore::getFilename(const OctreeId& id)
+{
+	std::stringstream buf;
+	buf << "tile_" << id.level << "_" << id.z << "_" << id.x << "_" << id.y << ".laz";
+	return osgDB::concatPaths(_path, buf.str());
+}
+
+bool FilePointTileStore::get(const OctreeId& id, PointList& points)
+{	
+	std::string filename = getFilename(id);
+	if (osgDB::fileExists(filename))
+	{
+		PDALUtils::readPointsFromLAZ(points, filename);
+		return true;
+	}
+	return false;
+}
+
+void FilePointTileStore::set(const OctreeId& id, PointList& points, bool append)
+{
+	std::string filename = getFilename(id);
+	osgEarth::makeDirectoryForFile(filename);
+	if (append)
+	{
+		PDALUtils::appendPointsToLaz(points, filename);
+	}
+	else
+	{
+		PDALUtils::writePointsToLaz(points, filename);
+	}
+}

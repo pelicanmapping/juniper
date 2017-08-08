@@ -16,37 +16,46 @@
 * LAWS AND INTERNATIONAL TREATIES.  THE RECEIPT OR POSSESSION OF  THIS SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY ANY RIGHTS
 * TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
 */
+#include <osgJuniper/OctreeId>
 
-#ifndef OSGJUNIPER_PDALUTILS
-#define OSGJUNIPER_PDALUTILS 1
+using namespace osgJuniper;
 
-#include <osgJuniper/Common>
-#include <map>
-#include <pdal/StageFactory.hpp>
-#include <OpenThreads/ReentrantMutex>
-#include <osgJuniper/Point>
-
-
-namespace osgJuniper
+/****************************************************************************/
+OctreeId::OctreeId(int in_level, int in_x, int in_y, int in_z):
+level(in_level),
+x(in_x),
+y(in_y),
+z(in_z)
 {
-	typedef std::map< std::string, std::string> ExtensionToDriverMap;
-
-	class OSGJUNIPER_EXPORT PDALUtils
-	{
-	public:
-		static void mapExtensionToDriver(const std::string& extension, const std::string& driver);
-		static std::string inferReaderDriver(const std::string& filename);		
-
-		static void writePointsToLaz(const PointList& points, const std::string& filename);
-		static void readPointsFromLAZ(PointList& points, const std::string& filename);
-		static void appendPointsToLaz(const PointList& points, const std::string& filename);
-
-		static OpenThreads::ReentrantMutex& getPDALMutex();
-	};
-
-#define PDAL_SCOPED_LOCK \
-    OpenThreads::ScopedLock<OpenThreads::ReentrantMutex> _slock( PDALUtils::getPDALMutex() )\
-
 }
 
-#endif
+OctreeId::OctreeId() :
+	level(-1),
+	x(-1),
+	y(-1),
+	z(-1)
+{
+}
+
+bool OctreeId::operator == (const OctreeId& rhs) const
+{
+	return (level == rhs.level) && (x == rhs.x) && (y == rhs.y) && (z == rhs.z);
+}
+
+bool OctreeId::operator != (const OctreeId& rhs) const
+{
+	return (level != rhs.level) || (x != rhs.x) || (y != rhs.y) || (z != rhs.z);
+}
+
+bool OctreeId::operator < (const OctreeId& rhs) const
+{
+	if (level<rhs.level) return true;
+	if (level>rhs.level) return false;
+	if (x<rhs.x) return true;
+	if (x>rhs.x) return false;
+	if (y<rhs.y) return true;
+	if (y>rhs.y) return false;
+	return z<rhs.z;
+}
+
+bool OctreeId::valid() const { return level >= 0; }

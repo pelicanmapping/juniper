@@ -29,12 +29,11 @@ Point::Point() :
 	z(0.0),
 	r(0.0),
 	g(0.0),
-	b(0.0)/*,
+	b(0.0),
 	a(0.0),
 	classification(0),
 	intensity(0),
 	returnNumber(0)
-	*/
 {
 }
 
@@ -159,8 +158,3 @@ CompositePointSourceCursor::nextPoint(Point& point)
     }
     return gotPoint;
 }
-
-
-
-
-

@@ -28,109 +28,9 @@
 #include <osgJuniper/PDALUtils>
 #include <osgJuniper/PointReaderWriter>
 
-#include <pdal/StageFactory.hpp>
-#include <pdal/filters/StreamCallbackFilter.hpp>
-#include <pdal/filters/MergeFilter.hpp>
-#include <pdal/io/BufferReader.hpp>
+#include <osgJuniper/FilePointTileStore>
 
 using namespace osgJuniper;
-using namespace pdal;
-
-static pdal::StageFactory _factory;
-
-std::string getFilename(OctreeId id, const std::string& ext)
-{
-	std::stringstream buf;
-	buf << "tile_" << id.level << "_" << id.z << "_" << id.x << "_" << id.y << "." << ext;
-	return buf.str();
-}
-
-void writePointsToLaz(const PointList& points, const std::string& filename)
-{
-	PointTable pointTable;
-	pointTable.layout()->registerDim(Dimension::Id::X);
-	pointTable.layout()->registerDim(Dimension::Id::Y);
-	pointTable.layout()->registerDim(Dimension::Id::Z);
-	pointTable.layout()->registerDim(Dimension::Id::Red);
-	pointTable.layout()->registerDim(Dimension::Id::Green);
-	pointTable.layout()->registerDim(Dimension::Id::Blue);
-	PointViewPtr view(new PointView(pointTable));
-
-	int idx = 0;
-
-	for (PointList::const_iterator itr = points.begin(); itr != points.end(); ++itr)
-	{
-		const Point& point = *itr;
-		// The point passed, so include it in the list.
-		view->setField(pdal::Dimension::Id::X, idx, point.x);
-		view->setField(pdal::Dimension::Id::Y, idx, point.y);
-		view->setField(pdal::Dimension::Id::Z, idx, point.z);
-
-		view->setField(pdal::Dimension::Id::Red, idx, point.r);
-		view->setField(pdal::Dimension::Id::Green, idx, point.g);
-		view->setField(pdal::Dimension::Id::Blue, idx, point.b);
-		idx++;
-	}
-
-	BufferReader bufferReader;
-	bufferReader.addView(view);
-
-	Stage *writer = 0;
-	{PDAL_SCOPED_LOCK; writer = _factory.createStage("writers.las"); }
-
-	osgEarth::makeDirectoryForFile(filename);
-
-	Options options;
-	options.add("filename", filename);
-
-	writer->setInput(bufferReader);
-	writer->setOptions(options);
-	{ PDAL_SCOPED_LOCK; writer->prepare(pointTable); }
-	writer->execute(pointTable);
-
-	// Destroy the writer stage, we're done with it.
-	{PDAL_SCOPED_LOCK; _factory.destroyStage(writer); }
-}
-
-
-void readPointsFromLAZ(PointList& points, const std::string& filename)
-{
-	points.clear();
-	if (osgDB::fileExists(filename))
-	{
-		Stage* stage = 0;
-		{
-			PDAL_SCOPED_LOCK;
-			stage = _factory.createStage("readers.las");
-			pdal::Options opt;
-			opt.add("filename", filename);
-			stage->setOptions(opt);
-		}
-
-		if (stage)
-		{
-			pdal::PointTable table;
-			{ PDAL_SCOPED_LOCK;  stage->prepare(table); }
-
-			pdal::PointViewSet point_view_set = stage->execute(table);
-			pdal::PointViewPtr point_view = *point_view_set.begin();
-
-			for (unsigned int i = 0; i < point_view->size(); i++)
-			{
-				PointRef point(point_view->point(i));
-				Point p;
-				p.x = point.getFieldAs<double>(pdal::Dimension::Id::X);
-				p.y = point.getFieldAs<double>(pdal::Dimension::Id::Y);
-				p.z = point.getFieldAs<double>(pdal::Dimension::Id::Z);
-				p.r = point.getFieldAs<int>(pdal::Dimension::Id::Red);
-				p.g = point.getFieldAs<int>(pdal::Dimension::Id::Green);
-				p.b = point.getFieldAs<int>(pdal::Dimension::Id::Blue);
-				points.push_back(p);
-			}
-		}
-	}
-}
-
 
 class TileIndex;
 
@@ -154,8 +54,9 @@ public:
 class TileIndex
 {	
 public:
-	TileIndex(OctreeNode* root):
-		_root(root)
+	TileIndex(OctreeNode* root, PointTileStore* tileStore):
+		_root(root),
+		_tileStore(tileStore)
 	{
 	}
 
@@ -182,13 +83,6 @@ public:
 
 			if (tized.size() == 7)
 			{
-				/*
-				OSG_NOTICE << filename << std::endl;
-				for (unsigned int j = 0; j < tized.size(); j++)
-				{
-					OSG_NOTICE << "tized " << j << "=" << tized[j] << std::endl;
-				}
-				*/
 				int level = osgEarth::as<int>(tized[2], 0);
 
 				if (level == startLevel)
@@ -252,9 +146,8 @@ public:
 		PointList points;
 		for (unsigned int i = 0; i < node->getChildren().size(); i++)
 		{
-			std::string filename = getFilename(node->getChildren()[i]->getID(), "laz");
+			_tileStore->get(node->getChildren()[i]->getID(), points);
 			PointList pts;
-			readPointsFromLAZ(pts, filename);
 			points.insert(points.end(), pts.begin(), pts.end());
 		}
 
@@ -276,9 +169,7 @@ public:
 
 			if (!keepers.empty())
 			{				
-				std::string tileFilename = getFilename(id, "laz");				
-				writePointsToLaz(keepers, tileFilename);
-
+				_tileStore->set(id, keepers, true);
 				OpenThreads::ScopedLock< OpenThreads::Mutex > lock(_tilesMutex);
 				_tiles.insert(id);
 			}
@@ -288,6 +179,7 @@ public:
 	OpenThreads::Mutex _tilesMutex;
 	std::set< OctreeId > _tiles;
 	osg::ref_ptr< OctreeNode > _root;
+	osg::ref_ptr< PointTileStore > _tileStore;
 };
 
 
@@ -329,7 +221,9 @@ int main(int argc, char** argv)
 	osg::ref_ptr< OctreeNode > root = new OctreeNode();
 	root->setBoundingBox(osg::BoundingBoxd(minX, minY, minZ, maxX, maxY, maxZ));	
 
-	TileIndex index(root);
+	osg::ref_ptr< PointTileStore > tileStore = new FilePointTileStore(".");
+
+	TileIndex index(root, tileStore.get());
 	index.scan(".", level);
 
 	for (int i = level; i > 0; i--)
