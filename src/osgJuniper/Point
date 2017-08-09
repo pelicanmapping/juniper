@@ -57,7 +57,10 @@ namespace osgJuniper
 		unsigned char returnNumber;        
     };
 
-    typedef std::list< Point > PointList;    
+    //typedef std::list< Point > PointList;    
+	// Using a vector is a little harder on memory, but really increases cache coherency so there is a big speed win.
+	typedef std::vector< Point > PointList;    
+
 
     /**
      * A cursor that lets you iterate over points from a PointSource
