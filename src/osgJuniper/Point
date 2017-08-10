@@ -54,13 +54,14 @@ namespace osgJuniper
 
 		unsigned short intensity;
 		unsigned char classification;
-		unsigned char returnNumber;        
+		unsigned char returnNumber;       
+
+		static void write(std::ostream &out, const std::vector< Point >& points);
+		static void read(std::istream &in, std::vector< Point >& points);
     };
 
-    //typedef std::list< Point > PointList;    
-	// Using a vector is a little harder on memory, but really increases cache coherency so there is a big speed win.
-	typedef std::vector< Point > PointList;    
-
+	typedef std::vector< Point > PointList;
+	    
 
     /**
      * A cursor that lets you iterate over points from a PointSource

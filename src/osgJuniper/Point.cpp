@@ -37,6 +37,61 @@ Point::Point() :
 {
 }
 
+void Point::write(std::ostream &out, const std::vector< Point >& points)
+{
+	for (PointList::const_iterator itr = points.begin(); itr != points.end(); ++itr)
+	{
+		const Point& point = *itr;
+
+		float position[3];
+		position[0] = point.x;
+		position[1] = point.y;
+		position[2] = point.z;
+
+		unsigned char color[3];
+		color[0] = point.r / 256;
+		color[1] = point.g / 256;
+		color[2] = point.b / 256;
+
+		out.write((char*)position, sizeof(float) * 3);
+		out.write((char*)color, sizeof(unsigned char) * 3);
+		out.write((char*)&point.classification, sizeof(unsigned char));
+		out.write((char*)&point.intensity, sizeof(unsigned short));
+	}
+}
+void Point::read(std::istream &in, std::vector< Point >& points)
+{
+	int numRead = 0;
+	while (in.good())
+	{
+		float position[3];
+		unsigned char color[3];
+		unsigned char classification;
+		unsigned short intensity;
+
+		Point point;
+		if (in.read((char*)position, sizeof(float) * 3) &&
+			in.read((char*)color, sizeof(unsigned char) * 3) &&
+			in.read((char*)(&classification), sizeof(unsigned char)) &&
+			in.read((char*)(&intensity), sizeof(unsigned short))
+			)
+		{		
+			point.x = position[0];
+			point.y = position[1];
+			point.z = position[2];
+
+			point.r = color[0] * 256;
+			point.g = color[1] * 256;
+			point.b = color[2] * 256;
+
+			point.classification = classification;
+			point.intensity = intensity;
+			points.push_back(point);
+			numRead++;
+		}
+	}
+}
+
 /****************************************************************************/
 PointSource*
 PointSource::loadPointSource(const std::string &filename, const osgDB::ReaderWriter::Options* options)

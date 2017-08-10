@@ -33,7 +33,6 @@ _nextID(0)
 {	
 	rocksdb::DB* db;
 	rocksdb::Options options;
-	//options.PrepareForBulkLoad();
 	options.create_if_missing = true;
 	options.compression = rocksdb::kSnappyCompression;
 	rocksdb::Status status = rocksdb::DB::Open(options, path, &db);
@@ -61,40 +60,69 @@ std::string RocksDBPointTileStore::getKey(const OctreeId& id)
 }
 
 bool RocksDBPointTileStore::get(const OctreeId& id, PointList& points)
-{	
-	return false;
+{		
+	//points.clear();	
+
+	rocksdb::DB* db = (rocksdb::DB*)_db;
+	std::string key = getKey(id);
+
+	//OSG_NOTICE << "RocksDB reading from " <<  key << std::endl;
+
+	rocksdb::Iterator* it = db->NewIterator(rocksdb::ReadOptions());
+	for (it->Seek(key);
+		it->Valid() && osgEarth::startsWith(it->key().ToString(), key);
+		it->Next()) {
+		//OSG_NOTICE << "RocksDB reading key " << it->key().ToString() << ": value size=" << it->value().ToString().size() << std::endl;
+		std::istringstream in(it->value().ToString(), std::ios::binary);		
+		Point::read(in, points);		
+	}
+	delete it;
+
+	//OSG_NOTICE << "RocksDB read " << points.size() << " from " << key << std::endl;
+	return true;
 }
 
 void RocksDBPointTileStore::set(const OctreeId& id, PointList& points, bool append)
 {
 	long guid = nextID();
 
-	std::ostringstream out;
-	for (PointList::iterator itr = points.begin(); itr != points.end(); ++itr)
-	{
-		Point& point = *itr;
-		float position[3];
-		position[0] = point.x;
-		position[1] = point.y;
-		position[2] = point.z;
-
-		char color[3];
-		color[0] = point.r / 65536;
-		color[1] = point.g / 65536;
-		color[2] = point.b / 65536;
-
-		out.write((char*)position, sizeof(float) * 3);
-		out.write((char*)color, sizeof(char) * 3);
-		out.write((char*)&point.classification, sizeof(unsigned char));
-		out.write((char*)&point.intensity, sizeof(unsigned short));
-	}	
+	std::ostringstream out(std::ios::binary);
+	Point::write(out, points);
 
 	std::stringstream key;
-	key << getKey(id) << "/" << guid;
-	((rocksdb::DB*)_db)->Put(rocksdb::WriteOptions(), key.str(), out.str());
+	key << getKey(id) << "/";
+	if (append)
+	{
+		key << guid;
+	}
+	//OSG_NOTICE << "Writing to key " << key.str() << std::endl;
+	//((rocksdb::DB*)_db)->Put(rocksdb::WriteOptions(), key.str(), out.str());
+	rocksdb::WriteOptions opt;
+	//opt.sync = true;
+	//opt.disableWAL = true;
+	((rocksdb::DB*)_db)->Put(opt, key.str(), out.str());
 }
 
 void RocksDBPointTileStore::queryKeys(const KeyQuery& query, std::set< OctreeId >& keys)
 {
-	// TODO:
+	rocksdb::DB* db = (rocksdb::DB*)_db;
+	rocksdb::Iterator* it = db->NewIterator(rocksdb::ReadOptions());
+	for (it->SeekToFirst(); it->Valid(); it->Next()) {
+		unsigned int level, x, y, z, guid;
+		sscanf(it->key().ToString().c_str(), "%d/%d/%d/%d/%d", &level, &z, &x, &y, &guid);
+		if (
+			(query._minLevel < 0 || level >= query._minLevel) &&
+			(query._maxLevel < 0 || level <= query._maxLevel) &&
+			(query._minX < 0 || x >= query._minX) &&
+			(query._maxX < 0 || x <= query._maxX) &&
+			(query._minY < 0 || y >= query._minY) &&
+			(query._maxY < 0 || y <= query._maxY) &&
+			(query._minZ < 0 || z >= query._minZ) &&
+			(query._maxZ < 0 || z <= query._maxZ)
+			)
+		{
+			keys.insert(OctreeId(level, x, y, z));
+		}
+	}
+	delete it;
 }

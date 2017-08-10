@@ -27,6 +27,7 @@
 #include <osgJuniper/Utils>
 #include <osgJuniper/PDALUtils>
 #include <osgJuniper/FilePointTileStore>
+#include <osgJuniper/RocksDBPointTileStore>
 #include <osgJuniper/PointReaderWriter>
 #include <pdal/io/BufferReader.hpp>
 
@@ -205,6 +206,7 @@ void Splitter::split()
 		p.r = point.getFieldAs<int>(Dimension::Id::Red);
 		p.g = point.getFieldAs<int>(Dimension::Id::Green);
 		p.b = point.getFieldAs<int>(Dimension::Id::Blue);
+
 		cell->points.push_back(p);
 		_activePoints++;
 		if (_activePoints >= 50000000)
@@ -323,10 +325,26 @@ void Splitter::computeMetaData()
 void Splitter::clearCells()
 {
 	OSG_NOTICE << "Writing" << std::endl;
+	/*
+	for (OctreeToCellMap::iterator itr = _cells.begin(); itr != _cells.end();)
+	{
+		if (itr->second->points.size() > 0)
+		{
+			_tileStore->set(itr->first, itr->second->points, true);
+			itr = _cells.erase(itr);
+		}
+		else
+		{
+			OSG_NOTICE << "Skipping " << std::endl;
+			++itr;
+		}
+	}
+	*/
 	for (OctreeToCellMap::iterator itr = _cells.begin(); itr != _cells.end(); ++itr)
 	{
 		_tileStore->set(itr->first, itr->second->points, true);
 	}
+
 	_cells.clear();
 	_activePoints = 0;
 }
@@ -395,6 +413,9 @@ int main(int argc, char** argv)
     unsigned int level = 8;
     arguments.read("--level", level);    
 
+	bool threaded = false;
+	threaded = arguments.read("--threaded");
+
 	//Read in the filenames to process
     for(int pos=1;pos<arguments.argc();++pos)
     {
@@ -421,28 +442,37 @@ int main(int argc, char** argv)
 	splitter.setLevel(level);
 	splitter.computeMetaData();
 
-	osg::ref_ptr< PointTileStore > tileStore = new FilePointTileStore(".");
+	//osg::ref_ptr< PointTileStore > tileStore = new FilePointTileStore(".");
+	osg::ref_ptr< PointTileStore > tileStore = new RocksDBPointTileStore("tiled");
 
-	// Make a splitter per thread
-	std::vector< std::thread > threads;
-	std::vector< Splitter > splitters;
-	osg::ref_ptr< OctreeNode > node = splitter.getOctreeNode();
-	for (unsigned int i = 0; i < 8; i++)
-	{		
-		Splitter s;
-		s.setTileStore(tileStore.get());
-		s.getInputFiles().insert(s.getInputFiles().begin(), splitter.getInputFiles().begin(), splitter.getInputFiles().end());
-		s.setLevel(level);
-		osg::ref_ptr< OctreeNode > childNode = node->createChild(i);
-		s.setFilterID(childNode->getID());
-		threads.push_back(std::thread(call_from_thread, s));
-		splitters.push_back(s);
-	}
-
-	// Wait for all the threads to finish.
-	for (unsigned int i = 0; i < threads.size(); i++)
+	if (threaded)
 	{
-		threads[i].join();
+		// Make a splitter per thread
+		std::vector< std::thread > threads;
+		std::vector< Splitter > splitters;
+		osg::ref_ptr< OctreeNode > node = splitter.getOctreeNode();
+		for (unsigned int i = 0; i < 8; i++)
+		{
+			Splitter s;
+			s.setTileStore(tileStore.get());
+			s.getInputFiles().insert(s.getInputFiles().begin(), splitter.getInputFiles().begin(), splitter.getInputFiles().end());
+			s.setLevel(level);
+			osg::ref_ptr< OctreeNode > childNode = node->createChild(i);
+			s.setFilterID(childNode->getID());
+			threads.push_back(std::thread(call_from_thread, s));
+			splitters.push_back(s);
+		}
+
+		// Wait for all the threads to finish.
+		for (unsigned int i = 0; i < threads.size(); i++)
+		{
+			threads[i].join();
+		}
+	}
+	else
+	{
+		splitter.setTileStore(tileStore.get());
+		splitter.split();
 	}
 
     osg::Timer_t endTime = osg::Timer::instance()->tick();

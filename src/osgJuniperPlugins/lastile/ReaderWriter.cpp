@@ -17,6 +17,7 @@
 * TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
 */
 #include <osg/PagedLOD>
+#include <osg/MatrixTransform>
 #include <osgDB/FileNameUtils>
 #include <osgDB/Registry>
 #include <osgDB/ReaderWriter>
@@ -24,15 +25,83 @@
 #include <osgDB/ReadFile>
 #include <osgJuniper/PointCloud>
 #include <osgJuniper/Octree>
+#include <osgJuniper/PointTileStore>
+#include <osgJuniper/RocksDBPointTileStore>
 #include <osgEarth/PagedNode>
 
 using namespace osgJuniper;
 
-std::string getFilename(OctreeId id, const std::string& ext)
+osg::Node* makeNode(const PointList& points)
 {
-	std::stringstream buf;
-	buf << "tile_" << id.level << "_" << id.z << "_" << id.x << "_" << id.y << "." << ext;
-	return buf.str();
+	OSG_NOTICE << "Making node with " << points.size() << " points " << std::endl;
+	osg::Vec3d anchor;
+	bool first = true;
+
+	osg::Geode* geode = new osg::Geode;
+
+	osg::Geometry* geometry = 0;
+	osg::Vec3Array* verts = 0;
+	osg::Vec4ubArray* colors = 0;
+	osg::Vec4Array* dataArray = 0;
+
+	for (unsigned int i = 0; i < points.size(); i++)
+	{
+		const Point& point = points[i];
+
+		// Initialize the geometry if needed.
+		if (!geometry)
+		{
+			geometry = new osg::Geometry;
+			geometry->setUseVertexBufferObjects(true);
+			geometry->setUseDisplayList(false);
+
+			verts = new osg::Vec3Array();
+			geometry->setVertexArray(verts);
+
+			colors = new osg::Vec4ubArray();
+			geometry->setColorArray(colors);
+			geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+
+			dataArray = new osg::Vec4Array();
+			geometry->setVertexAttribArray(osg::Drawable::ATTRIBUTE_6, dataArray);
+			geometry->setVertexAttribBinding(osg::Drawable::ATTRIBUTE_6, osg::Geometry::BIND_PER_VERTEX);
+			geometry->setVertexAttribNormalize(osg::Drawable::ATTRIBUTE_6, false);
+
+		}
+
+		osg::Vec3d location = osg::Vec3d(point.x, point.y, point.z);
+
+		osg::Vec4 data;
+		data.x() = point.classification;
+		data.y() = point.returnNumber;
+		data.z() = point.intensity;
+
+		dataArray->push_back(data);
+
+		if (first)
+		{
+			anchor = location;
+			first = false;
+		}
+		osg::Vec3 position = location - anchor;
+		verts->push_back(position);
+
+		osg::Vec4ub color = osg::Vec4ub(point.r / 256, point.g /256, point.b / 256, 255);
+		colors->push_back(color);
+	}
+
+	// Add a final geometry if necessary
+	if (geometry)
+	{
+		geode->addDrawable(geometry);
+		geometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, verts->size()));
+		geometry = 0;
+	}
+
+	osg::MatrixTransform* mt = new osg::MatrixTransform;
+	mt->setMatrix(osg::Matrixd::translate(anchor));
+	mt->addChild(geode);
+	return mt;
 }
 
 
@@ -54,8 +123,8 @@ public:
 	class PagedOctreeNode : public osgEarth::PagedNode
 	{
 	public:
-		PagedOctreeNode(const std::string& filename, OctreeNode* octree, float rangeFactor) :
-			_filename(filename),
+		PagedOctreeNode(PointTileStore* tileStore, OctreeNode* octree, float rangeFactor) :
+			_tileStore(tileStore),
 			_octree(octree)
 		{
 			setRangeFactor(rangeFactor);
@@ -66,14 +135,15 @@ public:
 		virtual osg::Node* loadChildren()
 		{
 			osg::Group* group = new osg::Group;
-			std::string path = osgDB::getFilePath(_filename);
 			for (unsigned int i = 0; i < 8; ++i)
 			{
 				osg::ref_ptr< OctreeNode > child = _octree->createChild(i);
-				std::string childFilename = osgDB::concatPaths(path, getFilename(child->getID(), "laz"));
-				if (osgDB::fileExists(childFilename))
+
+				// TODO:  Do an exact key match thing instead of reading all the points.
+				PointList pts;
+				if (_tileStore->get(child->getID(), pts))
 				{
-					group->addChild(new PagedOctreeNode(childFilename, child, getRangeFactor()));
+					group->addChild(new PagedOctreeNode(_tileStore.get(), child, getRangeFactor()));
 				}
 			}
 			return group;
@@ -81,12 +151,16 @@ public:
 
 		virtual void build()
 		{
-			std::string filename = getFilename(_octree->getID(), "laz");
-			osg::Node* node = osgDB::readNodeFile(filename);
-			if (node)
+			PointList points;
+			_tileStore->get(_octree->getID(), points);
+			if (points.size() > 0)
 			{
-				_attachPoint->addChild(node);
-			}
+				osg::Node* node = makeNode(points);
+				if (node)
+				{
+					_attachPoint->addChild(node);
+				}
+			}			
 		}
 
 
@@ -97,6 +171,7 @@ public:
 
 		virtual bool hasChildren() const
 		{
+			/*
 			std::string path = osgDB::getFilePath(_filename);
 			bool hasChildren = false;
 			for (unsigned int i = 0; i < 8; ++i)
@@ -109,10 +184,25 @@ public:
 				}
 			}
 			return false;
+			*/
+
+			for (unsigned int i = 0; i < 8; ++i)
+			{
+				osg::ref_ptr< OctreeNode > child = _octree->createChild(i);
+				PointList pts;
+				if (_tileStore->get(child->getID(), pts))
+				{
+					if (pts.size() > 0) return true;
+				}
+			}
+
+
+			return false;
+			
 		}
 
 		osg::ref_ptr< OctreeNode > _octree;
-		std::string _filename;
+		osg::ref_ptr< PointTileStore > _tileStore;
 	};
 
 
@@ -133,158 +223,11 @@ public:
 
 		std::string file = osgDB::getNameLessExtension(location);
 
-		double radiusFactor = 5.0;
+		double radiusFactor = 5.0;		
 
-		std::string inExt = osgDB::getFileExtension(file);
-
-		std::string ext = "laz";
-		if (options && !options->getOptionString().empty())
-		{
-			std::string radiusFactorStr = options->getPluginStringData("radiusFactor");
-			if (!radiusFactorStr.empty())
-			{
-				std::istringstream iss(radiusFactorStr);
-				iss >> radiusFactor;
-			}
-
-			std::string outExt = options->getPluginStringData("ext");
-			if (!outExt.empty())
-			{
-				ext = outExt;
-			}
-		}
-
-
-		return new PagedOctreeNode(file, root, radiusFactor);
-		/*
-
-		std::string file = osgDB::getNameLessExtension( location );
-		std::string path = osgDB::getFilePath(file);
-
-		// Get the octree tile name.
-		std::string tileID = osgDB::getNameLessExtension(osgDB::getSimpleFileName(file));
-		unsigned int level, x, y, z;
-		sscanf(tileID.c_str(), "tile_%d_%d_%d_%d", &level, &z, &x, &y);
-
-		// Create octree cell.
-		OctreeId id(level, x, y, z);
-		osg::ref_ptr< OctreeNode > octree = root->createChild(id);
-
-		double radiusFactor = 2.5;
-
-		std::string inExt = osgDB::getFileExtension(file);
-
-		std::string ext = "laz";
-		if (options && !options->getOptionString().empty())
-		{
-		std::string radiusFactorStr = options->getPluginStringData("radiusFactor");
-		if (!radiusFactorStr.empty())
-		{
-		std::istringstream iss(radiusFactorStr);
-		iss >> radiusFactor;
-		}
-
-		std::string outExt = options->getPluginStringData("ext");
-		if (!outExt.empty())
-		{
-		ext = outExt;
-		}
-		}
-
-		bool hasChildren = false;
-		// Load all of the children for the octree
-		osg::Group* group = new osg::Group;
-		for (unsigned int i = 0; i < 8; ++i)
-		{
-		osg::ref_ptr< OctreeNode > child = octree->createChild(i);
-		std::string childFilename = osgDB::concatPaths(path, getFilename(child->getID(), inExt));
-
-		osg::Node* node = osgDB::readNodeFile(childFilename);
-		if (node)
-		{
-		osg::PagedLOD* plod = new osg::PagedLOD;
-
-		group->addChild(node);
-
-		// Now just quickly see if this node has any children
-		if (!hasChildren)
-		{
-		for (unsigned int j = 0; j < 8; ++j)
-		{
-		osg::ref_ptr< OctreeNode > child2 = octree->createChild(i);
-		std::string childFilename2 = osgDB::concatPaths(path, getFilename(child2->getID(), inExt));
-		if (osgDB::fileExists(childFilename2))
-		{
-		hasChildren = true;
-		break;
-		}
-		}
-		}
-		}
-
-
-
-		// Setup the min and max ranges.
-		float minRange = (float)(octree->getBoundingBox().radius() * radiusFactor);
-
-		// Replace mode, the parent is replaced by its children.
-
-
-		if (hasChildren)
-		{
-		plod->setRange(0, minRange, FLT_MAX);
-		plod->setRange(1, 0, minRange);
-		}
-		else
-		{
-		plod->setRange(0, 0, FLT_MAX);
-		}
-
-
-
-
-		//plod->setRange(1, 0, minRange);
-		/*
-		double childRadius = node->getBound().radius() / 2.0;
-		for (unsigned int i = 0; i < 8; ++i)
-		{
-		osg::ref_ptr< OctreeNode > child = octree->createChild(i);
-		std::string childFilename = osgDB::concatPaths(path, getFilename(child->getID(), inExt));
-
-		if (osgDB::fileExists(childFilename) || osgDB::containsServerAddress(childFilename))
-		{
-		//std::string outFilename = osgDB::concatPaths(path, getFilename(child->getID(), ext));
-		std::stringstream buf;
-		buf << path;
-		if (!path.empty())
-		{
-		buf << "/";
-		}
-		buf << getFilename(child->getID(), ext);
-		std::string outFilename = buf.str();
-		if (ext == "las" || ext == "laz")
-		{
-		outFilename += ".lastile";
-		}
-		plod->setFileName(childNum, outFilename);
-		plod->setRange(childNum, 0, childRadius * radiusFactor);
-		childNum++;
-		}
-		}
-
-		// If this is the root node go ahead and add a PointCloud decorator to make it look nice.
-		if (id.level == 0 && id.x == 0 && id.y == 0 && id.z == 0)
-		{
-		PointCloudDecorator *decorator = new PointCloudDecorator();
-		decorator->addChild(plod);
-		return decorator;
-		}
-		else
-		{
-		// Just return the PagedLOD.
-		return plod;
-		}
-		*/
+		osg::ref_ptr< PointTileStore > tileStore = new RocksDBPointTileStore("tiled");
+		
+		return new PagedOctreeNode(tileStore.get(), root, radiusFactor);
 	}
 };
 

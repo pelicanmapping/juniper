@@ -27,6 +27,7 @@
 #include <osgJuniper/Utils>
 #include <osgJuniper/PDALUtils>
 #include <osgJuniper/PointReaderWriter>
+#include <osgJuniper/RocksDBPointTileStore>
 
 #include <osgJuniper/FilePointTileStore>
 
@@ -86,7 +87,6 @@ public:
 
 		OSG_NOTICE << "Building " << ids.size() << " for level " << level << std::endl;
 
-
 		osg::ref_ptr< osg::OperationQueue > queue = new osg::OperationQueue;
 		std::vector< osg::ref_ptr< osg::OperationsThread > > threads;
 		for (unsigned int i = 0; i < numThreads; i++)
@@ -114,16 +114,17 @@ public:
 
 	void build(const OctreeId &id, unsigned int innerLevel)
 	{
+		OSG_NOTICE << std::endl << "Building tile: " << id.level << "/" << id.z << "/" << id.x << "/" << id.y << std::endl;
+
 		osg::ref_ptr< OctreeNode > node = _root->createChild(id);
 		node->split();
 
 		// Read all the children points		
+		// TODO:  This assumes that you can call get on the same point list mulitple times.
 		PointList points;
 		for (unsigned int i = 0; i < node->getChildren().size(); i++)
 		{
 			_tileStore->get(node->getChildren()[i]->getID(), points);
-			PointList pts;
-			points.insert(points.end(), pts.begin(), pts.end());
 		}
 
 		if (!points.empty())
@@ -144,11 +145,15 @@ public:
 
 			if (!keepers.empty())
 			{				
-				_tileStore->set(id, keepers, true);
+				_tileStore->set(id, keepers, false);
 				OpenThreads::ScopedLock< OpenThreads::Mutex > lock(_tilesMutex);
 				_tiles.insert(id);
 			}
-		}
+			else
+			{
+				OSG_NOTICE << "No keepers for key " << std::endl;
+			}
+		}		
 	}
 
 	OpenThreads::Mutex _tilesMutex;
@@ -196,7 +201,8 @@ int main(int argc, char** argv)
 	osg::ref_ptr< OctreeNode > root = new OctreeNode();
 	root->setBoundingBox(osg::BoundingBoxd(minX, minY, minZ, maxX, maxY, maxZ));	
 
-	osg::ref_ptr< PointTileStore > tileStore = new FilePointTileStore(".");
+	//osg::ref_ptr< PointTileStore > tileStore = new FilePointTileStore(".");
+	osg::ref_ptr< PointTileStore > tileStore = new RocksDBPointTileStore("tiled");
 
 	TileIndex index(root, tileStore.get());
 	index.scan(level);
