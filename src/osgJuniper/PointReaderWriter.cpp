@@ -147,20 +147,3 @@ void PointWriter::write(pdal::PointRef& point)
 	p.b = b;
 	write(p);
 }
-
-
-void PointWriter::write(const PointList& points)
-{
-	if (!_out.is_open())
-	{
-		_out.open(_filename.c_str(), std::ios::out | std::ios::binary | std::ios::app);
-		if (!_out.is_open())
-		{
-			std::cout << "Failed to open " << _filename << std::endl;
-		}
-	}
-
-	_out.write((char*)&points.begin(), sizeof(Point) * points.size());	
-}
-
-
