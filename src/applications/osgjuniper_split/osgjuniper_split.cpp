@@ -378,12 +378,6 @@ void Splitter::closeReader()
 	}
 }
 
-
-void call_from_thread(Splitter& splitter)
-{
-	splitter.split();
-}
-
 int main(int argc, char** argv)
 {
 	_setmaxstdio(5000);
@@ -413,9 +407,6 @@ int main(int argc, char** argv)
     unsigned int level = 8;
     arguments.read("--level", level);    
 
-	bool threaded = false;
-	threaded = arguments.read("--threaded");
-
 	//Read in the filenames to process
     for(int pos=1;pos<arguments.argc();++pos)
     {
@@ -444,36 +435,8 @@ int main(int argc, char** argv)
 
 	//osg::ref_ptr< PointTileStore > tileStore = new FilePointTileStore(".");
 	osg::ref_ptr< PointTileStore > tileStore = new RocksDBPointTileStore("tiled");
-
-	if (threaded)
-	{
-		// Make a splitter per thread
-		std::vector< std::thread > threads;
-		std::vector< Splitter > splitters;
-		osg::ref_ptr< OctreeNode > node = splitter.getOctreeNode();
-		for (unsigned int i = 0; i < 8; i++)
-		{
-			Splitter s;
-			s.setTileStore(tileStore.get());
-			s.getInputFiles().insert(s.getInputFiles().begin(), splitter.getInputFiles().begin(), splitter.getInputFiles().end());
-			s.setLevel(level);
-			osg::ref_ptr< OctreeNode > childNode = node->createChild(i);
-			s.setFilterID(childNode->getID());
-			threads.push_back(std::thread(call_from_thread, s));
-			splitters.push_back(s);
-		}
-
-		// Wait for all the threads to finish.
-		for (unsigned int i = 0; i < threads.size(); i++)
-		{
-			threads[i].join();
-		}
-	}
-	else
-	{
-		splitter.setTileStore(tileStore.get());
-		splitter.split();
-	}
+	splitter.setTileStore(tileStore.get());
+	splitter.split();
 
     osg::Timer_t endTime = osg::Timer::instance()->tick();
 
