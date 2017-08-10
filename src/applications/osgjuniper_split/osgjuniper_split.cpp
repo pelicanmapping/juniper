@@ -33,6 +33,8 @@
 #include <pdal/filters/StreamCallbackFilter.hpp>
 #include <pdal/filters/MergeFilter.hpp>
 
+#include <thread>
+
 using namespace osgJuniper;
 using namespace pdal;
 
@@ -175,7 +177,7 @@ public:
 /**
  * Splits a list of input files to a single octree level.
  */
-class Splitter
+class Splitter : public osg::Referenced
 {
 public:
 	Splitter();
@@ -464,9 +466,9 @@ void Splitter::closeReader()
 }
 
 
-void call_from_thread(Splitter& splitter)
+void call_from_thread(Splitter* splitter)
 {
-	splitter.split();
+	splitter->split();
 }
 
 
@@ -499,10 +501,6 @@ int main(int argc, char** argv)
     unsigned int level = 8;
     arguments.read("--level", level);
 
-    // Initialize the threads
-    unsigned int numThreads = OpenThreads::GetNumberOfProcessors();
-    arguments.read("--threads", numThreads);
-
 	//Read in the filenames to process
     for(int pos=1;pos<arguments.argc();++pos)
     {
@@ -520,29 +518,29 @@ int main(int argc, char** argv)
     }
 
 	// Create a top level splitter to compute the metadata.
-	Splitter splitter;
+	osg::ref_ptr< Splitter > splitter = new Splitter;
     for (unsigned int i = 0; i < filenames.size(); i++)
     {
-        splitter.getInputFiles().push_back(filenames[i]);
+        splitter->getInputFiles().push_back(filenames[i]);
         OSG_NOTICE << "Processing filenames " << filenames[i] << std::endl;
     }
-	splitter.setLevel(level);
-	splitter.computeMetaData();
+	splitter->setLevel(level);
+	splitter->computeMetaData();
 
 
 	// Make a splitter per thread
 	std::vector< std::thread > threads;
-	std::vector< Splitter > splitters;
-	osg::ref_ptr< OctreeNode > node = splitter.getOctreeNode();
+	std::vector< osg::ref_ptr< Splitter > > splitters;
+	osg::ref_ptr< OctreeNode > node = splitter->getOctreeNode();
 	for (unsigned int i = 0; i < 8; i++)
 	{		
-		Splitter s;
-		s.getInputFiles().insert(s.getInputFiles().begin(), splitter.getInputFiles().begin(), splitter.getInputFiles().end());
-		s.setLevel(level);
+		osg::ref_ptr< Splitter > s = new Splitter;
+		s->getInputFiles().insert(s->getInputFiles().begin(), splitter->getInputFiles().begin(), splitter->getInputFiles().end());
+		s->setLevel(level);
 		osg::ref_ptr< OctreeNode > childNode = node->createChild(i);
-		s.setFilterID(childNode->getID());
-		threads.push_back(std::thread(call_from_thread, s));
-		splitters.push_back(s);
+		s->setFilterID(childNode->getID());
+		threads.push_back(std::thread(call_from_thread, s.get()));
+		splitters.push_back(s.get());
 	}
 
 	// Wait for all the threads to finish.
