@@ -379,8 +379,7 @@ void Splitter::closeReader()
 }
 
 int main(int argc, char** argv)
-{
-	_setmaxstdio(5000);
+{	
     osg::Timer_t startTime = osg::Timer::instance()->tick();
     std::vector< std::string > filenames;
 
