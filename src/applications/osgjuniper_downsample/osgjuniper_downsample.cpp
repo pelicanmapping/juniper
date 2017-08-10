@@ -61,15 +61,19 @@ public:
 	{
 	}
 
-	void add(const OctreeId& id)
-	{
-		_tiles.insert(id);
-	}
-
 	void scan(unsigned int startLevel)
 	{
 		_tiles.clear();
-		_tileStore->queryKeys(KeyQuery(startLevel, startLevel, -1, -1, -1, -1, -1, -1), _tiles);
+
+		// Get the keys in the tile store
+		std::set< OctreeId > ids;
+		_tileStore->queryKeys(KeyQuery(startLevel, startLevel, -1, -1, -1, -1, -1, -1), ids);
+
+		// Mark them all as being the highest resolution
+		for (std::set< OctreeId >::iterator itr = ids.begin(); itr != ids.end(); ++itr)
+		{
+			_tiles[*itr] = true;
+		}
 		OSG_NOTICE << "Found " << _tiles.size() << std::endl;
 	}
 
@@ -78,9 +82,9 @@ public:
 		std::set< OctreeId > ids;
 		for (auto itr = _tiles.begin(); itr != _tiles.end(); ++itr)
 		{
-			if (itr->level == level)
+			if (itr->first.level== level)
 			{
-				OctreeId parent = OctreeNode::getParentID(*itr);
+				OctreeId parent = OctreeNode::getParentID(itr->first);
 				ids.insert(parent);
 			}
 		}
@@ -122,42 +126,81 @@ public:
 		// Read all the children points		
 		// TODO:  This assumes that you can call get on the same point list mulitple times.
 		PointList points;
+		bool highestLevel = true;
 		for (unsigned int i = 0; i < node->getChildren().size(); i++)
 		{
 			_tileStore->get(node->getChildren()[i]->getID(), points);
+			OpenThreads::ScopedLock< OpenThreads::Mutex > lock(_tilesMutex);
+			std::map<OctreeId, bool>::iterator itr = _tiles.find(node->getChildren()[i]->getID());
+			if (itr != _tiles.end())
+			{
+				if (itr->second == false)
+				{
+					highestLevel = false;
+				}
+			}
 		}
 
 		if (!points.empty())
-		{
-			PointList keepers;
-
-			std::set< OctreeId > innerCells;
-
-			for (PointList::iterator itr = points.begin(); itr != points.end(); ++itr)
+		{			
+			// If we are at the highest level and the children don't contain at least a minimum number of points
+			// then simplify take all of the points and promote them up instead of sampling.
+			int minPoints = 10000;
+			if (points.size() <= minPoints && highestLevel)
 			{
-				OctreeId cell = node->getID(osg::Vec3d(itr->x, itr->y, itr->z), innerLevel);
-				if (innerCells.find(cell) == innerCells.end())
+				OSG_NOTICE << "Taking all " << points.size() << " points for " << id.level << "/" << id.z << "/" << id.x << "/" << id.y << std::endl;
+				// Write all of the points to this cell
+				_tileStore->set(id, points, false);						
 				{
-					keepers.push_back(*itr);
-					innerCells.insert(cell);
-				}
-			}
+					OpenThreads::ScopedLock< OpenThreads::Mutex > lock(_tilesMutex);
+					// Insert this cell into the index.
+					_tiles[id] = true;
 
-			if (!keepers.empty())
-			{				
-				_tileStore->set(id, keepers, false);
-				OpenThreads::ScopedLock< OpenThreads::Mutex > lock(_tilesMutex);
-				_tiles.insert(id);
+					// Remove all of the child tiles from the tile store and the tiles index.
+					for (unsigned int i = 0; i < node->getChildren().size(); i++)
+					{
+						const OctreeId childId = node->getChildren()[i]->getID();
+						std::map<OctreeId,bool>::iterator itr = _tiles.find(childId);
+						if (itr != _tiles.end())
+						{
+							_tiles.erase(itr);
+						}
+						_tileStore->remove(childId);							
+					}
+				}
 			}
 			else
 			{
-				OSG_NOTICE << "No keepers for key " << std::endl;
+				PointList keepers;
+
+				std::set< OctreeId > innerCells;
+
+				for (PointList::iterator itr = points.begin(); itr != points.end(); ++itr)
+				{
+					OctreeId cell = node->getID(osg::Vec3d(itr->x, itr->y, itr->z), innerLevel);
+					if (innerCells.find(cell) == innerCells.end())
+					{
+						keepers.push_back(*itr);
+						innerCells.insert(cell);
+					}
+				}
+
+				if (!keepers.empty())
+				{
+					_tileStore->set(id, keepers, false);
+					OpenThreads::ScopedLock< OpenThreads::Mutex > lock(_tilesMutex);
+					_tiles[id] = false;
+				}
+				else
+				{
+					OSG_NOTICE << "No keepers for key " << std::endl;
+				}
 			}
 		}		
 	}
 
 	OpenThreads::Mutex _tilesMutex;
-	std::set< OctreeId > _tiles;
+	std::map< OctreeId, bool > _tiles;
 	osg::ref_ptr< OctreeNode > _root;
 	osg::ref_ptr< PointTileStore > _tileStore;
 };

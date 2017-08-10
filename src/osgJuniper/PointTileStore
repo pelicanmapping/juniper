@@ -59,6 +59,7 @@ namespace osgJuniper
 
 		virtual bool get(const OctreeId& id, PointList& points) = 0;
 		virtual void set(const OctreeId& id, PointList& points, bool append) = 0;
+		virtual void remove(const OctreeId& id) = 0;
 
 		virtual void queryKeys(const KeyQuery& query, std::set< OctreeId >& keys) = 0;
 	};

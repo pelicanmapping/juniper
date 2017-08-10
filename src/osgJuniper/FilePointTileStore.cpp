@@ -69,6 +69,15 @@ void FilePointTileStore::set(const OctreeId& id, PointList& points, bool append)
 	}
 }
 
+void FilePointTileStore::remove(const OctreeId& id)
+{
+	std::string filename = getFilename(id);
+	if (osgDB::fileExists(filename))
+	{
+		unlink( filename.c_str() );
+	}
+}
+
 void FilePointTileStore::queryKeys(const KeyQuery& query, std::set< OctreeId >& keys)
 {
 	keys.clear();

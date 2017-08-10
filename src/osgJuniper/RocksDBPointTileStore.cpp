@@ -95,11 +95,7 @@ void RocksDBPointTileStore::set(const OctreeId& id, PointList& points, bool appe
 	{
 		key << guid;
 	}
-	//OSG_NOTICE << "Writing to key " << key.str() << std::endl;
-	//((rocksdb::DB*)_db)->Put(rocksdb::WriteOptions(), key.str(), out.str());
 	rocksdb::WriteOptions opt;
-	//opt.sync = true;
-	//opt.disableWAL = true;
 	((rocksdb::DB*)_db)->Put(opt, key.str(), out.str());
 }
 
@@ -125,4 +121,28 @@ void RocksDBPointTileStore::queryKeys(const KeyQuery& query, std::set< OctreeId 
 		}
 	}
 	delete it;
+}
+
+void RocksDBPointTileStore::remove(const OctreeId& id)
+{
+	rocksdb::DB* db = (rocksdb::DB*)_db;
+	std::string key = getKey(id);
+
+	std::vector< std::string > keys;
+
+	rocksdb::Iterator* it = db->NewIterator(rocksdb::ReadOptions());
+	for (it->Seek(key);
+		it->Valid() && osgEarth::startsWith(it->key().ToString(), key);
+		it->Next()) {
+		keys.push_back(it->key().ToString());		
+	}
+	delete it;
+
+	for (std::vector< std::string >::iterator itr = keys.begin(); itr != keys.end(); ++itr)
+	{
+		OSG_NOTICE << "Rocks deleting key " << *itr << std::endl;
+		db->Delete(rocksdb::WriteOptions(), *itr);
+	}	
+
+	db->SyncWAL();
 }
