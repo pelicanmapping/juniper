@@ -106,7 +106,6 @@ void PDALUtils::writePointsToLaz(const PointList& points, const std::string& fil
 
 void PDALUtils::readPointsFromLAZ(PointList& points, const std::string& filename)
 {
-	points.clear();
 	if (osgDB::fileExists(filename))
 	{
 		Stage* stage = 0;
