@@ -39,21 +39,63 @@ Point::Point() :
 
 void Point::write(std::ostream &out, const std::vector< Point >& points)
 {
+	float minX = FLT_MAX;
+	float minY = FLT_MAX;
+	float minZ = FLT_MAX;
+
+	float maxX = -FLT_MAX;
+	float maxY = -FLT_MAX;
+	float maxZ = -FLT_MAX;
+
+	// Compute the min/max of the points so we can quantize it.
+	for (PointList::const_iterator itr = points.begin(); itr != points.end(); ++itr)
+	{
+		if (minX > itr->x) minX = itr->x;
+		if (maxX < itr->x) maxX = itr->x;
+
+		if (minY > itr->y) minY = itr->y;
+		if (maxY < itr->y) maxY = itr->y;
+
+		if (minZ > itr->z) minZ = itr->z;
+		if (maxZ < itr->z) maxZ = itr->z;
+	}
+
+	// Write out the min/maxes
+	out.write((char*)&minX, sizeof(float));
+	out.write((char*)&minY, sizeof(float));
+	out.write((char*)&minZ, sizeof(float));
+
+	out.write((char*)&maxX, sizeof(float));
+	out.write((char*)&maxY, sizeof(float));
+	out.write((char*)&maxZ, sizeof(float));
+
+	float width = maxX - minX;
+	float depth = maxY - minY;
+	float height = maxZ - minZ;
+
 	for (PointList::const_iterator itr = points.begin(); itr != points.end(); ++itr)
 	{
 		const Point& point = *itr;
 
+		/*
 		float position[3];
 		position[0] = point.x;
 		position[1] = point.y;
 		position[2] = point.z;
+		*/
+
+		unsigned short position[3];
+		position[0] = (unsigned short)(((point.x - minX) / width) * 65535.0f);
+		position[1] = (unsigned short)(((point.y - minY) / depth) * 65535.0f);
+		position[2] = (unsigned short)(((point.z - minZ) / height) * 65535.0f);
 
 		unsigned char color[3];
 		color[0] = point.r / 256;
 		color[1] = point.g / 256;
 		color[2] = point.b / 256;
 
-		out.write((char*)position, sizeof(float) * 3);
+		//out.write((char*)position, sizeof(float) * 3);
+		out.write((char*)position, sizeof(unsigned short) * 3);
 		out.write((char*)color, sizeof(unsigned char) * 3);
 		out.write((char*)&point.classification, sizeof(unsigned char));
 		out.write((char*)&point.intensity, sizeof(unsigned short));
@@ -62,23 +104,52 @@ void Point::write(std::ostream &out, const std::vector< Point >& points)
 void Point::read(std::istream &in, std::vector< Point >& points)
 {
 	int numRead = 0;
+
+	float minX = FLT_MAX;
+	float minY = FLT_MAX;
+	float minZ = FLT_MAX;
+
+	float maxX = -FLT_MAX;
+	float maxY = -FLT_MAX;
+	float maxZ = -FLT_MAX;
+
+	// Write out the min/maxes
+	in.read((char*)&minX, sizeof(float));
+	in.read((char*)&minY, sizeof(float));
+	in.read((char*)&minZ, sizeof(float));
+
+	in.read((char*)&maxX, sizeof(float));
+	in.read((char*)&maxY, sizeof(float));
+	in.read((char*)&maxZ, sizeof(float));
+
+	float width = maxX - minX;
+	float depth = maxY - minY;
+	float height = maxZ - minZ;	
 	while (in.good())
 	{
-		float position[3];
+		//float position[3];
+		unsigned short position[3];
 		unsigned char color[3];
 		unsigned char classification;
 		unsigned short intensity;
 
 		Point point;
-		if (in.read((char*)position, sizeof(float) * 3) &&
+		if (//in.read((char*)position, sizeof(float) * 3) &&
+			in.read((char*)position, sizeof(unsigned short) * 3) &&
 			in.read((char*)color, sizeof(unsigned char) * 3) &&
 			in.read((char*)(&classification), sizeof(unsigned char)) &&
 			in.read((char*)(&intensity), sizeof(unsigned short))
 			)
 		{		
+			/*
 			point.x = position[0];
 			point.y = position[1];
 			point.z = position[2];
+			*/
+
+			point.x = minX + width * (position[0] / 65535.0f);
+			point.y = minY + depth * (position[1] / 65535.0f);
+			point.z = minZ + height * (position[2] / 65535.0f);
 
 			point.r = color[0] * 256;
 			point.g = color[1] * 256;
