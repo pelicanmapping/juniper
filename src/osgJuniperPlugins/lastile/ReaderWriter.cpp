@@ -26,6 +26,7 @@
 #include <osgJuniper/PointCloud>
 #include <osgJuniper/Octree>
 #include <osgJuniper/PointTileStore>
+#include <osgJuniper/FilePointTileStore>
 #include <osgJuniper/RocksDBPointTileStore>
 #include <osgEarth/PagedNode>
 
@@ -225,7 +226,8 @@ public:
 
 		double radiusFactor = 5.0;		
 
-		osg::ref_ptr< PointTileStore > tileStore = new RocksDBPointTileStore("tiled");
+		//osg::ref_ptr< PointTileStore > tileStore = new RocksDBPointTileStore("tiled");
+		osg::ref_ptr< PointTileStore > tileStore = new FilePointTileStore(".");
 		
 		return new PagedOctreeNode(tileStore.get(), root, radiusFactor);
 	}

@@ -88,6 +88,11 @@ public:
 
 	void computeMetaData();
 
+	/**
+	 * Suggests a split level based on the metadata of the input files
+	 */
+	int suggestSplitLevel();
+
 	unsigned int getLevel() const { return _level; }
 	void setLevel(unsigned int level) { _level = level; }
 
@@ -159,6 +164,35 @@ std::shared_ptr< OctreeCell > Splitter::getOrCreateCell(const OctreeId& id)
 	std::shared_ptr< OctreeCell > cell = std::make_shared<OctreeCell>();
 	_cells[id] = cell;
 	return cell;
+}
+
+int Splitter::suggestSplitLevel()
+{
+	float width = _node->getWidth();
+	float depth = _node->getDepth();
+	float height = _node->getHeight();
+
+	// Compute the volume of the dataset.
+	float volume = width * depth * height;
+
+	// Get the number of points per cubic meter
+	float pointsPerCubicMeter = (float)_totalNumPoints / volume;
+
+	// Find the level that most closely corresponds to our suggested level.
+	unsigned int targetPoints = 10000;
+	float outVolume = volume;
+	unsigned int suggestedLevel = 0;
+	for (unsigned int i = 0; i < 10; i++)
+	{
+		suggestedLevel = i;
+		unsigned int numberOfPoints = (outVolume * pointsPerCubicMeter);
+		if (numberOfPoints <= targetPoints)
+		{
+			break;
+		}
+		outVolume /= 8.0;
+	}
+	return suggestedLevel;
 }
 
 void Splitter::split()
@@ -325,21 +359,6 @@ void Splitter::computeMetaData()
 void Splitter::clearCells()
 {
 	OSG_NOTICE << "Writing" << std::endl;
-	/*
-	for (OctreeToCellMap::iterator itr = _cells.begin(); itr != _cells.end();)
-	{
-		if (itr->second->points.size() > 0)
-		{
-			_tileStore->set(itr->first, itr->second->points, true);
-			itr = _cells.erase(itr);
-		}
-		else
-		{
-			OSG_NOTICE << "Skipping " << std::endl;
-			++itr;
-		}
-	}
-	*/
 	for (OctreeToCellMap::iterator itr = _cells.begin(); itr != _cells.end(); ++itr)
 	{
 		_tileStore->set(itr->first, itr->second->points, true);
@@ -403,7 +422,7 @@ int main(int argc, char** argv)
         }
     }
 
-    unsigned int level = 8;
+	int level = -1;
     arguments.read("--level", level);    
 
 	//Read in the filenames to process
@@ -428,12 +447,21 @@ int main(int argc, char** argv)
     {
         splitter.getInputFiles().push_back(filenames[i]);
         OSG_NOTICE << "Processing filenames " << filenames[i] << std::endl;
-    }
-	splitter.setLevel(level);
+    }	
 	splitter.computeMetaData();
 
-	//osg::ref_ptr< PointTileStore > tileStore = new FilePointTileStore(".");
-	osg::ref_ptr< PointTileStore > tileStore = new RocksDBPointTileStore("tiled");
+	// Get a suggested level if one wasn't specified
+	if (level < 0)
+	{
+		level = splitter.suggestSplitLevel();		
+	}
+
+	OSG_NOTICE << "Splitting to level " << level << std::endl;
+
+    splitter.setLevel(level);
+
+	osg::ref_ptr< PointTileStore > tileStore = new FilePointTileStore(".");
+	//osg::ref_ptr< PointTileStore > tileStore = new RocksDBPointTileStore("tiled");
 	splitter.setTileStore(tileStore.get());
 	splitter.split();
 

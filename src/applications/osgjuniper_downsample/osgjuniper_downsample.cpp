@@ -244,8 +244,8 @@ int main(int argc, char** argv)
 	osg::ref_ptr< OctreeNode > root = new OctreeNode();
 	root->setBoundingBox(osg::BoundingBoxd(minX, minY, minZ, maxX, maxY, maxZ));	
 
-	//osg::ref_ptr< PointTileStore > tileStore = new FilePointTileStore(".");
-	osg::ref_ptr< PointTileStore > tileStore = new RocksDBPointTileStore("tiled");
+	osg::ref_ptr< PointTileStore > tileStore = new FilePointTileStore(".");
+	//osg::ref_ptr< PointTileStore > tileStore = new RocksDBPointTileStore("tiled");
 
 	TileIndex index(root, tileStore.get());
 	index.scan(level);
