@@ -38,6 +38,8 @@
 using namespace osgJuniper;
 using namespace pdal;
 
+const unsigned int targetPoints = 50000;
+
 static pdal::StageFactory _factory;
 
 Stage* createStageForFile(const std::string& filename) {
@@ -61,11 +63,12 @@ Stage* createStageForFile(const std::string& filename) {
 class OctreeCell
 {
 public:
-	OctreeCell()
+	OctreeCell():
+		_count(0)
 	{		
 	}
 
-	PointList points;
+	unsigned int _count;
 };
 
 /**
@@ -113,7 +116,11 @@ public:
 
 protected:
 
-	void clearCells();
+	void addPoint(const Point& point);
+
+	void writeNode(OctreeNode* node);
+
+	void flush();
 
 
 	unsigned int _totalNumPoints;
@@ -122,9 +129,13 @@ protected:
 	unsigned int _level;
 	std::vector<std::string> _inputFiles;
 
-	typedef std::map < OctreeId, std::shared_ptr< OctreeCell> > OctreeToCellMap;
+	typedef std::map < OctreeId, std::shared_ptr< OctreeCell> > OctreeToCellMap;	
 	OctreeToCellMap _cells;
 	std::shared_ptr<OctreeCell> getOrCreateCell(const OctreeId& id);
+
+	typedef std::map < OctreeId, osg::ref_ptr< OctreeNode> > OctreeToNodeMap;
+	OctreeToNodeMap _nodes;
+	osg::ref_ptr<OctreeNode> getOrCreateNode(const OctreeId& id);
 
 	pdal::Stage* _readerStage;
 
@@ -166,6 +177,19 @@ std::shared_ptr< OctreeCell > Splitter::getOrCreateCell(const OctreeId& id)
 	return cell;
 }
 
+osg::ref_ptr< OctreeNode > Splitter::getOrCreateNode(const OctreeId& id)
+{
+	OctreeToNodeMap::iterator itr = _nodes.find(id);
+	if (itr != _nodes.end())
+	{
+		return itr->second;
+	}
+
+	osg::ref_ptr< OctreeNode > node = _node->createChild(id);
+	_nodes[id] = node;
+	return node;
+}
+
 int Splitter::suggestSplitLevel()
 {
 	float width = _node->getWidth();
@@ -178,8 +202,7 @@ int Splitter::suggestSplitLevel()
 	// Get the number of points per cubic meter
 	float pointsPerCubicMeter = (float)_totalNumPoints / volume;
 
-	// Find the level that most closely corresponds to our suggested level.
-	unsigned int targetPoints = 10000;
+	// Find the level that most closely corresponds to our suggested level.	
 	float outVolume = volume;
 	unsigned int suggestedLevel = 0;
 	for (unsigned int i = 0; i < 10; i++)
@@ -193,6 +216,95 @@ int Splitter::suggestSplitLevel()
 		outVolume /= 8.0;
 	}
 	return suggestedLevel;
+}
+
+/**
+ * Get the leaf node from an OctreeNode where a point should be inserted.
+ */
+OctreeNode* getLeafNode(OctreeNode* node, const osg::Vec3d& point)
+{
+	if (!node->isSplit() && node->getBoundingBox().contains(point)) return node;
+
+	if (node->isSplit())
+	{
+		for (unsigned int i = 0; i < node->getChildren().size(); i++)
+		{
+			OctreeNode* result = getLeafNode(node->getChildren()[i].get(), point);
+			if (result)
+			{
+				return result;
+			}
+		}
+	}
+
+	return 0;
+}
+
+void Splitter::addPoint(const Point& p)
+{
+	osg::Vec3d position(p.x, p.y, p.z);
+	OctreeId childId = _node->getID(position, _level);
+
+	// Figure out which node the point should be inserted at at the split level
+    osg::ref_ptr< OctreeNode > baseNode = getOrCreateNode(childId);
+	osg::ref_ptr< OctreeNode > node = getLeafNode(baseNode.get(), position);
+
+	// Get the cell count of the desired node
+	std::shared_ptr< OctreeCell > cell = getOrCreateCell(node->getID());;
+	if (cell->_count == targetPoints)
+	{
+		OSG_NOTICE << "Splitting cell " << node->getID().level << " / " << node->getID().z << " / " << node->getID().x << " / " << node->getID().y << " with " << cell->_count << " points" << std::endl;
+		// This cell is at it's maximum, so we need to subdivide the cell and start inserting at it's children instead
+
+		// Get all of the points for this cell (including ones in memory in the node itself currently)
+		_tileStore->get(node->getID(), node->getPoints());
+
+		// Set the cell count to zero, it no longer contains any points.
+		cell->_count = 0;
+
+		// Split the node so points will be added to the leaf instead.
+		node->split();
+
+		// Remove the node from the store.
+		_tileStore->remove(node->getID());
+
+
+		// Make a temporary list of points to write back out.
+		PointList points;
+		// Add the input poinnode, it's going to be filtered down to the children in the next loop.
+		points.push_back(p);
+		points.insert(points.end(), node->getPoints().begin(), node->getPoints().end());
+		
+		// Clear points out of the node
+		node->getPoints().clear();
+
+		for (PointList::iterator itr = node->getPoints().begin(); itr != node->getPoints().end(); ++itr)
+		{			
+			addPoint(*itr);
+		}				
+	}
+	else
+	{
+		cell->_count++;
+		node->getPoints().push_back(p);
+
+		_activePoints++;
+		if (_activePoints >= 50000000)
+		{
+			flush();
+		}
+	}
+}
+
+void Splitter::writeNode(OctreeNode* node)
+{
+	_tileStore->set(node->getID(), node->getPoints(), true);
+	node->getPoints().clear();
+
+	for (unsigned int i = 0; i < node->getChildren().size(); i++)
+	{
+		writeNode(node->getChildren()[i].get());
+	}
 }
 
 void Splitter::split()
@@ -230,9 +342,6 @@ void Splitter::split()
 			return false;
 		}
 
-		OctreeId childId = _node->getID(osg::Vec3d(x, y, z), _level);
-
-		std::shared_ptr< OctreeCell > cell = getOrCreateCell(childId);
 		Point p;
 		p.x = x;
 		p.y = y; 
@@ -241,12 +350,7 @@ void Splitter::split()
 		p.g = point.getFieldAs<int>(Dimension::Id::Green);
 		p.b = point.getFieldAs<int>(Dimension::Id::Blue);
 
-		cell->points.push_back(p);
-		_activePoints++;
-		if (_activePoints >= 50000000)
-		{
-			clearCells();
-		}
+		addPoint(p);
 
 		complete++;
 		if (complete % 10000 == 0)
@@ -262,7 +366,7 @@ void Splitter::split()
 	{PDAL_SCOPED_LOCK; callbackFilter.prepare(fixed); }
 	callbackFilter.execute(fixed);
 
-	clearCells();
+	flush();
 }
 
 void Splitter::computeMetaData()
@@ -356,15 +460,18 @@ void Splitter::computeMetaData()
 		<< _bounds.xMax() << ", " << _bounds.yMax() << ", " << _bounds.zMax() << std::endl;
 }
 
-void Splitter::clearCells()
+
+void Splitter::flush()
 {
 	OSG_NOTICE << "Writing" << std::endl;
-	for (OctreeToCellMap::iterator itr = _cells.begin(); itr != _cells.end(); ++itr)
+	
+	for (OctreeToNodeMap::iterator itr = _nodes.begin(); itr != _nodes.end(); ++itr)
 	{
-		_tileStore->set(itr->first, itr->second->points, true);
+		writeNode(itr->second.get());
 	}
 
 	_cells.clear();
+	_nodes.clear();
 	_activePoints = 0;
 }
 

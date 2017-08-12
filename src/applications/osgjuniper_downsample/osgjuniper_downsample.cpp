@@ -61,18 +61,23 @@ public:
 	{
 	}
 
-	void scan(unsigned int startLevel)
+	void scan(unsigned int &minLevel, unsigned int &maxLevel)
 	{
 		_tiles.clear();
 
 		// Get the keys in the tile store
 		std::set< OctreeId > ids;
-		_tileStore->queryKeys(KeyQuery(startLevel, startLevel, -1, -1, -1, -1, -1, -1), ids);
+		_tileStore->queryKeys(KeyQuery(), ids);
+
+		minLevel = UINT_MAX;
+		maxLevel = 0;
 
 		// Mark them all as being the highest resolution
 		for (std::set< OctreeId >::iterator itr = ids.begin(); itr != ids.end(); ++itr)
 		{
 			_tiles[*itr] = true;
+			if (itr->level < minLevel) minLevel = itr->level;
+			if (itr->level > maxLevel) maxLevel = itr->level;
 		}
 		OSG_NOTICE << "Found " << _tiles.size() << std::endl;
 	}
@@ -145,7 +150,7 @@ public:
 		{			
 			// If we are at the highest level and the children don't contain at least a minimum number of points
 			// then simplify take all of the points and promote them up instead of sampling.
-			int minPoints = 10000;
+			int minPoints = 50000;
 			if (points.size() <= minPoints && highestLevel)
 			{
 				OSG_NOTICE << "Taking all " << points.size() << " points for " << id.level << "/" << id.z << "/" << id.x << "/" << id.y << std::endl;
@@ -218,12 +223,14 @@ int main(int argc, char** argv)
 
     osg::ArgumentParser arguments(&argc,argv);	
 
+	/*
 	int level;
 	if (!arguments.read("--level", level))
 	{
 		OSG_NOTICE << "Please specify a level to build up from" << std::endl;
 		return -1;
 	}
+	*/
 
 	int innerLevel = 6;
 	arguments.read("--innerLevel", innerLevel);
@@ -248,9 +255,10 @@ int main(int argc, char** argv)
 	//osg::ref_ptr< PointTileStore > tileStore = new RocksDBPointTileStore("tiled");
 
 	TileIndex index(root, tileStore.get());
-	index.scan(level);
+	unsigned int minLevel, maxLevel;
+	index.scan(minLevel, maxLevel);
 
-	for (int i = level; i > 0; i--)
+	for (int i = maxLevel; i > 0; i--)
 	{
 		OSG_NOTICE << "Building parents for " << i << std::endl;
 		index.buildParents(i, innerLevel, numThreads);
