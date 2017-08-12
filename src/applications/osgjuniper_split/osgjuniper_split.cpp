@@ -470,8 +470,6 @@ void Splitter::flush()
 		writeNode(itr->second.get());
 	}
 
-	_cells.clear();
-	_nodes.clear();
 	_activePoints = 0;
 }
 
