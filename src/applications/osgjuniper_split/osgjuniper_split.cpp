@@ -276,7 +276,7 @@ void Splitter::addPoint(const Point& p)
 		points.insert(points.end(), node->getPoints().begin(), node->getPoints().end());
 		
 		// Clear points out of the node
-		node->getPoints().clear();
+		node->clearPoints();
 
 		for (PointList::iterator itr = node->getPoints().begin(); itr != node->getPoints().end(); ++itr)
 		{			
@@ -299,7 +299,7 @@ void Splitter::addPoint(const Point& p)
 void Splitter::writeNode(OctreeNode* node)
 {
 	_tileStore->set(node->getID(), node->getPoints(), true);
-	node->getPoints().clear();
+	node->clearPoints();
 
 	for (unsigned int i = 0; i < node->getChildren().size(); i++)
 	{

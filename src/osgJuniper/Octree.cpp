@@ -79,6 +79,14 @@ unsigned int OctreeNode::getDimensions(unsigned int level) const
 	return dim;
 }
 
+void OctreeNode::clearPoints()
+{
+	// Rather than calling clear we swap this vector with an empty one to force memory to actually be deallocated.
+    //https://prateekvjoshi.com/2013/10/20/c-vector-memory-release/
+	PointList pts;
+	_points.swap(pts);
+}
+
 OctreeNode* OctreeNode::createChild(const OctreeId& id)
 {    
 	unsigned int dim = getDimensions(id.level);
