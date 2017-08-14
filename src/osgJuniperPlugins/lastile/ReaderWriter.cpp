@@ -32,80 +32,6 @@
 
 using namespace osgJuniper;
 
-osg::Node* makeNode(const PointList& points)
-{
-	OSG_NOTICE << "Making node with " << points.size() << " points " << std::endl;
-	osg::Vec3d anchor;
-	bool first = true;
-
-	osg::Geode* geode = new osg::Geode;
-
-	osg::Geometry* geometry = 0;
-	osg::Vec3Array* verts = 0;
-	osg::Vec4ubArray* colors = 0;
-	osg::Vec4Array* dataArray = 0;
-
-	for (unsigned int i = 0; i < points.size(); i++)
-	{
-		const Point& point = points[i];
-
-		// Initialize the geometry if needed.
-		if (!geometry)
-		{
-			geometry = new osg::Geometry;
-			geometry->setUseVertexBufferObjects(true);
-			geometry->setUseDisplayList(false);
-
-			verts = new osg::Vec3Array();
-			geometry->setVertexArray(verts);
-
-			colors = new osg::Vec4ubArray();
-			geometry->setColorArray(colors);
-			geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
-
-			dataArray = new osg::Vec4Array();
-			geometry->setVertexAttribArray(osg::Drawable::ATTRIBUTE_6, dataArray);
-			geometry->setVertexAttribBinding(osg::Drawable::ATTRIBUTE_6, osg::Geometry::BIND_PER_VERTEX);
-			geometry->setVertexAttribNormalize(osg::Drawable::ATTRIBUTE_6, false);
-
-		}
-
-		osg::Vec3d location = osg::Vec3d(point.x, point.y, point.z);
-
-		osg::Vec4 data;
-		data.x() = point.classification;
-		data.y() = point.returnNumber;
-		data.z() = point.intensity;
-
-		dataArray->push_back(data);
-
-		if (first)
-		{
-			anchor = location;
-			first = false;
-		}
-		osg::Vec3 position = location - anchor;
-		verts->push_back(position);
-
-		osg::Vec4ub color = osg::Vec4ub(point.r / 256, point.g /256, point.b / 256, 255);
-		colors->push_back(color);
-	}
-
-	// Add a final geometry if necessary
-	if (geometry)
-	{
-		geode->addDrawable(geometry);
-		geometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, verts->size()));
-		geometry = 0;
-	}
-
-	osg::MatrixTransform* mt = new osg::MatrixTransform;
-	mt->setMatrix(osg::Matrixd::translate(anchor));
-	mt->addChild(geode);
-	return mt;
-}
-
-
 class LASTileReaderWriter : public osgDB::ReaderWriter
 {
 public:
@@ -156,7 +82,7 @@ public:
 			_tileStore->get(_octree->getID(), points);
 			if (points.size() > 0)
 			{
-				osg::Node* node = makeNode(points);
+				osg::Node* node = new PointCloud(points);
 				if (node)
 				{
 					_attachPoint->addChild(node);
@@ -171,22 +97,7 @@ public:
 		}
 
 		virtual bool hasChildren() const
-		{
-			/*
-			std::string path = osgDB::getFilePath(_filename);
-			bool hasChildren = false;
-			for (unsigned int i = 0; i < 8; ++i)
-			{
-				osg::ref_ptr< OctreeNode > child = _octree->createChild(i);
-				std::string childFilename = osgDB::concatPaths(path, getFilename(child->getID(), "laz"));
-				if (osgDB::fileExists(childFilename))
-				{
-					return true;
-				}
-			}
-			return false;
-			*/
-
+		{		
 			for (unsigned int i = 0; i < 8; ++i)
 			{
 				osg::ref_ptr< OctreeNode > child = _octree->createChild(i);
@@ -196,10 +107,7 @@ public:
 					if (pts.size() > 0) return true;
 				}
 			}
-
-
-			return false;
-			
+			return false;			
 		}
 
 		osg::ref_ptr< OctreeNode > _octree;
@@ -216,8 +124,6 @@ public:
 		double minX, minY, minZ, maxX, maxY, maxZ;
 		std::ifstream in("metadata.txt");
 		in >> minX >> minY >> minZ >> maxX >> maxY >> maxZ;
-		std::cout << "Bounds " << minX << " " << minY << " " << minZ << " to "
-			<< maxX << " " << maxY << " " << maxZ << std::endl;
 
 		osg::ref_ptr< OctreeNode > root = new OctreeNode();
 		root->setBoundingBox(osg::BoundingBoxd(minX, minY, minZ, maxX, maxY, maxZ));
@@ -228,8 +134,10 @@ public:
 
 		//osg::ref_ptr< PointTileStore > tileStore = new RocksDBPointTileStore("tiled");
 		osg::ref_ptr< PointTileStore > tileStore = new FilePointTileStore(".");
-		
-		return new PagedOctreeNode(tileStore.get(), root, radiusFactor);
+
+		PointCloudDecorator* decorator = new PointCloudDecorator;
+		decorator->addChild(new PagedOctreeNode(tileStore.get(), root, radiusFactor));
+		return decorator;
 	}
 };
 

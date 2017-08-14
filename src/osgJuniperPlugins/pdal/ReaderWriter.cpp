@@ -31,118 +31,10 @@
 #include <pdal/PipelineExecutor.hpp>
 
 #include <osgJuniper/PDALUtils>
+#include <osgJuniper/PointCloud>
 
 using namespace pdal;
 using namespace osgJuniper;
-
-namespace
-{
-	static OpenThreads::Mutex pdalMutex;
-}
-
-#define PDAL_LOCK OpenThreads::ScopedLock< OpenThreads::Mutex > lock(pdalMutex)
-
-osg::Node* makeNode(PointViewPtr view, const osgDB::ReaderWriter::Options* options)
-{   
-	OSG_NOTICE << "Making node with " << view->size() << " points " << std::endl;
-    osg::Vec3d anchor;
-    bool first = true;
-
-    unsigned int NUM_POINTS_PER_GEOMETRY = 50000;
-
-    osg::Geode* geode = new osg::Geode;
-
-    osg::Geometry* geometry = 0;
-    osg::Vec3Array* verts = 0;
-    osg::Vec4ubArray* colors = 0;
-    osg::Vec4Array* dataArray = 0;	
-
-    for (unsigned int i = 0; i < view->size(); i++)
-    {                 
-		PointRef point(view->point(i));
-
-        // Initialize the geometry if needed.
-        if (!geometry)
-        {
-            geometry = new osg::Geometry;
-            geometry->setUseVertexBufferObjects( true );
-            geometry->setUseDisplayList( false );
-
-            verts = new osg::Vec3Array();
-            geometry->setVertexArray( verts );    
-
-            colors =new osg::Vec4ubArray();    
-            geometry->setColorArray(colors);
-            geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
-
-            dataArray = new osg::Vec4Array();
-            geometry->setVertexAttribArray(osg::Drawable::ATTRIBUTE_6, dataArray);
-            geometry->setVertexAttribBinding(osg::Drawable::ATTRIBUTE_6, osg::Geometry::BIND_PER_VERTEX);
-            geometry->setVertexAttribNormalize(osg::Drawable::ATTRIBUTE_6, false);    
-
-        }
-
-		osg::Vec3d location = osg::Vec3d(point.getFieldAs<double>(pdal::Dimension::Id::X), point.getFieldAs<double>(pdal::Dimension::Id::Y), point.getFieldAs<double>(pdal::Dimension::Id::Z));
-
-        osg::Vec4 data;
-		data.x() = point.hasDim(pdal::Dimension::Id::Classification) ? point.getFieldAs<int>(pdal::Dimension::Id::Classification) : 0;
-		data.y() = point.hasDim(pdal::Dimension::Id::ReturnNumber) ? point.getFieldAs<int>(pdal::Dimension::Id::ReturnNumber) : 0;
-		data.z() = point.hasDim(pdal::Dimension::Id::Intensity) ? point.getFieldAs<int>(pdal::Dimension::Id::Intensity) : 0;
-
-        dataArray->push_back(data);
-
-        if (first)
-        {
-            anchor = location;
-            first = false;
-        }
-        osg::Vec3 position = location - anchor;
-        verts->push_back(position);
-
-        osg::Vec4ub color = osg::Vec4ub(0, 0, 0, 255);
-		if (point.hasDim(pdal::Dimension::Id::Red))
-		{
-			color.r() = point.getFieldAs<int>(pdal::Dimension::Id::Red) / 256;
-		}
-
-		if (point.hasDim(pdal::Dimension::Id::Green))
-		{
-			color.g() = point.getFieldAs<int>(pdal::Dimension::Id::Green) / 256;
-		}
-
-		if (point.hasDim(pdal::Dimension::Id::Blue))
-		{
-			color.b() = point.getFieldAs<int>(pdal::Dimension::Id::Blue) / 256;
-		}
-
-		if (point.hasDim(pdal::Dimension::Id::Alpha))
-		{
-			color.a() = point.getFieldAs<int>(pdal::Dimension::Id::Alpha) / 256;
-		}
-
-        colors->push_back(color);        
-
-        if (verts->size() == NUM_POINTS_PER_GEOMETRY)
-        {
-            geode->addDrawable( geometry );
-            geometry->addPrimitiveSet( new osg::DrawArrays(GL_POINTS, 0, verts->size()) );
-            geometry = 0;
-        }
-    }        
-
-    // Add a final geometry if necessary
-    if (geometry)
-    {
-        geode->addDrawable( geometry );
-        geometry->addPrimitiveSet( new osg::DrawArrays(GL_POINTS, 0, verts->size()) );
-        geometry = 0;
-    }
-
-    osg::MatrixTransform* mt = new osg::MatrixTransform;
-    mt->setMatrix(osg::Matrixd::translate(anchor));
-    mt->addChild(geode);
-    return mt;    
-}
 
 class PDALReaderWriter : public osgDB::ReaderWriter
 {
@@ -193,7 +85,7 @@ public:
 		}
 		else
 		{
-			PDAL_LOCK;
+			PDAL_SCOPED_LOCK;
 			stage = factory.createStage(driver);
 			pdal::Options opt;
 			opt.add("filename", filename);
@@ -203,12 +95,33 @@ public:
 		if (stage)
 		{			
 			pdal::PointTable table;
-			{ PDAL_LOCK;  stage->prepare(table); }
+			{ PDAL_SCOPED_LOCK;  stage->prepare(table); }
 
 			pdal::PointViewSet point_view_set = stage->execute(table);
 			pdal::PointViewPtr point_view = *point_view_set.begin();
 
-			return makeNode(point_view, options);
+			PointList points;
+			points.reserve(point_view->size());
+
+			for (unsigned int i = 0; i < point_view->size(); i++)
+			{
+				PointRef pdalPoint(point_view->point(i));
+				Point point;
+
+				point.x = pdalPoint.getFieldAs<double>(Dimension::Id::X);
+				point.y = pdalPoint.getFieldAs<double>(Dimension::Id::Y);
+				point.z = pdalPoint.getFieldAs<double>(Dimension::Id::Z);
+				point.r = pdalPoint.getFieldAs<int>(Dimension::Id::Red);
+				point.g = pdalPoint.getFieldAs<int>(Dimension::Id::Green);
+				point.b = pdalPoint.getFieldAs<int>(Dimension::Id::Blue);
+				point.a = pdalPoint.getFieldAs<int>(Dimension::Id::Alpha);
+				point.intensity = pdalPoint.getFieldAs<int>(Dimension::Id::Intensity);
+				point.returnNumber = pdalPoint.getFieldAs<int>(Dimension::Id::ReturnNumber);
+				point.classification = pdalPoint.getFieldAs<int>(Dimension::Id::Classification);
+				points.push_back(point);
+			}
+
+			return new PointCloud(points);
 		}
 		return ReadResult::ERROR_IN_READING_FILE;
     }

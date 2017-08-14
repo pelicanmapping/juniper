@@ -20,20 +20,86 @@
 #include <osgJuniper/PointCloud>
 
 #include <osg/Program>
-#include <osg/Drawable>
+#include <osg/Geometry>
+#include <osg/Geode>
 
 using namespace osgJuniper;
 
 PointCloud::PointCloud()
 {
-    _operationThread = new osg::OperationThread;
-    setDataVariance(osg::Object::DYNAMIC);
 }
 
-PointCloud::PointCloud(const PointCloud& rhs, const osg::CopyOp& copyop)
+PointCloud::PointCloud(const PointList& points)
 {
-    // do nothing
+	setPoints(points);
 }
+
+void PointCloud::setPoints(const PointList& points)
+{	
+	// Remove all the children.
+	removeChildren(0, getNumChildren());
+
+	osg::Vec3d anchor;
+	bool first = true;
+
+	osg::Geode* geode = new osg::Geode;
+
+	osg::Geometry* geometry = new osg::Geometry;
+	geometry->setUseVertexBufferObjects(true);
+	geometry->setUseDisplayList(false);
+
+	osg::Vec3Array* verts = new osg::Vec3Array();
+	verts->reserve(points.size());
+	geometry->setVertexArray(verts);
+	
+	osg::Vec4ubArray* colors = new osg::Vec4ubArray();
+	colors->reserve(points.size());
+	geometry->setColorArray(colors);
+	geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
+
+	osg::Vec4Array* dataArray = new osg::Vec4Array();
+	dataArray->reserve(points.size());
+	geometry->setVertexAttribArray(osg::Drawable::ATTRIBUTE_6, dataArray);
+	geometry->setVertexAttribBinding(osg::Drawable::ATTRIBUTE_6, osg::Geometry::BIND_PER_VERTEX);
+	geometry->setVertexAttribNormalize(osg::Drawable::ATTRIBUTE_6, false);
+
+	for (unsigned int i = 0; i < points.size(); i++)
+	{
+		const Point& point = points[i];
+
+		osg::Vec3d location = osg::Vec3d(point.x, point.y, point.z);
+
+		osg::Vec4 data;
+		data.x() = point.classification;
+		data.y() = point.returnNumber;
+		data.z() = point.intensity;
+
+		dataArray->push_back(data);
+
+		if (first)
+		{
+			anchor = location;
+			first = false;
+		}
+		osg::Vec3 position = location - anchor;
+		verts->push_back(position);
+
+		osg::Vec4ub color = osg::Vec4ub(point.r / 256, point.g / 256, point.b / 256, 255);
+		colors->push_back(color);
+	}
+
+	// Add a final geometry if necessary
+	if (geometry)
+	{
+		geode->addDrawable(geometry);
+		geometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, verts->size()));
+		geometry = 0;
+	}
+
+	setMatrix(osg::Matrixd::translate(anchor));
+	addChild(geode);	
+}
+
 
 static const char *vertSource = { 
 

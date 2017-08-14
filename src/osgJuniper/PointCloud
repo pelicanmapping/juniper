@@ -21,23 +21,20 @@
 
 #include "Common"
 #include <osg/Group>
-#include <osg/OperationThread>
-
 #include <osg/Point>
+#include <osg/MatrixTransform>
 #include <osg/Texture2D>
+
+#include <osgJuniper/Point>
 
 namespace osgJuniper
 {
-
-    class OSGJUNIPER_EXPORT PointCloud : public osg::Group
+    class OSGJUNIPER_EXPORT PointCloud : public osg::MatrixTransform
     {
     public:
-        PointCloud();
-        PointCloud(const PointCloud& rhs, const osg::CopyOp& copyop=osg::CopyOp::SHALLOW_COPY);
-        //META_Node(osgJuniper, PointCloud);
-    protected:
-
-        osg::ref_ptr<osg::OperationThread> _operationThread;
+		PointCloud();
+        PointCloud(const PointList& points);
+		void setPoints(const PointList& points);
     };
 
 
