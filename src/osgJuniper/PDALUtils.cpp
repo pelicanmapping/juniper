@@ -45,14 +45,14 @@ void PDALUtils::mapExtensionToDriver(const std::string& extension, const std::st
 
 std::string PDALUtils::inferReaderDriver(const std::string& filename)
 {
+	PDAL_SCOPED_LOCK;
 	std::string ext = osgDB::getFileExtension(filename);
 	ExtensionToDriverMap::iterator itr = s_extensionsToDriverMap.find(ext);
 	if (itr != s_extensionsToDriverMap.end())
 	{
 		return itr->second;
 	}
-	pdal::StageFactory factory;
-	return factory.inferReaderDriver(filename);
+	return STAGE_FACTORY.inferReaderDriver(filename);
 }
 
 
