@@ -27,11 +27,6 @@
 #include <pdal/filters/StreamCallbackFilter.hpp>
 #include <pdal/io/BufferReader.hpp>
 
-namespace
-{
-	static OpenThreads::Mutex pdalMutex;
-}
-
 using namespace osgJuniper;
 
 using namespace pdal;
@@ -366,9 +361,17 @@ std::string OctreeCellBuilder::getFilename(OctreeId id, const std::string& ext) 
 	 double height = _bounds.zMax() - _bounds.zMin();
 	 double depth = _bounds.yMax() - _bounds.yMin();
 	 double max = osg::maximum(osg::maximum(width, height), depth);
-	 _bounds.xMax() = _bounds.xMin() + max;
-	 _bounds.yMax() = _bounds.yMin() + max;
-	 _bounds.zMax() = _bounds.zMin() + max;
+	 double halfMax = max / 2.0;
+
+	 osg::Vec3d center = _bounds.center();
+
+	 _bounds = osg::BoundingBox(center - osg::Vec3d(halfMax, halfMax, halfMax), center + osg::Vec3d(halfMax, halfMax, halfMax));
+
+
+	 // Write out some metadata
+	 std::ofstream out("metadata.txt");
+	 out << std::setprecision(8) << _bounds.xMin() << " " << _bounds.yMin() << " " << _bounds.zMin() << " " << _bounds.xMax() << " " << _bounds.yMax() << " " << _bounds.zMax();
+	 out.close();
 }
 
  void OctreeCellBuilder::buildRoot(unsigned int numThreads)
