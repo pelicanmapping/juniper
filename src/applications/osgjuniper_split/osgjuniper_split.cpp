@@ -497,7 +497,7 @@ void Splitter::closeReader()
 }
 
 int main(int argc, char** argv)
-{	
+{
     osg::Timer_t startTime = osg::Timer::instance()->tick();
     std::vector< std::string > filenames;
 
