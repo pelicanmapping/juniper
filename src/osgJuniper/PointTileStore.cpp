@@ -61,9 +61,11 @@ PointTileStore* PointTileStore::create(const TilesetInfo& info)
 	{
 		return new FilePointTileStore(info.getPath());
 	}
+#if HAVE_ROCKSDB
 	else if (info.getDriver() == "rocksdb")
 	{
 		return new RocksDBPointTileStore(info.getPath());
 	}
+#endif
 	return 0;
 }

@@ -26,8 +26,6 @@
 #include <osgJuniper/PointCloud>
 #include <osgJuniper/Octree>
 #include <osgJuniper/PointTileStore>
-#include <osgJuniper/FilePointTileStore>
-#include <osgJuniper/RocksDBPointTileStore>
 #include <osgEarth/PagedNode>
 
 using namespace osgJuniper;

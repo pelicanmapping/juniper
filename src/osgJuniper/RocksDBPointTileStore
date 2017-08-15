@@ -20,6 +20,8 @@
 #ifndef OSGJUNIPER_ROCKSDBPOINTTILESTORE
 #define OSGJUNIPER_ROCKSDBPOINTTILESTORE 1
 
+#ifdef HAVE_ROCKSDB
+
 #include <osgJuniper/Common>
 #include <osgJuniper/PointTileStore>
 
@@ -49,5 +51,7 @@ namespace osgJuniper
 		void* _db;
 	};
 }
+
+#endif
 
 #endif
