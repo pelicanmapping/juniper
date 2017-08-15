@@ -18,6 +18,9 @@
 */
 #include <osgJuniper/PointTileStore>
 
+#include <osgJuniper/FilePointTileStore>
+#include <osgJuniper/RocksDBPointTileStore>
+
 using namespace osgJuniper;
 
 /****************************************************************************/
@@ -50,4 +53,17 @@ KeyQuery::KeyQuery(int minLevel, int maxLevel,
 	_minZ(minZ),
 	_maxZ(maxZ)
 {
+}
+
+PointTileStore* PointTileStore::create(const TilesetInfo& info)
+{
+	if(info.getDriver() == "filesystem")
+	{
+		return new FilePointTileStore(info.getPath());
+	}
+	else if (info.getDriver() == "rocksdb")
+	{
+		return new RocksDBPointTileStore(info.getPath());
+	}
+	return 0;
 }

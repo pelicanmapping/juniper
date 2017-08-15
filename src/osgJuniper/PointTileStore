@@ -23,6 +23,7 @@
 #include <osgJuniper/Common>
 #include <osgJuniper/OctreeId>
 #include <osgJuniper/Point>
+#include <osgJuniper/TilesetInfo>
 #include <set>
 
 namespace osgJuniper
@@ -62,6 +63,8 @@ namespace osgJuniper
 		virtual void remove(const OctreeId& id) = 0;
 
 		virtual void queryKeys(const KeyQuery& query, std::set< OctreeId >& keys) = 0;
+
+		static PointTileStore* create(const TilesetInfo& info);
 	};
 }
 
