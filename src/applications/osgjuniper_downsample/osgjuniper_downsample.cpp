@@ -30,6 +30,7 @@
 #include <osgJuniper/RocksDBPointTileStore>
 
 #include <osgJuniper/FilePointTileStore>
+#include <osgJuniper/TilesetInfo>
 
 using namespace osgJuniper;
 
@@ -85,12 +86,15 @@ public:
 	void buildParents(unsigned int level, unsigned int innerLevel, unsigned int numThreads)
 	{
 		std::set< OctreeId > ids;
-		for (auto itr = _tiles.begin(); itr != _tiles.end(); ++itr)
 		{
-			if (itr->first.level== level)
+			OpenThreads::ScopedLock< OpenThreads::Mutex > lock(_tilesMutex);
+			for (auto itr = _tiles.begin(); itr != _tiles.end(); ++itr)
 			{
-				OctreeId parent = OctreeNode::getParentID(itr->first);
-				ids.insert(parent);
+				if (itr->first.level == level)
+				{
+					OctreeId parent = OctreeNode::getParentID(itr->first);
+					ids.insert(parent);
+				}
 			}
 		}
 
@@ -117,6 +121,12 @@ public:
 		while (!queue->empty())
 		{
 			OpenThreads::Thread::YieldCurrentThread();
+		}
+
+		for (unsigned int i = 0; i < numThreads; i++)
+		{
+			threads[i]->setDone(true);
+			threads[i]->join();
 		}
 		OSG_NOTICE << "Done building level " << level << std::endl;
 	}
@@ -223,15 +233,6 @@ int main(int argc, char** argv)
 
     osg::ArgumentParser arguments(&argc,argv);	
 
-	/*
-	int level;
-	if (!arguments.read("--level", level))
-	{
-		OSG_NOTICE << "Please specify a level to build up from" << std::endl;
-		return -1;
-	}
-	*/
-
 	int innerLevel = 6;
 	arguments.read("--innerLevel", innerLevel);
 
@@ -241,18 +242,34 @@ int main(int argc, char** argv)
 	arguments.read("--threads", numThreads);
 	OSG_NOTICE << "Num threads " << numThreads << std::endl;
 
-	// Read the metadata file produced by the splitter
-	double minX, minY, minZ, maxX, maxY, maxZ;
-	std::ifstream in("metadata.txt");
-	in >> minX >> minY >> minZ >> maxX >> maxY >> maxZ;
-	std::cout << "Bounds " << minX << " " << minY << " " << minZ << " to " 
-		<< maxX << " " << maxY << " " << maxZ << std::endl;
-	
-	osg::ref_ptr< OctreeNode > root = new OctreeNode();
-	root->setBoundingBox(osg::BoundingBoxd(minX, minY, minZ, maxX, maxY, maxZ));	
+	std::string infoFilename;
 
-	osg::ref_ptr< PointTileStore > tileStore = new FilePointTileStore(".");
-	//osg::ref_ptr< PointTileStore > tileStore = new RocksDBPointTileStore("tiled");
+	for (int pos = 1; pos<arguments.argc(); ++pos)
+	{
+		if (!arguments.isOption(pos))
+		{
+			infoFilename = arguments[pos];
+			break;
+		}
+	}
+
+	if (infoFilename.empty())
+	{
+		OSG_NOTICE << "Please specify a tileset.lastile file";
+		return -1;
+	}
+
+	TilesetInfo info = TilesetInfo::read(infoFilename);
+
+	osg::ref_ptr< OctreeNode > root = new OctreeNode();
+	root->setBoundingBox(info.getBounds());	
+
+	osg::ref_ptr< PointTileStore > tileStore = PointTileStore::create(info);	
+	if (!tileStore.valid())
+	{
+		OSG_NOTICE << "Failed to create tilestore " << info.getDriver() << std::endl;
+		return -1;
+	}
 
 	TileIndex index(root, tileStore.get());
 	unsigned int minLevel, maxLevel;

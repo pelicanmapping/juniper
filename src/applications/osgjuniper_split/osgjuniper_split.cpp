@@ -26,11 +26,10 @@
 #include <iostream>
 #include <osgJuniper/Utils>
 #include <osgJuniper/PDALUtils>
-#include <osgJuniper/FilePointTileStore>
-#include <osgJuniper/RocksDBPointTileStore>
-#include <osgJuniper/PointReaderWriter>
-#include <pdal/io/BufferReader.hpp>
+#include <osgJuniper/PointTileStore>
+#include <osgJuniper/TilesetInfo>
 
+#include <pdal/io/BufferReader.hpp>
 #include <pdal/StageFactory.hpp>
 #include <pdal/filters/StreamCallbackFilter.hpp>
 #include <pdal/filters/MergeFilter.hpp>
@@ -450,11 +449,6 @@ void Splitter::computeMetaData()
 	_node = new OctreeNode();
 	_node->setBoundingBox(_bounds);
 
-	// Write out some metadata
-	std::ofstream out("metadata.txt");
-	out << std::setprecision(8) << _bounds.xMin() << " " << _bounds.yMin() << " " << _bounds.zMin() << " " << _bounds.xMax() << " " << _bounds.yMax() << " " << _bounds.zMax();
-	out.close();
-
 	OSG_NOTICE << "points=" << _totalNumPoints << std::endl
 		<< " bounds " << _bounds.xMin() << ", " << _bounds.yMin() << ", " << _bounds.zMin() << " to "
 		<< _bounds.xMax() << ", " << _bounds.yMax() << ", " << _bounds.zMax() << std::endl;
@@ -530,6 +524,28 @@ int main(int argc, char** argv)
 	int level = -1;
     arguments.read("--level", level);    
 
+	std::string driver = "filesystem";
+	arguments.read("--driver", driver);
+
+	std::string path;
+	arguments.read("--out", path);
+
+	if (driver != "filesystem" && driver != "rocksdb")
+	{
+		OSG_NOTICE << "Driver " << driver << " not supported" << std::endl;
+		return -1;
+	}
+
+	if (driver == "filesystem" && path.empty())
+	{
+		// Write to the current directory
+		path = ".";
+	}
+	else if (driver == "rocksdb" && path.empty())
+	{
+		path = "tiles.db";
+	}
+
 	//Read in the filenames to process
     for(int pos=1;pos<arguments.argc();++pos)
     {
@@ -565,8 +581,20 @@ int main(int argc, char** argv)
 
     splitter.setLevel(level);
 
-	osg::ref_ptr< PointTileStore > tileStore = new FilePointTileStore(".");
-	//osg::ref_ptr< PointTileStore > tileStore = new RocksDBPointTileStore("tiled");
+	// Write out the tileset info.
+	TilesetInfo info;
+	info.setBounds(splitter.getBounds());
+	info.setAdditive(false);
+	info.setDriver(driver);
+	info.setPath(path);
+	TilesetInfo::write(info, "tileset.lastile");
+
+	osg::ref_ptr< PointTileStore > tileStore = PointTileStore::create(info);
+	if (!tileStore.valid())
+	{
+		OSG_NOTICE << "Failed to create tilestore " << driver << std::endl;
+		return -1;
+	}
 	splitter.setTileStore(tileStore.get());
 	splitter.split();
 
