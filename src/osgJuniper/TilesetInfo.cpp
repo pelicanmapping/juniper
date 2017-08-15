@@ -96,8 +96,10 @@ TilesetInfo TilesetInfo::read(const std::string& filename)
 		Json::Value bounds = root["bounds"];
 		info._bounds.xMin() = bounds[0u].asDouble();
 		info._bounds.yMin() = bounds[1u].asDouble();
-		info._bounds.xMax() = bounds[2u].asDouble();
-		info._bounds.yMax() = bounds[3u].asDouble();
+		info._bounds.zMin() = bounds[2u].asDouble();
+		info._bounds.xMax() = bounds[3u].asDouble();
+		info._bounds.yMax() = bounds[4u].asDouble();
+		info._bounds.zMax() = bounds[5u].asDouble();
 	}
 	in.close();
 	return info;
