@@ -39,6 +39,7 @@ SET(HEADERS
     PointCloudTools
     PointTileStore
     StreamingNode
+    TilesetInfo
     Velodyne
 )
 
@@ -60,6 +61,7 @@ SET(SOURCES
     PointCloudTools.cpp
     PointTileStore.cpp
     StreamingNode.cpp
+    TilesetInfo.cpp
     Velodyne.cpp
 )
 
