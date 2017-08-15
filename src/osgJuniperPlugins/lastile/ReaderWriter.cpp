@@ -50,11 +50,12 @@ public:
 	class PagedOctreeNode : public osgEarth::PagedNode
 	{
 	public:
-		PagedOctreeNode(PointTileStore* tileStore, OctreeNode* octree, float rangeFactor) :
+		PagedOctreeNode(PointTileStore* tileStore, OctreeNode* octree, float rangeFactor, bool additive) :
 			_tileStore(tileStore),
 			_octree(octree)
 		{
 			setRangeFactor(rangeFactor);
+		    setAdditive(additive),
 			build();
 			setupPaging();
 		}
@@ -70,7 +71,7 @@ public:
 				PointList pts;
 				if (_tileStore->get(child->getID(), pts))
 				{
-					group->addChild(new PagedOctreeNode(_tileStore.get(), child, getRangeFactor()));
+					group->addChild(new PagedOctreeNode(_tileStore.get(), child, getRangeFactor(), getAdditive()));
 				}
 			}
 			return group;
@@ -120,23 +121,24 @@ public:
 		if (!acceptsExtension(osgDB::getLowerCaseFileExtension(location)))
 			return ReadResult::FILE_NOT_HANDLED;
 
-		// Read the metadata file produced by the splitter
-		double minX, minY, minZ, maxX, maxY, maxZ;
-		std::ifstream in("metadata.txt");
-		in >> minX >> minY >> minZ >> maxX >> maxY >> maxZ;
+		TilesetInfo info = TilesetInfo::read(location);
 
 		osg::ref_ptr< OctreeNode > root = new OctreeNode();
-		root->setBoundingBox(osg::BoundingBoxd(minX, minY, minZ, maxX, maxY, maxZ));
+		root->setBoundingBox(info.getBounds());
 
 		std::string file = osgDB::getNameLessExtension(location);
 
 		double radiusFactor = 5.0;		
 
-		//osg::ref_ptr< PointTileStore > tileStore = new RocksDBPointTileStore("tiled");
-		osg::ref_ptr< PointTileStore > tileStore = new FilePointTileStore(".");
+		osg::ref_ptr< PointTileStore > tileStore = PointTileStore::create(info);
+		if (!tileStore.valid())
+		{
+			OSG_NOTICE << "Failed to read tilestore from " << location << std::endl;
+			return ReadResult::ERROR_IN_READING_FILE;
+		}
 
 		PointCloudDecorator* decorator = new PointCloudDecorator;
-		decorator->addChild(new PagedOctreeNode(tileStore.get(), root, radiusFactor));
+		decorator->addChild(new PagedOctreeNode(tileStore.get(), root, radiusFactor, info.getAdditive()));
 		return decorator;
 	}
 };
