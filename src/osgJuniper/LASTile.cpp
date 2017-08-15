@@ -33,8 +33,6 @@ using namespace osgJuniper;
 using namespace pdal;
 using namespace std;
 
-static pdal::StageFactory _factory;
-
 Progress::Progress():
 _complete(0),
     _total(0)
@@ -499,7 +497,7 @@ return true;
 	bufferReader.addView(view);
 
 	Stage *writer = 0;
-	{PDAL_SCOPED_LOCK; writer = _factory.createStage("writers.las"); }
+	{PDAL_SCOPED_LOCK; writer = PDALUtils::getStageFactory()->createStage("writers.las"); }
 
 	std::string filename = getFilename(_node->getID(), "laz");
 	osgEarth::makeDirectoryForFile(filename);
@@ -513,7 +511,7 @@ return true;
 	writer->execute(pointTable);
 
 	// Destroy the writer stage, we're done with it.
-	{PDAL_SCOPED_LOCK; _factory.destroyStage(writer); }
+	{PDAL_SCOPED_LOCK; PDALUtils::getStageFactory()->destroyStage(writer); }
 
 	closeChildWriters();
 	closeReader();
@@ -563,7 +561,7 @@ Stage* OctreeCellBuilder::createStageForFile(const std::string& filename) {
 	else
 	{
 		std::string driver = PDALUtils::inferReaderDriver(filename);
-		reader = _factory.createStage(driver);
+		reader = PDALUtils::getStageFactory()->createStage(driver);
 		if (reader) {
 			Options opt;
 			opt.add("filename", filename);
@@ -598,7 +596,7 @@ void OctreeCellBuilder::closeReader()
 	{
 		for (unsigned int i = 0; i < _readerStage->getInputs().size(); i++)
 		{
-			_factory.destroyStage(_readerStage->getInputs()[i]);
+			PDALUtils::getStageFactory()->destroyStage(_readerStage->getInputs()[i]);
 		}
 		delete _readerStage;
 		_readerStage = 0;

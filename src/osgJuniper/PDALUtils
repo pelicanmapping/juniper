@@ -41,6 +41,8 @@ namespace osgJuniper
 		static void readPointsFromLAZ(PointList& points, const std::string& filename);
 		static void appendPointsToLaz(const PointList& points, const std::string& filename);
 
+		static pdal::StageFactory* getStageFactory();
+
 		static OpenThreads::ReentrantMutex& getPDALMutex();
 	};
 

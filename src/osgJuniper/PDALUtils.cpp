@@ -27,11 +27,6 @@
 using namespace osgJuniper;
 using namespace pdal;
 
-namespace
-{
-	StageFactory STAGE_FACTORY;
-}
-
 static ExtensionToDriverMap s_extensionsToDriverMap =
 {
 	{ "f32", "readers.f32" },
@@ -43,6 +38,12 @@ void PDALUtils::mapExtensionToDriver(const std::string& extension, const std::st
 	s_extensionsToDriverMap[extension] = driver;
 }
 
+pdal::StageFactory* PDALUtils::getStageFactory()
+{
+	static StageFactory STAGE_FACTORY;
+	return &STAGE_FACTORY;
+}
+
 std::string PDALUtils::inferReaderDriver(const std::string& filename)
 {
 	PDAL_SCOPED_LOCK;
@@ -52,7 +53,7 @@ std::string PDALUtils::inferReaderDriver(const std::string& filename)
 	{
 		return itr->second;
 	}
-	return STAGE_FACTORY.inferReaderDriver(filename);
+	return getStageFactory()->inferReaderDriver(filename);
 }
 
 
@@ -88,7 +89,7 @@ void PDALUtils::writePointsToLaz(const PointList& points, const std::string& fil
 	bufferReader.addView(view);
 
 	Stage *writer = 0;
-	{PDAL_SCOPED_LOCK; writer = STAGE_FACTORY.createStage("writers.las"); }
+	{PDAL_SCOPED_LOCK; writer = getStageFactory()->createStage("writers.las"); }
 
 	osgEarth::makeDirectoryForFile(filename);
 
@@ -101,7 +102,7 @@ void PDALUtils::writePointsToLaz(const PointList& points, const std::string& fil
 	writer->execute(pointTable);
 
 	// Destroy the writer stage, we're done with it.
-	{PDAL_SCOPED_LOCK; STAGE_FACTORY.destroyStage(writer); }
+	{PDAL_SCOPED_LOCK; getStageFactory()->destroyStage(writer); }
 }
 
 void PDALUtils::readPointsFromLAZ(PointList& points, const std::string& filename)
@@ -111,7 +112,7 @@ void PDALUtils::readPointsFromLAZ(PointList& points, const std::string& filename
 		Stage* stage = 0;
 		{
 			PDAL_SCOPED_LOCK;
-			stage = STAGE_FACTORY.createStage("readers.las");
+			stage = getStageFactory()->createStage("readers.las");
 			pdal::Options opt;
 			opt.add("filename", filename);
 			stage->setOptions(opt);
