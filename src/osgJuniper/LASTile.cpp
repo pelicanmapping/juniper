@@ -18,6 +18,7 @@
 */
 #include <osgJuniper/LASTile>
 #include <osgJuniper/PDALUtils>
+#include <osgJuniper/TilesetInfo>
 #include <osgEarth/FileUtils>
 #include <osgEarth/Random>
 #include <osgEarth/GeoData>
@@ -367,11 +368,12 @@ std::string OctreeCellBuilder::getFilename(OctreeId id, const std::string& ext) 
 
 	 _bounds = osg::BoundingBox(center - osg::Vec3d(halfMax, halfMax, halfMax), center + osg::Vec3d(halfMax, halfMax, halfMax));
 
-
-	 // Write out some metadata
-	 std::ofstream out("metadata.txt");
-	 out << std::setprecision(8) << _bounds.xMin() << " " << _bounds.yMin() << " " << _bounds.zMin() << " " << _bounds.xMax() << " " << _bounds.yMax() << " " << _bounds.zMax();
-	 out.close();
+	 TilesetInfo info;
+	 info.setBounds(_bounds);
+	 info.setAdditive(true);
+	 info.setDriver("filesystem");
+	 info.setPath(".");
+	 TilesetInfo::write(info, "tileset.lastile");
 }
 
  void OctreeCellBuilder::buildRoot(unsigned int numThreads)
