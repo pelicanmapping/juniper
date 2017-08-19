@@ -118,6 +118,12 @@ _innerLevel(6),
 
 OctreeCellBuilder::~OctreeCellBuilder()
 {                 
+	for (unsigned int i = 0; i < _threads.size(); i++)
+	{
+		OSG_NOTICE << "Shutting down thread " << i << std::endl;
+		_threads[i]->setDone(true);
+		_threads[i]->join();
+	}
 }
 
 unsigned int OctreeCellBuilder::getNumPoints() const
