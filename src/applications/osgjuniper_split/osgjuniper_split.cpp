@@ -242,6 +242,12 @@ OctreeNode* getLeafNode(OctreeNode* node, const osg::Vec3d& point)
 void Splitter::addPoint(const Point& p)
 {
 	osg::Vec3d position(p.x, p.y, p.z);
+	// Make sure the point fits in the bounding box.
+	if (!_node->getBoundingBox().contains(position))
+	{
+		OSG_NOTICE << "Skipping point " << p.x << ", " << p.y << ", " << p.z << " since it doesn't fit in bounding box" << std::endl; 
+		return;
+	}
 	OctreeId childId = _node->getID(position, _level);
 
 	// Figure out which node the point should be inserted at at the split level
