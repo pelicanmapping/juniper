@@ -19,6 +19,7 @@
 
 #include <osgJuniper/TilesetInfo>
 #include <osgEarth/JsonUtils>
+#include <osgEarth/FileUtils>
 #include <iostream>
 #include <fstream>
 
@@ -91,7 +92,7 @@ TilesetInfo TilesetInfo::read(const std::string& filename)
 	if (reader.parse(in, root))
 	{
 		info._driver = root["driver"].asString();
-		info._path = root["path"].asString();
+		info._path = osgEarth::getFullPath(filename, root["path"].asString());
 		info._additive = root["additive"].asBool();
 		Json::Value bounds = root["bounds"];
 		info._bounds.xMin() = bounds[0u].asDouble();
