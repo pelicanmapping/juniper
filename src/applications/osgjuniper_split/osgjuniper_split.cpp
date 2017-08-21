@@ -16,14 +16,18 @@
 * LAWS AND INTERNATIONAL TREATIES.  THE RECEIPT OR POSSESSION OF  THIS SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY ANY RIGHTS
 * TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
 */
-#include <osgJuniper/Octree>
 #include <osgEarth/StringUtils>
 #include <osgEarth/FileUtils>
+#include <osgEarth/SpatialReference>
+#include <osgEarth/GeoData>
+
 #include <osg/BoundingBox>
+#include <osg/ArgumentParser>
+
 #include <osgDB/FileUtils>
 #include <osgDB/FileNameUtils>
-#include <osg/ArgumentParser>
-#include <iostream>
+
+#include <osgJuniper/Octree>
 #include <osgJuniper/Utils>
 #include <osgJuniper/PDALUtils>
 #include <osgJuniper/PointTileStore>
@@ -33,6 +37,8 @@
 #include <pdal/StageFactory.hpp>
 #include <pdal/filters/StreamCallbackFilter.hpp>
 #include <pdal/filters/MergeFilter.hpp>
+
+#include <iostream>
 
 using namespace osgJuniper;
 using namespace pdal;
@@ -101,6 +107,14 @@ public:
 	void initReader();
 	void closeReader();
 
+	osgEarth::SpatialReference* getSourceSRS() const;
+	void setSourceSRS(osgEarth::SpatialReference* srs);
+
+	osgEarth::SpatialReference* getDestSRS() const;
+	void setDestSRS(osgEarth::SpatialReference* srs);
+
+	void reprojectPoint(const osg::Vec3d& input, osg::Vec3d& output);
+
 	OctreeNode* getOctreeNode() const { return _node.get(); }
 
 	const osg::BoundingBoxd& getBounds() const
@@ -112,6 +126,9 @@ public:
 	{
 		return _totalNumPoints;
 	}
+
+	bool getGeocentric() const;
+	void setGeocentric(bool geocentric);
 
 protected:
 
@@ -143,12 +160,18 @@ protected:
 	osg::ref_ptr< PointTileStore > _tileStore;
 
 	OctreeId _filterID;
+
+	osg::ref_ptr< osgEarth::SpatialReference > _srcSRS;
+	osg::ref_ptr< osgEarth::SpatialReference > _destSRS;
+
+	bool _geocentric;
 };
 
 Splitter::Splitter():
 	_totalNumPoints(0),
 	_activePoints(0),
-	_readerStage(0)
+	_readerStage(0),
+	_geocentric(false)
 {
 }
 
@@ -239,6 +262,29 @@ OctreeNode* getLeafNode(OctreeNode* node, const osg::Vec3d& point)
 	return 0;
 }
 
+void Splitter::reprojectPoint(const osg::Vec3d& input, osg::Vec3d& output)
+{
+	if (_srcSRS.valid() && _destSRS.valid())
+	{
+		osgEarth::GeoPoint geoPoint(_srcSRS, input);
+		osgEarth::GeoPoint mapPoint;
+		geoPoint.transform(_destSRS, mapPoint);
+		if (!_geocentric)
+		{
+			output = mapPoint.vec3d();
+		}
+		else
+		{
+			mapPoint.toWorld(output);
+		}
+	}
+	else
+	{
+		output = input;
+	}
+}
+
+
 void Splitter::addPoint(const Point& p)
 {
 	osg::Vec3d position(p.x, p.y, p.z);
@@ -285,6 +331,7 @@ void Splitter::addPoint(const Point& p)
 
 		for (PointList::iterator itr = node->getPoints().begin(); itr != node->getPoints().end(); ++itr)
 		{			
+
 			addPoint(*itr);
 		}				
 	}
@@ -311,6 +358,37 @@ void Splitter::writeNode(OctreeNode* node)
 		writeNode(node->getChildren()[i].get());
 	}
 }
+
+osgEarth::SpatialReference* Splitter::getSourceSRS() const
+{
+	return _srcSRS.get();
+}
+
+void Splitter::setSourceSRS(osgEarth::SpatialReference* srs)
+{
+	_srcSRS = srs;
+}
+
+osgEarth::SpatialReference* Splitter::getDestSRS() const
+{
+	return _destSRS;
+}
+
+void Splitter::setDestSRS(osgEarth::SpatialReference* srs)
+{
+	_destSRS = srs;
+}
+
+bool Splitter::getGeocentric() const
+{
+	return _geocentric;
+}
+
+void Splitter::setGeocentric(bool geocentric)
+{
+	_geocentric = geocentric;
+}
+
 
 void Splitter::split()
 {
@@ -347,10 +425,15 @@ void Splitter::split()
 			return false;
 		}
 
+		// Reproject the point if necessary
+		osg::Vec3d in(x, y, z);
+		osg::Vec3d out;
+		reprojectPoint(in, out);
+
 		Point p;
-		p.x = x;
-		p.y = y; 
-		p.z = z;
+		p.x = out.x();
+		p.y = out.y();
+		p.z = out.z();
 		p.r = point.getFieldAs<int>(Dimension::Id::Red);
 		p.g = point.getFieldAs<int>(Dimension::Id::Green);
 		p.b = point.getFieldAs<int>(Dimension::Id::Blue);
@@ -440,6 +523,34 @@ void Splitter::computeMetaData()
 	}
 
 	_bounds = osg::BoundingBoxd(minX, minY, minZ, maxX, maxY, maxZ);
+
+	// Reproject the corners of the bounds if reprojection is enabled
+	if (_srcSRS.valid() && _destSRS.get())
+	{
+		minX = DBL_MAX;
+		minY = DBL_MAX;
+		minZ = DBL_MAX;
+		maxX = -DBL_MAX;
+		maxY = -DBL_MAX;
+		maxZ = -DBL_MAX;
+
+		for (unsigned int i = 0; i < 8; i++)
+		{
+			osg::Vec3d cornerIn = _bounds.corner(i);
+			osg::Vec3d cornerOut;
+			reprojectPoint(cornerIn, cornerOut);
+
+			if (minX > cornerOut.x()) minX = cornerOut.x();
+			if (minY > cornerOut.y()) minY = cornerOut.y();
+			if (minZ > cornerOut.z()) minZ = cornerOut.z();
+
+			if (maxX < cornerOut.x()) maxX = cornerOut.x();
+			if (maxY < cornerOut.y()) maxY = cornerOut.y();
+			if (maxZ < cornerOut.z()) maxZ = cornerOut.z();
+		}
+
+		_bounds = osg::BoundingBoxd(minX, minY, minZ, maxX, maxY, maxZ);
+	}
 
 	double width = _bounds.xMax() - _bounds.xMin();
 	double height = _bounds.zMax() - _bounds.zMin();
@@ -552,6 +663,47 @@ int main(int argc, char** argv)
 		path = "tiles.db";
 	}
 
+	std::string srcSRSString;
+	arguments.read("--src", srcSRSString);
+	OSG_NOTICE << "Read src " << srcSRSString << std::endl;
+
+	std::string destSRSString;
+	arguments.read("--dest", destSRSString);
+
+	bool geocentric = arguments.read("--geocentric");
+
+	if (geocentric)
+	{
+		destSRSString = "epsg:4326";
+	}
+
+	if (destSRSString.empty() && !srcSRSString.empty() ||
+		!destSRSString.empty() && srcSRSString.empty())
+	{
+		OSG_NOTICE << "Please provide both source and destination srs if you want to reproject" << std::endl;
+		return 1;
+	}
+
+	osg::ref_ptr< osgEarth::SpatialReference > srcSRS;
+	osg::ref_ptr< osgEarth::SpatialReference > destSRS;
+
+	if (!srcSRSString.empty() && !destSRSString.empty())
+	{
+		srcSRS = osgEarth::SpatialReference::create(srcSRSString);
+		if (!srcSRS.valid())
+		{
+			OSG_NOTICE << srcSRSString << " is not a valid SRS" << std::endl;
+			return 1;
+		}
+
+		destSRS = osgEarth::SpatialReference::create(destSRSString);
+		if (!destSRS.valid())
+		{
+			OSG_NOTICE << destSRSString << " is not a valid SRS" << std::endl;
+			return 1;
+		}
+	}
+
 	//Read in the filenames to process
     for(int pos=1;pos<arguments.argc();++pos)
     {
@@ -575,6 +727,9 @@ int main(int argc, char** argv)
         splitter.getInputFiles().push_back(filenames[i]);
         OSG_NOTICE << "Processing filenames " << filenames[i] << std::endl;
     }	
+	splitter.setDestSRS(destSRS.get());
+	splitter.setSourceSRS(srcSRS.get());
+	splitter.setGeocentric(geocentric);
 	splitter.computeMetaData();
 
 	// Get a suggested level if one wasn't specified
