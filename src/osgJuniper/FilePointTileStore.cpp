@@ -87,18 +87,18 @@ void FilePointTileStore::queryKeys(const KeyQuery& query, std::set< OctreeId >& 
 	std::vector< std::string > contents = osgJuniper::Utils::getFilesFromDirectory(_path, "laz");
 	for (unsigned int i = 0; i < contents.size(); i++)
 	{
-		std::string filename = contents[i];
+		std::string filename = osgDB::getSimpleFileName(contents[i]);
 
 		osgEarth::StringTokenizer tok("_.");
 		osgEarth::StringVector tized;
 		tok.tokenize(filename, tized);
 
-		if (tized.size() == 7)
+		if (tized.size() == 6)
 		{
-			int level = osgEarth::as<int>(tized[2], 0);
-			int z = osgEarth::as<int>(tized[3], 0);
-			int x = osgEarth::as<int>(tized[4], 0);
-			int y = osgEarth::as<int>(tized[5], 0);
+			int level = osgEarth::as<int>(tized[1], 0);
+			int z = osgEarth::as<int>(tized[2], 0);
+			int x = osgEarth::as<int>(tized[3], 0);
+			int y = osgEarth::as<int>(tized[4], 0);
 
 			if (
 				(query._minLevel < 0 || level >= query._minLevel) &&
