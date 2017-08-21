@@ -301,7 +301,8 @@ void Splitter::addPoint(const Point& p)
 	osg::ref_ptr< OctreeNode > node = getLeafNode(baseNode.get(), position);
 
 	// Get the cell count of the desired node
-	std::shared_ptr< OctreeCell > cell = getOrCreateCell(node->getID());;
+	std::shared_ptr< OctreeCell > cell = getOrCreateCell(node->getID());
+
 	if (cell->_count == targetPoints)
 	{
 		OSG_NOTICE << "Splitting cell " << node->getID().level << " / " << node->getID().z << " / " << node->getID().x << " / " << node->getID().y << " with " << cell->_count << " points" << std::endl;
@@ -329,9 +330,9 @@ void Splitter::addPoint(const Point& p)
 		// Clear points out of the node
 		node->clearPoints();
 
-		for (PointList::iterator itr = node->getPoints().begin(); itr != node->getPoints().end(); ++itr)
+		// Add the points back into the dataset, which will navigate down to the child nodes.
+		for (PointList::iterator itr = points.begin(); itr != points.end(); ++itr)
 		{			
-
 			addPoint(*itr);
 		}				
 	}
