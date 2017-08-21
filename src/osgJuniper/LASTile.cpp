@@ -241,9 +241,9 @@ void OctreeCellBuilder::setGeocentric(bool geocentric)
 
 osg::Vec3d OctreeCellBuilder::reprojectPoint(const osg::Vec3d& input)
 {
-    if (_srcSRS.valid() && _destSRS.valid())
+    if ((_srcSRS.valid() && _destSRS.valid()))
     {
-        osgEarth::GeoPoint geoPoint(_srcSRS, input);                  
+	    osgEarth::GeoPoint geoPoint(_srcSRS, input);                  
         osgEarth::GeoPoint mapPoint;
         geoPoint.transform(_destSRS, mapPoint);     
         if (!_geocentric)
@@ -252,7 +252,7 @@ osg::Vec3d OctreeCellBuilder::reprojectPoint(const osg::Vec3d& input)
         }    
         osg::Vec3d world;
         mapPoint.toWorld(world);
-        return world;              
+		return world;
     }    
     return input;
 }
@@ -362,6 +362,35 @@ std::string OctreeCellBuilder::getFilename(OctreeId id, const std::string& ext) 
 
 	 _bounds = osg::BoundingBoxd(minX, minY, minZ, maxX, maxY, maxZ);
 
+	 // Reproject the corners of the bounds if reprojection is enabled
+	 if (_srcSRS.valid() && _destSRS.get())
+	 {
+		 minX = DBL_MAX;
+		 minY = DBL_MAX;
+		 minZ = DBL_MAX;
+		 maxX = -DBL_MAX;
+		 maxY = -DBL_MAX;
+		 maxZ = -DBL_MAX;
+
+		 for (unsigned int i = 0; i < 8; i++)
+		 {
+			 osg::Vec3d cornerIn = _bounds.corner(i);
+			 osg::Vec3d cornerOut;
+			 cornerOut = reprojectPoint(cornerIn);
+
+			 if (minX > cornerOut.x()) minX = cornerOut.x();
+			 if (minY > cornerOut.y()) minY = cornerOut.y();
+			 if (minZ > cornerOut.z()) minZ = cornerOut.z();
+
+			 if (maxX < cornerOut.x()) maxX = cornerOut.x();
+			 if (maxY < cornerOut.y()) maxY = cornerOut.y();
+			 if (maxZ < cornerOut.z()) maxZ = cornerOut.z();
+		 }
+
+		 _bounds = osg::BoundingBoxd(minX, minY, minZ, maxX, maxY, maxZ);
+	 }
+
+
 	 double width = _bounds.xMax() - _bounds.xMin();
 	 double height = _bounds.zMax() - _bounds.zMin();
 	 double depth = _bounds.yMax() - _bounds.yMin();
@@ -446,7 +475,7 @@ void OctreeCellBuilder::build()
 	{
 		double x = point.getFieldAs<double>(Dimension::Id::X);
 		double y = point.getFieldAs<double>(Dimension::Id::Y);
-		double z = point.getFieldAs<double>(Dimension::Id::Z);		
+		double z = point.getFieldAs<double>(Dimension::Id::Z);
 
 		// Reproject the point
 		osg::Vec3d location(x, y, z);
@@ -456,42 +485,42 @@ void OctreeCellBuilder::build()
 		point.setField(Dimension::Id::Y, world.y());
 		point.setField(Dimension::Id::Z, world.z());
 
-// Figure out what cell this point should go in.
-OctreeId id = _node->getID(location, _innerLevel);
+		// Figure out what cell this point should go in.
+		OctreeId id = _node->getID(world, _innerLevel);
 
-// See how many points are currently in this cell
-int count = getPointsInCell(id);
+		// See how many points are currently in this cell
+		int count = getPointsInCell(id);
 
-if ((_targetNumPoints != 0 && keep()) || count == 0 || _node->getID().level >= _maxLevel)
-{
-	// The point passed, so include it in the list.
-	view->setField(pdal::Dimension::Id::X, idx, point.getFieldAs<double>(pdal::Dimension::Id::X));
-	view->setField(pdal::Dimension::Id::Y, idx, point.getFieldAs<double>(pdal::Dimension::Id::Y));
-	view->setField(pdal::Dimension::Id::Z, idx, point.getFieldAs<double>(pdal::Dimension::Id::Z));
+		if ((_targetNumPoints != 0 && keep()) || count == 0 || _node->getID().level >= _maxLevel)
+		{
+			// The point passed, so include it in the list.
+			view->setField(pdal::Dimension::Id::X, idx, point.getFieldAs<double>(pdal::Dimension::Id::X));
+			view->setField(pdal::Dimension::Id::Y, idx, point.getFieldAs<double>(pdal::Dimension::Id::Y));
+			view->setField(pdal::Dimension::Id::Z, idx, point.getFieldAs<double>(pdal::Dimension::Id::Z));
 
-	view->setField(pdal::Dimension::Id::Red, idx, point.getFieldAs<int>(pdal::Dimension::Id::Red));
-	view->setField(pdal::Dimension::Id::Green, idx, point.getFieldAs<int>(pdal::Dimension::Id::Green));
-	view->setField(pdal::Dimension::Id::Blue, idx, point.getFieldAs<int>(pdal::Dimension::Id::Blue));
-	_progress->incrementComplete(1);
-	incrementPointsInCell(id, 1);
-	_numPoints++;
-	idx++;
-}
-else
-{
+			view->setField(pdal::Dimension::Id::Red, idx, point.getFieldAs<int>(pdal::Dimension::Id::Red));
+			view->setField(pdal::Dimension::Id::Green, idx, point.getFieldAs<int>(pdal::Dimension::Id::Green));
+			view->setField(pdal::Dimension::Id::Blue, idx, point.getFieldAs<int>(pdal::Dimension::Id::Blue));
+			_progress->incrementComplete(1);
+			incrementPointsInCell(id, 1);
+			_numPoints++;
+			idx++;
+		}
+		else
+		{
 
-	// The point didn't pass, so write it to one of the output files.                
-	std::shared_ptr< PointWriter > writer = getOrCreateWriter(location);
-	if (writer)
-	{
-		writer->write(point);
-	}
-	else
-	{
-		_progress->incrementComplete(1);
-	}
-}
-return true;
+			// The point didn't pass, so write it to one of the output files.                
+			std::shared_ptr< PointWriter > writer = getOrCreateWriter(world);
+			if (writer)
+			{
+				writer->write(point);
+			}
+			else
+			{
+				_progress->incrementComplete(1);
+			}
+		}
+		return true;
 	};
 	callbackFilter.setCallback(cb);
 
@@ -541,9 +570,10 @@ void OctreeCellBuilder::buildChildren()
 			builder->setNode(node.get());
 			builder->getInputFiles().push_back(_outputFiles[i]);
 			builder->setDeleteInputs(true);
-			builder->setSourceSRS(_srcSRS.get());
-			builder->setDestSRS(_destSRS.get());
-			builder->setGeocentric(_geocentric);
+			// The points are going to be reprojected in the parent, so we don't need to do any reprojection in the children.
+			//builder->setSourceSRS(_destSRS.get());
+			//builder->setDestSRS(_destSRS.get());
+			//builder->setGeocentric(_geocentric);
 			builder->setOperationQueue(_queue);
 			builder->setProgress(_progress);
 			builder->setMaxLevel(_maxLevel);
