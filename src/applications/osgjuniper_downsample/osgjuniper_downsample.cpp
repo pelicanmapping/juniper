@@ -58,8 +58,19 @@ class TileIndex
 public:
 	TileIndex(OctreeNode* root, PointTileStore* tileStore):
 		_root(root),
-		_tileStore(tileStore)
+		_tileStore(tileStore),
+		_targetNumPoints(50000)
 	{
+	}
+
+	unsigned int getTargetNumPoints() const
+	{
+		return _targetNumPoints;
+	}
+
+	void setTargetNumPoints(unsigned int targetNumPoints)
+	{
+		_targetNumPoints = targetNumPoints;
 	}
 
 	void scan(unsigned int &minLevel, unsigned int &maxLevel)
@@ -159,9 +170,8 @@ public:
 		if (!points.empty())
 		{			
 			// If we are at the highest level and the children don't contain at least a minimum number of points
-			// then simplify take all of the points and promote them up instead of sampling.
-			int minPoints = 50000;
-			if (points.size() <= minPoints && highestLevel)
+			// then simplify take all of the points and promote them up instead of sampling.		
+			if (points.size() <= _targetNumPoints && highestLevel)
 			{
 				OSG_NOTICE << "Taking all " << points.size() << " points for " << id.level << "/" << id.z << "/" << id.x << "/" << id.y << std::endl;
 				// Write all of the points to this cell
@@ -218,6 +228,7 @@ public:
 	std::map< OctreeId, bool > _tiles;
 	osg::ref_ptr< OctreeNode > _root;
 	osg::ref_ptr< PointTileStore > _tileStore;
+	unsigned int _targetNumPoints;
 };
 
 
@@ -241,6 +252,9 @@ int main(int argc, char** argv)
 	unsigned int numThreads = OpenThreads::GetNumberOfProcessors();
 	arguments.read("--threads", numThreads);
 	OSG_NOTICE << "Num threads " << numThreads << std::endl;
+
+	unsigned int target = 50000;
+	arguments.read("--target", target);
 
 	std::string infoFilename;
 
@@ -272,6 +286,7 @@ int main(int argc, char** argv)
 	}
 
 	TileIndex index(root, tileStore.get());
+	index.setTargetNumPoints(target);
 	unsigned int minLevel, maxLevel;
 	index.scan(minLevel, maxLevel);
 
