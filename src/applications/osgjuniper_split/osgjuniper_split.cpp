@@ -43,8 +43,6 @@
 using namespace osgJuniper;
 using namespace pdal;
 
-const unsigned int targetPoints = 50000;
-
 static pdal::StageFactory _factory;
 
 Stage* createStageForFile(const std::string& filename) {
@@ -130,6 +128,9 @@ public:
 	bool getGeocentric() const;
 	void setGeocentric(bool geocentric);
 
+	unsigned int getTargetNumPoints() const;
+	void setTargetNumPoints(unsigned int targetNumPoints);
+
 protected:
 
 	void addPoint(const Point& point);
@@ -141,6 +142,7 @@ protected:
 
 	unsigned int _totalNumPoints;
 	unsigned int _activePoints;
+	unsigned int _targetNumPoints;
 	osg::BoundingBoxd _bounds;
 	unsigned int _level;
 	std::vector<std::string> _inputFiles;
@@ -171,7 +173,8 @@ Splitter::Splitter():
 	_totalNumPoints(0),
 	_activePoints(0),
 	_readerStage(0),
-	_geocentric(false)
+	_geocentric(false),
+	_targetNumPoints(50000)
 {
 }
 
@@ -231,7 +234,7 @@ int Splitter::suggestSplitLevel()
 	{
 		suggestedLevel = i;
 		unsigned int numberOfPoints = (outVolume * pointsPerCubicMeter);
-		if (numberOfPoints <= targetPoints)
+		if (numberOfPoints <= _targetNumPoints)
 		{
 			break;
 		}
@@ -309,7 +312,7 @@ void Splitter::addPoint(const Point& p)
 	// Get the cell count of the desired node
 	std::shared_ptr< OctreeCell > cell = getOrCreateCell(node->getID());
 
-	if (cell->_count == targetPoints)
+	if (cell->_count == _targetNumPoints)
 	{
 		OSG_NOTICE << "Splitting cell " << node->getID().level << " / " << node->getID().z << " / " << node->getID().x << " / " << node->getID().y << " with " << cell->_count << " points" << std::endl;
 		// This cell is at it's maximum, so we need to subdivide the cell and start inserting at it's children instead
@@ -625,6 +628,18 @@ void Splitter::closeReader()
 	}
 }
 
+
+unsigned int Splitter::getTargetNumPoints() const
+{
+	return _targetNumPoints;
+}
+
+void Splitter::setTargetNumPoints(unsigned int targetNumPoints)
+{
+	_targetNumPoints = targetNumPoints;
+}
+
+
 int main(int argc, char** argv)
 {
     osg::Timer_t startTime = osg::Timer::instance()->tick();
@@ -674,6 +689,10 @@ int main(int argc, char** argv)
 	{
 		path = "tiles.db";
 	}
+
+
+	unsigned int target = 50000;
+	arguments.read("--target", target);
 
 	std::string srcSRSString;
 	arguments.read("--src", srcSRSString);
@@ -742,6 +761,7 @@ int main(int argc, char** argv)
 	splitter.setDestSRS(destSRS.get());
 	splitter.setSourceSRS(srcSRS.get());
 	splitter.setGeocentric(geocentric);
+	splitter.setTargetNumPoints(target);
 	splitter.computeMetaData();
 
 	// Get a suggested level if one wasn't specified
