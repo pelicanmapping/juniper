@@ -55,7 +55,7 @@ namespace osgJuniper
         static osg::Node* findNamedNode(osg::Node* node, const std::string& name);
         static void optimizeMesh( osg::Node* node );
         static std::string toLower( const std::string& str );
-
+		static std::vector< std::string > glob(const std::string& pathname);
     };
 
 }

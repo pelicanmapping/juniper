@@ -22,6 +22,10 @@
 #include <osgDB/FileNameUtils>
 #include <osgUtil/Optimizer>
 
+#ifdef WIN32
+#include <Windows.h>
+#endif
+
 using namespace osgJuniper;
 
 osg::Image*
@@ -103,6 +107,31 @@ Utils::getFilesFromDirectory(const std::string& directory, const std::string &ex
         }
     }
     return filenames;
+}
+
+std::vector< std::string >
+Utils::glob(const std::string& pathname)
+{
+	std::vector< std::string > results;
+#ifdef WIN32
+	std::string path = osgDB::getFilePath(pathname);
+
+	WIN32_FIND_DATA data;
+	HANDLE handle = FindFirstFile(pathname.c_str(), &data);
+	if (handle != INVALID_HANDLE_VALUE)
+	{
+		do
+		{
+			results.push_back(osgDB::concatPaths(path, data.cFileName));
+		} while (FindNextFile(handle, &data) != 0);
+		FindClose(handle);
+	}
+	return results;
+
+#else
+	results.push_back(pathname);
+#endif
+	return results;
 }
 
 void

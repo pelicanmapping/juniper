@@ -740,8 +740,9 @@ int main(int argc, char** argv)
     {
         if (!arguments.isOption(pos))
         {
-            filenames.push_back( arguments[pos]);
-            OSG_NOTICE << "filename " << arguments[pos] << std::endl;
+			// Expand the filenames using glob
+			std::vector< std::string > files = osgJuniper::Utils::glob(arguments[pos]);
+			filenames.insert(filenames.end(), files.begin(), files.end());
         }
     }
 

@@ -89,13 +89,14 @@ int main(int argc, char** argv)
         return 1;
     }
 
-        //Read in the filenames to process
+    //Read in the filenames to process
     for(int pos=1;pos<arguments.argc();++pos)
     {
         if (!arguments.isOption(pos))
         {
-            filenames.push_back( arguments[pos]);
-            OSG_NOTICE << "filename " << arguments[pos] << std::endl;
+			// Expand the filenames using glob
+			std::vector< std::string > files = osgJuniper::Utils::glob(arguments[pos]);
+			filenames.insert(filenames.end(), files.begin(), files.end());
         }
     }
 
