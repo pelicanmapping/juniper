@@ -245,20 +245,25 @@ int Splitter::suggestSplitLevel()
  */
 OctreeNode* getLeafNode(OctreeNode* node, const osg::Vec3d& point)
 {
-	if (!node->isSplit() && node->getBoundingBox().contains(point)) return node;
-
-	if (node->isSplit())
+	// Only check this node if the node contains the point.
+	if (node->getBoundingBox().contains(point))
 	{
-		for (unsigned int i = 0; i < node->getChildren().size(); i++)
+		// If the node isn't split, then use this node.
+		if (!node->isSplit()) return node;
+
+		// Check the children of this node.
+		if (node->isSplit())
 		{
-			OctreeNode* result = getLeafNode(node->getChildren()[i].get(), point);
-			if (result)
+			for (unsigned int i = 0; i < node->getChildren().size(); i++)
 			{
-				return result;
+				OctreeNode* result = getLeafNode(node->getChildren()[i].get(), point);
+				if (result)
+				{
+					return result;
+				}
 			}
 		}
 	}
-
 	return 0;
 }
 
@@ -298,6 +303,7 @@ void Splitter::addPoint(const Point& p)
 
 	// Figure out which node the point should be inserted at at the split level
     osg::ref_ptr< OctreeNode > baseNode = getOrCreateNode(childId);
+	
 	osg::ref_ptr< OctreeNode > node = getLeafNode(baseNode.get(), position);
 
 	// Get the cell count of the desired node
@@ -443,7 +449,7 @@ void Splitter::split()
 		p.r = point.getFieldAs<int>(Dimension::Id::Red);
 		p.g = point.getFieldAs<int>(Dimension::Id::Green);
 		p.b = point.getFieldAs<int>(Dimension::Id::Blue);
-
+		
 		addPoint(p);
 
 		complete++;
