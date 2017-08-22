@@ -351,9 +351,14 @@ void Splitter::addPoint(const Point& p)
 
 void Splitter::writeNode(OctreeNode* node)
 {
-	_tileStore->set(node->getID(), node->getPoints(), true);
-	node->clearPoints();
+	// Only write the node if it's non-empty
+	if (!node->getPoints().empty())
+	{		
+		_tileStore->set(node->getID(), node->getPoints(), true);
+		node->clearPoints();
+	}
 
+	// Write all the children
 	for (unsigned int i = 0; i < node->getChildren().size(); i++)
 	{
 		writeNode(node->getChildren()[i].get());
