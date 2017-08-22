@@ -23,6 +23,9 @@
 #include <osg/BoundingBox>
 #include <string>
 
+// You have to include osgEarth/Bounds here or otherwise you get a multiply defined symbols for BoundingBoxImpl<osg::Vec3d>
+#include <osgEarth/Bounds>
+
 namespace osgJuniper
 {
 	/**
