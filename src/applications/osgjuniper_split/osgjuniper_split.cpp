@@ -579,7 +579,8 @@ void Splitter::computeMetaData()
 	double height = _bounds.zMax() - _bounds.zMin();
 	double depth = _bounds.yMax() - _bounds.yMin();
 	double max = osg::maximum(osg::maximum(width, height), depth);
-	double halfMax = max / 2.0;
+	// Expand the half max slightly so that points on the edges don't get culled out due to precision errors.
+	double halfMax = 1.001 * (max / 2.0);
 
 	osg::Vec3d center = _bounds.center();
 
