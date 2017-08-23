@@ -452,6 +452,14 @@ void Splitter::split()
 		p.r = point.getFieldAs<int>(Dimension::Id::Red);
 		p.g = point.getFieldAs<int>(Dimension::Id::Green);
 		p.b = point.getFieldAs<int>(Dimension::Id::Blue);
+		if (point.hasDim(Dimension::Id::Classification))
+		{
+			p.classification = point.getFieldAs<char>(Dimension::Id::Classification);
+		}
+		if (point.hasDim(Dimension::Id::Intensity))
+		{
+			p.intensity = point.getFieldAs<int>(Dimension::Id::Intensity);
+		}
 		
 		addPoint(p);
 

@@ -67,6 +67,8 @@ void PDALUtils::writePointsToLaz(const PointList& points, const std::string& fil
 	pointTable.layout()->registerDim(Dimension::Id::Red);
 	pointTable.layout()->registerDim(Dimension::Id::Green);
 	pointTable.layout()->registerDim(Dimension::Id::Blue);
+	pointTable.layout()->registerDim(Dimension::Id::Classification);
+	pointTable.layout()->registerDim(Dimension::Id::Intensity);
 	PointViewPtr view(new PointView(pointTable));
 
 	int idx = 0;
@@ -82,6 +84,9 @@ void PDALUtils::writePointsToLaz(const PointList& points, const std::string& fil
 		view->setField(pdal::Dimension::Id::Red, idx, point.r);
 		view->setField(pdal::Dimension::Id::Green, idx, point.g);
 		view->setField(pdal::Dimension::Id::Blue, idx, point.b);
+
+		view->setField(pdal::Dimension::Id::Classification, idx, point.classification);
+		view->setField(pdal::Dimension::Id::Intensity, idx, point.intensity);
 		idx++;
 	}
 
@@ -136,6 +141,8 @@ void PDALUtils::readPointsFromLAZ(PointList& points, const std::string& filename
 				p.r = point.getFieldAs<int>(pdal::Dimension::Id::Red);
 				p.g = point.getFieldAs<int>(pdal::Dimension::Id::Green);
 				p.b = point.getFieldAs<int>(pdal::Dimension::Id::Blue);
+				p.classification = point.getFieldAs<char>(pdal::Dimension::Id::Classification);
+				p.intensity = point.getFieldAs<char>(pdal::Dimension::Id::Intensity);
 				points.push_back(p);
 			}
 		}

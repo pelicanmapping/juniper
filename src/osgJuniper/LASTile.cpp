@@ -464,6 +464,8 @@ void OctreeCellBuilder::build()
 	pointTable.layout()->registerDim(Dimension::Id::Red);
 	pointTable.layout()->registerDim(Dimension::Id::Green);
 	pointTable.layout()->registerDim(Dimension::Id::Blue);
+	pointTable.layout()->registerDim(Dimension::Id::Intensity);
+	pointTable.layout()->registerDim(Dimension::Id::Classification);
 	PointViewPtr view(new PointView(pointTable));
 
 	int idx = 0;
@@ -501,6 +503,8 @@ void OctreeCellBuilder::build()
 			view->setField(pdal::Dimension::Id::Red, idx, point.getFieldAs<int>(pdal::Dimension::Id::Red));
 			view->setField(pdal::Dimension::Id::Green, idx, point.getFieldAs<int>(pdal::Dimension::Id::Green));
 			view->setField(pdal::Dimension::Id::Blue, idx, point.getFieldAs<int>(pdal::Dimension::Id::Blue));
+			view->setField(pdal::Dimension::Id::Intensity, idx, point.getFieldAs<int>(pdal::Dimension::Id::Intensity));
+			view->setField(pdal::Dimension::Id::Classification, idx, point.getFieldAs<char>(pdal::Dimension::Id::Classification));
 			_progress->incrementComplete(1);
 			incrementPointsInCell(id, 1);
 			_numPoints++;
