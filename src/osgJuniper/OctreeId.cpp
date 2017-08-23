@@ -58,4 +58,4 @@ bool OctreeId::operator < (const OctreeId& rhs) const
 	return z<rhs.z;
 }
 
-bool OctreeId::valid() const { return level >= 0; }
+bool OctreeId::valid() const { return level >= 0 && x >= 0 && y >= 0 && z >= 0; }
