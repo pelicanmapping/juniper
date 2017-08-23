@@ -119,6 +119,11 @@ public:
 		return _bounds;
 	}
 
+	const osg::BoundingBoxd& getDataBounds() const
+	{
+		return _dataBounds;
+	}
+
 	unsigned int getTotalNumPoints() const
 	{
 		return _totalNumPoints;
@@ -141,7 +146,8 @@ protected:
 	unsigned int _totalNumPoints;
 	unsigned int _activePoints;
 	unsigned int _targetNumPoints;
-	osg::BoundingBoxd _bounds;
+	osg::BoundingBoxd _bounds;     // Bounds for root octree cell
+	osg::BoundingBoxd _dataBounds; // Bounds for raw data
 	unsigned int _level;
 	std::vector<std::string> _inputFiles;
 
@@ -218,29 +224,24 @@ osg::ref_ptr< OctreeNode > Splitter::getOrCreateNode(const OctreeId& id)
 
 int Splitter::suggestSplitLevel()
 {
-	float width = _node->getWidth();
-	float depth = _node->getDepth();
-	float height = _node->getHeight();
+	// Compute volume of octree root node
+	double nodeWidth = _node->getWidth();
+	double nodeDepth = _node->getDepth();
+	double nodeHeight = _node->getHeight();
+	double nodeVolume = nodeWidth * nodeDepth * nodeHeight;
 
-	// Compute the volume of the dataset.
-	float volume = width * depth * height;
+	// Compute volume of source dataset
+	double dataWidth = _dataBounds.xMax() - _dataBounds.xMin();
+	double dataDepth = _dataBounds.yMax() - _dataBounds.yMin();
+	double dataHeight = _dataBounds.zMax() - _dataBounds.zMin();
+	double dataVolume = dataWidth * dataDepth * dataHeight;
 
-	// Get the number of points per cubic meter
-	float pointsPerCubicMeter = (float)_totalNumPoints / volume;
-
-	// Find the level that most closely corresponds to our suggested level.	
-	float outVolume = volume;
-	unsigned int suggestedLevel = 0;
-	for (unsigned int i = 0; i < 10; i++)
-	{
-		suggestedLevel = i;
-		unsigned int numberOfPoints = (outVolume * pointsPerCubicMeter);
-		if (numberOfPoints <= _targetNumPoints)
-		{
-			break;
-		}
-		outVolume /= 8.0;
-	}
+	// Assuming a uniform point distribution, compute the octree level that will contain
+	// the target number of points per cell
+	double pointRatio = (double)_totalNumPoints / (double)_targetNumPoints;
+	double volumeRatio = nodeVolume / dataVolume;
+	int suggestedLevel = std::ceil(std::log(pointRatio*volumeRatio) / std::log(8.0));
+	suggestedLevel += 2; // Increase since some regions will have much higher than average point density
 	return suggestedLevel;
 }
 
@@ -569,6 +570,9 @@ void Splitter::computeMetaData()
 
 		_bounds = osg::BoundingBoxd(minX, minY, minZ, maxX, maxY, maxZ);
 	}
+
+	// Save data bounds
+	_dataBounds = _bounds;
 
 	double width = _bounds.xMax() - _bounds.xMin();
 	double height = _bounds.zMax() - _bounds.zMin();
