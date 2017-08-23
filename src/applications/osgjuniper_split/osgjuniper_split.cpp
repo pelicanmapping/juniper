@@ -39,11 +39,10 @@
 #include <pdal/filters/MergeFilter.hpp>
 
 #include <iostream>
+#include <thread>
 
 using namespace osgJuniper;
 using namespace pdal;
-
-static pdal::StageFactory _factory;
 
 Stage* createStageForFile(const std::string& filename) {
 	PDAL_SCOPED_LOCK;
@@ -51,7 +50,7 @@ Stage* createStageForFile(const std::string& filename) {
 	Stage* reader = 0;
 
 		std::string driver = PDALUtils::inferReaderDriver(filename);
-		reader = _factory.createStage(driver);
+		reader = PDALUtils::getStageFactory()->createStage(driver);
 		if (reader) {
 			Options opt;
 			opt.add("filename", filename);
@@ -77,7 +76,7 @@ public:
 /**
  * Splits a list of input files to a single octree level.
  */
-class Splitter
+class Splitter : public osg::Referenced
 {
 public:
 	Splitter();
@@ -139,7 +138,6 @@ protected:
 
 	void flush();
 
-
 	unsigned int _totalNumPoints;
 	unsigned int _activePoints;
 	unsigned int _targetNumPoints;
@@ -166,6 +164,8 @@ protected:
 	osg::ref_ptr< osgEarth::SpatialReference > _srcSRS;
 	osg::ref_ptr< osgEarth::SpatialReference > _destSRS;
 
+	osg::ref_ptr< OctreeNode > _filterNode;
+
 	bool _geocentric;
 };
 
@@ -174,12 +174,13 @@ Splitter::Splitter():
 	_activePoints(0),
 	_readerStage(0),
 	_geocentric(false),
-	_targetNumPoints(50000)
+	_targetNumPoints(50000),
+	_level(6)
 {
 }
 
 Splitter::~Splitter()
-{
+{	
 	closeReader();
 }
 
@@ -413,12 +414,6 @@ void Splitter::split()
 	// Initialize the reader
 	initReader();
 
-	osg::ref_ptr< OctreeNode > filterNode;
-	if (_filterID.valid())
-	{
-		filterNode = _node->createChild(_filterID);
-	}
-
 	int complete = 0;
 
 	// Read all the points
@@ -430,7 +425,7 @@ void Splitter::split()
 		double y = point.getFieldAs<double>(Dimension::Id::Y);
 		double z = point.getFieldAs<double>(Dimension::Id::Z);
 
-		if (filterNode.valid() && !filterNode->getBoundingBox().contains(osg::Vec3d(x,y,z)))
+		if (_filterNode.valid() && !_filterNode->getBoundingBox().contains(osg::Vec3d(x,y,z)))
 		{
 			complete++;
 			if (complete % 10000 == 0)
@@ -610,16 +605,52 @@ void Splitter::flush()
 
 void Splitter::initReader()
 {
+	// Initialize the filter node.
+	if (_filterID.valid())
+	{
+		_filterNode = _node->createChild(_filterID);
+	}
+
+	unsigned int numAdded = 0;
+
 	// Create a merge filter
 	MergeFilter *merged = new MergeFilter();
 	for (unsigned int i = 0; i < _inputFiles.size(); i++)
 	{
+		bool stageValid = true;
 		Stage* stage = createStageForFile(_inputFiles[i]);
 		if (stage)
 		{
-			merged->getInputs().push_back(stage);
+			// See if the stage is within the filter bounds.
+			if (_filterNode.valid())
+			{
+				PDAL_SCOPED_LOCK;
+				QuickInfo info = stage->preview();
+				if (info.m_valid)
+				{
+					osg::BoundingBoxd fileBounds(info.m_bounds.minx, info.m_bounds.miny, info.m_bounds.minz,
+						info.m_bounds.maxx, info.m_bounds.maxy, info.m_bounds.maxz);
+					if (!fileBounds.intersects(_filterNode->getBoundingBox()))
+					{
+						stageValid = false;
+						OSG_NOTICE << "Skipping file " << _inputFiles[i] << std::endl;
+					}
+				}
+			}
+
+			if (stageValid)
+			{
+				numAdded++;
+				merged->getInputs().push_back(stage);
+			}
+			else
+			{
+				PDALUtils::getStageFactory()->destroyStage(stage);
+			}
 		}
 	}
+
+	OSG_NOTICE << "Processing " << numAdded << " of " << _inputFiles.size() << std::endl;
 	_readerStage = merged;
 }
 
@@ -630,7 +661,7 @@ void Splitter::closeReader()
 	{
 		for (unsigned int i = 0; i < _readerStage->getInputs().size(); i++)
 		{
-			_factory.destroyStage(_readerStage->getInputs()[i]);
+			PDALUtils::getStageFactory()->destroyStage(_readerStage->getInputs()[i]);
 		}
 		delete _readerStage;
 		_readerStage = 0;
@@ -648,6 +679,20 @@ void Splitter::setTargetNumPoints(unsigned int targetNumPoints)
 	_targetNumPoints = targetNumPoints;
 }
 
+void call_from_thread(Splitter* splitter)
+{
+	splitter->split();
+}
+
+void do_join(std::thread& t)
+{
+	t.join();
+}
+
+void join_all(std::vector<std::thread>& v)
+{
+	std::for_each(v.begin(), v.end(), do_join);
+}
 
 int main(int argc, char** argv)
 {
@@ -768,32 +813,32 @@ int main(int argc, char** argv)
     }
 
 	// Create a top level splitter to compute the metadata.
-	Splitter splitter;
+	osg::ref_ptr< Splitter > rootSplitter = new Splitter;
     for (unsigned int i = 0; i < filenames.size(); i++)
     {
-        splitter.getInputFiles().push_back(filenames[i]);
+		rootSplitter->getInputFiles().push_back(filenames[i]);
         OSG_NOTICE << "Processing filenames " << filenames[i] << std::endl;
     }	
-	splitter.setFilterID(OctreeId(filterLevel, filterX, filterY, filterZ));
-	splitter.setDestSRS(destSRS.get());
-	splitter.setSourceSRS(srcSRS.get());
-	splitter.setGeocentric(geocentric);
-	splitter.setTargetNumPoints(target);
-	splitter.computeMetaData();
+	rootSplitter->setFilterID(OctreeId(filterLevel, filterX, filterY, filterZ));
+	rootSplitter->setDestSRS(destSRS.get());
+	rootSplitter->setSourceSRS(srcSRS.get());
+	rootSplitter->setGeocentric(geocentric);
+	rootSplitter->setTargetNumPoints(target);
+	rootSplitter->computeMetaData();
 
 	// Get a suggested level if one wasn't specified
 	if (level < 0)
 	{
-		level = splitter.suggestSplitLevel();		
+		level = rootSplitter->suggestSplitLevel();
 	}
 
 	OSG_NOTICE << "Splitting to level " << level << std::endl;
 
-    splitter.setLevel(level);
+	rootSplitter->setLevel(level);
 
 	// Write out the tileset info.
 	TilesetInfo info;
-	info.setBounds(splitter.getBounds());
+	info.setBounds(rootSplitter->getBounds());
 	info.setAdditive(false);
 	info.setDriver(driver);
 	info.setPath(path);
@@ -805,8 +850,41 @@ int main(int argc, char** argv)
 		OSG_NOTICE << "Failed to create tilestore " << driver << std::endl;
 		return -1;
 	}
-	splitter.setTileStore(tileStore.get());
-	splitter.split();
+	rootSplitter->setTileStore(tileStore.get());
+
+
+
+	bool threaded = false;
+	if (threaded)
+	{
+		std::vector< osg::ref_ptr< Splitter > > splitters;
+		std::vector<std::thread> threads;
+		osg::ref_ptr< OctreeNode > node = rootSplitter->getOctreeNode();
+		for (unsigned int i = 0; i < 8; i++)
+		{
+			osg::ref_ptr< OctreeNode > child = node->createChild(i);
+			Splitter* splitter = new Splitter;
+			splitter->getInputFiles().insert(splitter->getInputFiles().end(), rootSplitter->getInputFiles().begin(), rootSplitter->getInputFiles().end());
+			splitter->setFilterID(child->getID());
+			splitter->setLevel(level);
+			splitter->setTileStore(tileStore.get());
+			splitter->setDestSRS(destSRS.get());
+			splitter->setSourceSRS(srcSRS.get());
+			splitter->setGeocentric(geocentric);
+			splitter->setTargetNumPoints(target);
+			// TODO:  Remove need to run computeMetadata again.
+			splitter->computeMetaData();
+			splitters.push_back(splitter);	
+			threads.push_back(std::thread(call_from_thread, splitters[i].get()));
+		}
+
+		join_all(threads);
+		OSG_NOTICE << "Threads finished " << std::endl;
+	}
+	else
+	{
+		rootSplitter->split();
+	}
 
     osg::Timer_t endTime = osg::Timer::instance()->tick();
 
