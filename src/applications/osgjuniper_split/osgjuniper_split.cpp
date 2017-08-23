@@ -677,6 +677,12 @@ int main(int argc, char** argv)
 	int level = -1;
     arguments.read("--level", level);    
 
+	int filterLevel = -1;
+	int filterX = -1;
+	int filterY = -1;
+	int filterZ = -1;
+	arguments.read("--filter", filterLevel, filterZ, filterX, filterY);
+
 	std::string driver = "filesystem";
 	arguments.read("--driver", driver);
 
@@ -768,6 +774,7 @@ int main(int argc, char** argv)
         splitter.getInputFiles().push_back(filenames[i]);
         OSG_NOTICE << "Processing filenames " << filenames[i] << std::endl;
     }	
+	splitter.setFilterID(OctreeId(filterLevel, filterX, filterY, filterZ));
 	splitter.setDestSRS(destSRS.get());
 	splitter.setSourceSRS(srcSRS.get());
 	splitter.setGeocentric(geocentric);
