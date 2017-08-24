@@ -92,7 +92,9 @@ public:
 
 		virtual osg::BoundingSphere getKeyBound() const
 		{
-			return _octree->getBoundingBox();
+			osg::BoundingSphere bs;
+			bs.expandBy(_octree->getBoundingBox());
+			return bs;
 		}
 
 		virtual bool hasChildren() const
