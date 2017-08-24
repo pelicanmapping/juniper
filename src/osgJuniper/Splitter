@@ -1,0 +1,151 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2017 Pelican Mapping
+* Pelican Mapping CONFIDENTIAL
+* Copyright (c) 2010-2017 [Pelican Mapping], All Rights Reserved.
+*
+* NOTICE:  All information contained herein is, and remains the property of Pelican Mapping. The intellectual and technical concepts contained
+* herein are proprietary to Pelican Mapping and may be covered by U.S. and Foreign Patents, patents in process, and are protected by trade secret or copyright law.
+* Dissemination of this information or reproduction of this material is strictly forbidden unless prior written permission is obtained
+* from Pelican Mapping.  Access to the source code contained herein is hereby forbidden to anyone except current Pelican Mapping employees, managers or contractors who have executed
+* Confidentiality and Non-disclosure agreements explicitly covering such access.
+*
+* The copyright notice above does not evidence any actual or intended publication or disclosure  of  this source code, which includes
+* information that is confidential and/or proprietary, and is a trade secret, of Pelican Mapping.   ANY REPRODUCTION, MODIFICATION, DISTRIBUTION, PUBLIC  PERFORMANCE,
+* OR PUBLIC DISPLAY OF OR THROUGH USE  OF THIS  SOURCE CODE  WITHOUT  THE EXPRESS WRITTEN CONSENT OF PELICAN MAPPING IS STRICTLY PROHIBITED, AND IN VIOLATION OF APPLICABLE
+* LAWS AND INTERNATIONAL TREATIES.  THE RECEIPT OR POSSESSION OF  THIS SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY ANY RIGHTS
+* TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
+*/
+#ifndef OSGJUNIPER_SPLITTER
+#define OSGJUNIPER_SPLITTER 1
+
+#include <osgJuniper/Common>
+#include <osgJuniper/PointTileStore>
+#include <osgJuniper/Octree>
+
+#include <pdal/Stage.hpp>
+
+#include <memory>
+
+namespace osgJuniper
+{
+	/**
+	* Splits a list of input files to a single octree level.
+	*/
+	class OSGJUNIPER_EXPORT Splitter : public osg::Referenced
+	{
+	public:
+		Splitter();
+		~Splitter();
+
+		PointTileStore* getTileStore() const { return _tileStore; }
+		void setTileStore(PointTileStore* tileStore) { _tileStore = tileStore; }
+
+		void setFilterID(const OctreeId& id) { _filterID = id; }
+
+		void split();
+
+		std::vector<std::string>& getInputFiles();
+
+		void computeMetaData();
+
+		/**
+		* Suggests a split level based on the metadata of the input files
+		*/
+		int suggestSplitLevel();
+
+		unsigned int getLevel() const { return _level; }
+		void setLevel(unsigned int level) { _level = level; }
+
+		void initReader();
+		void closeReader();
+
+		osgEarth::SpatialReference* getSourceSRS() const;
+		void setSourceSRS(osgEarth::SpatialReference* srs);
+
+		osgEarth::SpatialReference* getDestSRS() const;
+		void setDestSRS(osgEarth::SpatialReference* srs);
+
+		void reprojectPoint(const osg::Vec3d& input, osg::Vec3d& output);
+
+		OctreeNode* getOctreeNode() const { return _node.get(); }
+
+		const osg::BoundingBoxd& getBounds() const
+		{
+			return _bounds;
+		}
+
+		const osg::BoundingBoxd& getDataBounds() const
+		{
+			return _dataBounds;
+		}
+
+		unsigned int getTotalNumPoints() const
+		{
+			return _totalNumPoints;
+		}
+
+		bool getGeocentric() const;
+		void setGeocentric(bool geocentric);
+
+		unsigned int getTargetNumPoints() const;
+		void setTargetNumPoints(unsigned int targetNumPoints);
+
+	protected:
+
+		pdal::Stage* createStageForFile(const std::string& filename);
+
+		void addPoint(const Point& point);
+
+		void writeNode(OctreeNode* node);
+
+		void flush();
+
+		unsigned int _totalNumPoints;
+		unsigned int _activePoints;
+		unsigned int _targetNumPoints;
+		osg::BoundingBoxd _bounds;     // Bounds for root octree cell
+		osg::BoundingBoxd _dataBounds; // Bounds for raw data
+		unsigned int _level;
+		std::vector<std::string> _inputFiles;
+
+		// TODO:  Why not just an int?
+		class OctreeCell
+		{
+		public:
+			OctreeCell() :
+				_count(0)
+			{
+			}
+
+			unsigned int _count;
+		};
+
+		typedef std::map < OctreeId, std::shared_ptr< OctreeCell> > OctreeToCellMap;
+		OctreeToCellMap _cells;
+		std::shared_ptr<OctreeCell> getOrCreateCell(const OctreeId& id);
+
+		typedef std::map < OctreeId, osg::ref_ptr< OctreeNode> > OctreeToNodeMap;
+		OctreeToNodeMap _nodes;
+		osg::ref_ptr<OctreeNode> getOrCreateNode(const OctreeId& id);
+
+		pdal::Stage* _readerStage;
+
+		osg::ref_ptr< OctreeNode > _node;
+
+		osg::ref_ptr< PointTileStore > _tileStore;
+
+		OctreeId _filterID;
+
+		osg::ref_ptr< osgEarth::SpatialReference > _srcSRS;
+		osg::ref_ptr< osgEarth::SpatialReference > _destSRS;
+
+		osg::ref_ptr< OctreeNode > _filterNode;
+
+		bool _geocentric;
+	};
+} // namespace osgJuniper
+
+#endif
+
+

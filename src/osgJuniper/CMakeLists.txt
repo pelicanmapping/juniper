@@ -36,6 +36,7 @@ SET(HEADERS
     PointCloud
     PointCloudTools
     PointTileStore
+    Splitter
     StreamingNode
     TilesetInfo
     Velodyne
@@ -59,6 +60,7 @@ SET(SOURCES
     PointCloud.cpp
     PointCloudTools.cpp
     PointTileStore.cpp
+    Splitter.cpp
     StreamingNode.cpp
     TilesetInfo.cpp
     Velodyne.cpp
