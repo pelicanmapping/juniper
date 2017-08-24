@@ -42,7 +42,7 @@ namespace osgJuniper
 
 	protected:
 
-		std::string getFilename(const OctreeId& id);
+		std::string getKeyPath(const OctreeId& id);
 		std::string _path;
 	};
 }
