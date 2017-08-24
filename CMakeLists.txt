@@ -84,6 +84,10 @@ INCLUDE_DIRECTORIES(
 #ADD_DEFINITIONS(-D)
 # Platform specific definitions
 
+# Disable min/max macros
+ADD_DEFINITIONS(-DNOMINMAX)
+
+
 IF(WIN32)
   IF(MSVC)
         # This option is to enable the /MP switch for Visual Studio 2005 and above compilers
