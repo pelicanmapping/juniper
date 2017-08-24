@@ -65,18 +65,19 @@ std::vector<std::string>& Splitter::getInputFiles()
 	return _inputFiles;
 }
 
-
-std::shared_ptr< Splitter::OctreeCell > Splitter::getOrCreateCell(const OctreeId& id)
+unsigned int Splitter::getCellCount(const OctreeId& id)
 {
-	OctreeToCellMap::iterator itr = _cells.find(id);
-	if (itr != _cells.end())
+	OctreeToCountMap::iterator itr = _cellCounts.find(id);
+	if (itr != _cellCounts.end())
 	{
 		return itr->second;
 	}
+	return 0;
+}
 
-	std::shared_ptr< OctreeCell > cell = std::make_shared<OctreeCell>();
-	_cells[id] = cell;
-	return cell;
+void Splitter::setCellCount(const OctreeId& id, unsigned int value)
+{
+	_cellCounts[id] = value;
 }
 
 osg::ref_ptr< OctreeNode > Splitter::getOrCreateNode(const OctreeId& id)
@@ -182,18 +183,18 @@ void Splitter::addPoint(const Point& p)
 	osg::ref_ptr< OctreeNode > node = getLeafNode(baseNode.get(), position);
 
 	// Get the cell count of the desired node
-	std::shared_ptr< OctreeCell > cell = getOrCreateCell(node->getID());
+	unsigned int pointCount = getCellCount(node->getID());
 
-	if (cell->_count == _targetNumPoints)
+	if (pointCount == _targetNumPoints)
 	{
-		OSG_NOTICE << "Splitting cell " << node->getID().level << " / " << node->getID().z << " / " << node->getID().x << " / " << node->getID().y << " with " << cell->_count << " points" << std::endl;
+		OSG_NOTICE << "Splitting cell " << node->getID().level << " / " << node->getID().z << " / " << node->getID().x << " / " << node->getID().y << " with " << pointCount << " points" << std::endl;
 		// This cell is at it's maximum, so we need to subdivide the cell and start inserting at it's children instead
 
 		// Get all of the points for this cell (including ones in memory in the node itself currently)
 		_tileStore->get(node->getID(), node->getPoints());
-
+		
 		// Set the cell count to zero, it no longer contains any points.
-		cell->_count = 0;
+		setCellCount(node->getID(), 0);
 
 		// Split the node so points will be added to the leaf instead.
 		node->split();
@@ -219,7 +220,7 @@ void Splitter::addPoint(const Point& p)
 	}
 	else
 	{
-		cell->_count++;
+		setCellCount(node->getID(), pointCount + 1);
 		node->getPoints().push_back(p);
 
 		_activePoints++;

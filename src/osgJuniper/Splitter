@@ -109,21 +109,10 @@ namespace osgJuniper
 		unsigned int _level;
 		std::vector<std::string> _inputFiles;
 
-		// TODO:  Why not just an int?
-		class OctreeCell
-		{
-		public:
-			OctreeCell() :
-				_count(0)
-			{
-			}
-
-			unsigned int _count;
-		};
-
-		typedef std::map < OctreeId, std::shared_ptr< OctreeCell> > OctreeToCellMap;
-		OctreeToCellMap _cells;
-		std::shared_ptr<OctreeCell> getOrCreateCell(const OctreeId& id);
+		typedef std::map < OctreeId, unsigned int > OctreeToCountMap;
+		OctreeToCountMap _cellCounts;
+		unsigned int getCellCount(const OctreeId& id);
+		void setCellCount(const OctreeId& id, unsigned int value);
 
 		typedef std::map < OctreeId, osg::ref_ptr< OctreeNode> > OctreeToNodeMap;
 		OctreeToNodeMap _nodes;
