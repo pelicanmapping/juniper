@@ -22,6 +22,7 @@ SET(HEADERS
     IBR
     IBRCameraNode
     IBRManipulator
+    DirectoryPointTileStore
     FilePointTileStore
     NodeSequence
     Utils
@@ -44,6 +45,7 @@ SET(SOURCES
     IBR.cpp
     IBRCameraNode.cpp
     IBRManipulator.cpp
+    DirectoryPointTileStore.cpp
     FilePointTileStore.cpp
     NodeSequence.cpp
     Utils.cpp

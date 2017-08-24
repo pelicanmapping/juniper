@@ -738,13 +738,7 @@ int main(int argc, char** argv)
 	std::string path;
 	arguments.read("--out", path);
 
-	if (driver != "filesystem" && driver != "rocksdb")
-	{
-		OSG_NOTICE << "Driver " << driver << " not supported" << std::endl;
-		return -1;
-	}
-
-	if (driver == "filesystem" && path.empty())
+	if ((driver == "filesystem" || driver == "directory") && path.empty())
 	{
 		// Write to the current directory
 		path = ".";

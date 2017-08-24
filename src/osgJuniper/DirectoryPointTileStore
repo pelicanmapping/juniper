@@ -16,61 +16,35 @@
 * LAWS AND INTERNATIONAL TREATIES.  THE RECEIPT OR POSSESSION OF  THIS SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY ANY RIGHTS
 * TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
 */
+
+#ifndef OSGJUNIPER_DIRECTORYPOINTTILESTORE
+#define OSGJUNIPER_DIRECTORYPOINTTILESTORE 1
+
+#include <osgJuniper/Common>
 #include <osgJuniper/PointTileStore>
 
-#include <osgJuniper/FilePointTileStore>
-#include <osgJuniper/RocksDBPointTileStore>
-#include <osgJuniper/DirectoryPointTileStore>
-
-using namespace osgJuniper;
-
-/****************************************************************************/
-PointTileStore::PointTileStore()
+namespace osgJuniper
 {
+	/**
+	* A PointTileStore that stores the points in the file system using multiple files per directory
+	*/
+	class OSGJUNIPER_EXPORT DirectoryPointTileStore : public PointTileStore
+	{
+	public:
+		DirectoryPointTileStore(const std::string& path);
+
+		virtual bool get(const OctreeId& id, PointList& points);
+		virtual void set(const OctreeId& id, PointList& points, bool append);
+		virtual void queryKeys(const KeyQuery& query, std::set< OctreeId >& keys);
+		virtual void remove(const OctreeId& id);
+
+		const std::string& getPath() const;
+
+	protected:
+
+		std::string getKeyPath(const OctreeId& id);
+		std::string _path;
+	};
 }
 
-KeyQuery::KeyQuery():
-	_minLevel(-1),
-	_maxLevel(-1),
-	_minX(-1),
-	_maxX(-1),
-	_minY(-1),
-	_maxY(-1),
-	_minZ(-1),
-	_maxZ(-1)
-{
-}
-
-KeyQuery::KeyQuery(int minLevel, int maxLevel,
-	int minX, int maxX,
-	int minY, int maxY,
-	int minZ, int maxZ):
-	_minLevel(minLevel),
-	_maxLevel(maxLevel),
-	_minX(minX),
-	_maxX(maxX),
-	_minY(minY),
-	_maxY(maxY),
-	_minZ(minZ),
-	_maxZ(maxZ)
-{
-}
-
-PointTileStore* PointTileStore::create(const TilesetInfo& info)
-{
-	if(info.getDriver() == "filesystem")
-	{
-		return new FilePointTileStore(info.getPath());
-	}
-	else if (info.getDriver() == "directory")
-	{
-		return new DirectoryPointTileStore(info.getPath());
-	}
-#if HAVE_ROCKSDB
-	else if (info.getDriver() == "rocksdb")
-	{
-		return new RocksDBPointTileStore(info.getPath());
-	}
 #endif
-	return 0;
-}
