@@ -144,7 +144,7 @@ public:
 
 	void build(const OctreeId &id, unsigned int innerLevel)
 	{
-		OSG_NOTICE << std::endl << "Building tile: " << id.level << "/" << id.z << "/" << id.x << "/" << id.y << std::endl;
+		//OSG_NOTICE << std::endl << "Building tile: " << id.level << "/" << id.z << "/" << id.x << "/" << id.y << std::endl;
 
 		osg::ref_ptr< OctreeNode > node = _root->createChild(id);
 		node->split();
@@ -173,7 +173,7 @@ public:
 			// then simplify take all of the points and promote them up instead of sampling.		
 			if (points.size() <= _targetNumPoints && highestLevel)
 			{
-				OSG_NOTICE << "Taking all " << points.size() << " points for " << id.level << "/" << id.z << "/" << id.x << "/" << id.y << std::endl;
+				//OSG_NOTICE << "Taking all " << points.size() << " points for " << id.level << "/" << id.z << "/" << id.x << "/" << id.y << std::endl;
 				// Write all of the points to this cell
 				_tileStore->set(id, points, false);						
 				{
@@ -215,11 +215,7 @@ public:
 					_tileStore->set(id, keepers, false);
 					OpenThreads::ScopedLock< OpenThreads::Mutex > lock(_tilesMutex);
 					_tiles[id] = false;
-				}
-				else
-				{
-					OSG_NOTICE << "No keepers for key " << std::endl;
-				}
+				}				
 			}
 		}		
 	}
