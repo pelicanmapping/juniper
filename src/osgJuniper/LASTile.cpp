@@ -501,9 +501,9 @@ void OctreeCellBuilder::build()
 			view->setField(pdal::Dimension::Id::Y, idx, point.getFieldAs<double>(pdal::Dimension::Id::Y));
 			view->setField(pdal::Dimension::Id::Z, idx, point.getFieldAs<double>(pdal::Dimension::Id::Z));
 
-			view->setField(pdal::Dimension::Id::Red, idx, point.getFieldAs<int>(pdal::Dimension::Id::Red));
-			view->setField(pdal::Dimension::Id::Green, idx, point.getFieldAs<int>(pdal::Dimension::Id::Green));
-			view->setField(pdal::Dimension::Id::Blue, idx, point.getFieldAs<int>(pdal::Dimension::Id::Blue));
+			view->setField(pdal::Dimension::Id::Red, idx, point.getFieldAs<unsigned short>(pdal::Dimension::Id::Red));
+			view->setField(pdal::Dimension::Id::Green, idx, point.getFieldAs<unsigned short>(pdal::Dimension::Id::Green));
+			view->setField(pdal::Dimension::Id::Blue, idx, point.getFieldAs<unsigned short>(pdal::Dimension::Id::Blue));
 			view->setField(pdal::Dimension::Id::Intensity, idx, point.getFieldAs<int>(pdal::Dimension::Id::Intensity));
 			view->setField(pdal::Dimension::Id::Classification, idx, point.getFieldAs<char>(pdal::Dimension::Id::Classification));
 			_progress->incrementComplete(1);

@@ -47,10 +47,10 @@ namespace osgJuniper
 		double y;
 		double z;
 
-		int r;
-		int g;
-		int b;		
-		int a;
+		unsigned short r;
+		unsigned short g;
+		unsigned short b;
+		unsigned short a;
 
 		unsigned short intensity;
 		unsigned char classification;

@@ -22,6 +22,7 @@
 #include <osgJuniper/Common>
 #include <osgJuniper/PointTileStore>
 #include <osgJuniper/Octree>
+#include <osg/OperationThread>
 
 #include <pdal/Stage.hpp>
 
@@ -29,11 +30,14 @@
 
 namespace osgJuniper
 {
+	class WriteOperation;
+
 	/**
 	* Splits a list of input files to a single octree level.
 	*/
 	class OSGJUNIPER_EXPORT Splitter : public osg::Referenced
 	{
+		friend class WriteOperation;
 	public:
 		Splitter();
 		~Splitter();
@@ -91,7 +95,7 @@ namespace osgJuniper
 		unsigned int getTargetNumPoints() const;
 		void setTargetNumPoints(unsigned int targetNumPoints);
 
-		void writeNode(OctreeNode* node);
+		void writeNode(OctreeNode* node, unsigned int minPoints);
 
 	protected:
 
@@ -101,11 +105,12 @@ namespace osgJuniper
 
 		void addPoint(const Point& point);
 
-
-		void flush();
+		void flush(unsigned int minPoints);
 
 		unsigned int _totalNumPoints;
-		unsigned int _activePoints;
+		//unsigned int _activePoints;
+		OpenThreads::Atomic _activePoints;
+		unsigned int _pendingPoints;
 		unsigned int _targetNumPoints;
 		osg::BoundingBoxd _bounds;     // Bounds for root octree cell
 		osg::BoundingBoxd _dataBounds; // Bounds for raw data
@@ -136,7 +141,32 @@ namespace osgJuniper
 
 		std::set< OctreeId > _needsRefined;
 
+		osg::ref_ptr< osg::OperationQueue > _writeQueue;
+		osg::ref_ptr< osg::OperationsThread > _writeThread;
+
 		bool _geocentric;
+	};
+
+	class WriteOperation : public osg::Operation
+	{
+	public:
+
+		WriteOperation(Splitter* splitter, const OctreeId& id, const PointList& points) :
+			_splitter(splitter),
+			_points(points),
+			_id(id)
+		{
+		}
+
+		void operator()(osg::Object* object)
+		{
+			_splitter->getTileStore()->set(_id, _points, true);
+			--_splitter->_activePoints;
+		}
+
+		OctreeId _id;
+		PointList _points;
+		Splitter* _splitter;
 	};
 } // namespace osgJuniper
 

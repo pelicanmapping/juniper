@@ -138,9 +138,9 @@ void PDALUtils::readPointsFromLAZ(PointList& points, const std::string& filename
 				p.x = point.getFieldAs<double>(pdal::Dimension::Id::X);
 				p.y = point.getFieldAs<double>(pdal::Dimension::Id::Y);
 				p.z = point.getFieldAs<double>(pdal::Dimension::Id::Z);
-				p.r = point.getFieldAs<int>(pdal::Dimension::Id::Red);
-				p.g = point.getFieldAs<int>(pdal::Dimension::Id::Green);
-				p.b = point.getFieldAs<int>(pdal::Dimension::Id::Blue);
+				p.r = point.getFieldAs<unsigned short>(pdal::Dimension::Id::Red);
+				p.g = point.getFieldAs<unsigned short>(pdal::Dimension::Id::Green);
+				p.b = point.getFieldAs<unsigned short>(pdal::Dimension::Id::Blue);
 				p.classification = point.getFieldAs<unsigned char>(pdal::Dimension::Id::Classification);
 				p.intensity = point.getFieldAs<int>(pdal::Dimension::Id::Intensity);
 				points.push_back(p);

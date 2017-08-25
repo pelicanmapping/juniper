@@ -48,6 +48,7 @@ using namespace pdal;
 Splitter::Splitter() :
 	_totalNumPoints(0),
 	_activePoints(0),
+	_pendingPoints(0),
 	_readerStage(0),
 	_geocentric(false),
 	_targetNumPoints(50000),
@@ -235,27 +236,33 @@ void Splitter::addPoint(const Point& p)
 		setCellCount(node->getID(), pointCount + 1);
 		node->getPoints().push_back(p);
 
-		_activePoints++;
-		if (_activePoints >= 50000000)
+		++_activePoints;
+		++_pendingPoints;
+		if (_pendingPoints >= 50000000)
 		{
-			flush();
+			flush(1000);
 		}
 	}
 }
 
-void Splitter::writeNode(OctreeNode* node)
+void Splitter::writeNode(OctreeNode* node, unsigned int minPoints)
 {
 	// Only write the node if it's non-empty
 	if (!node->getPoints().empty())
 	{
-		_tileStore->set(node->getID(), node->getPoints(), true);
-		node->clearPoints();
+		//_tileStore->set(node->getID(), node->getPoints(), true);
+		if (node->getPoints().size() >= minPoints)
+		{
+			_writeQueue->add(new WriteOperation(this, node->getID(), node->getPoints()));
+			_pendingPoints -= node->getPoints().size();
+			node->clearPoints();
+		}
 	}
 
 	// Write all the children
 	for (unsigned int i = 0; i < node->getChildren().size(); i++)
 	{
-		writeNode(node->getChildren()[i].get());
+		writeNode(node->getChildren()[i].get(), minPoints);
 	}
 }
 
@@ -310,6 +317,12 @@ Stage* Splitter::createStageForFile(const std::string& filename)
 
 void Splitter::split()
 {
+	// Initialize the write thread
+	_writeQueue = new osg::OperationQueue;
+	_writeThread = new osg::OperationsThread;
+	_writeThread->setOperationQueue(_writeQueue);
+	_writeThread->start();
+
 	// First compute the metadata.
 	computeMetaData();
 
@@ -374,8 +387,18 @@ void Splitter::split()
 	{PDAL_SCOPED_LOCK; callbackFilter.prepare(fixed); }
 	callbackFilter.execute(fixed);
 
-	flush();
+	// Flush any remaining nodes
+	flush(0);
 
+	while (!_writeQueue->empty())
+	{
+		OpenThreads::Thread::YieldCurrentThread();
+	}
+
+	// Wait for the write thread to finished
+	_writeThread->setDone(true);
+	_writeThread->join();
+	
 	refine();
 }
 
@@ -460,7 +483,7 @@ public:
 			addPointToNode(node, *itr, _splitter->getTargetNumPoints());
 		}
 
-		_splitter->writeNode(node.get());
+		_splitter->writeNode(node.get(), 0);
 	}
 
 	OctreeId _id;	
@@ -632,16 +655,39 @@ void Splitter::computeMetaData()
 }
 
 
-void Splitter::flush()
+void Splitter::flush(unsigned int minPoints)
 {
 	OSG_NOTICE << "Writing" << std::endl;
 
+#if 0
 	for (OctreeToNodeMap::iterator itr = _nodes.begin(); itr != _nodes.end(); ++itr)
 	{
 		writeNode(itr->second.get());
 	}
+	_activePoints.exchange(0);
+#else
+	while (_activePoints > 100000000)
+	{
+		OpenThreads::Thread::YieldCurrentThread();
+		OSG_NOTICE << "Waiting..." << _activePoints << std::endl;
+	}
 
-	_activePoints = 0;
+	unsigned int previousPending = _pendingPoints;
+
+	for (OctreeToNodeMap::iterator itr = _nodes.begin(); itr != _nodes.end(); ++itr)
+	{
+		writeNode(itr->second.get(), minPoints);
+	}
+
+	OSG_NOTICE << "Wrote " << (previousPending - _pendingPoints) << " of " << previousPending << " in memory points" << std::endl;
+
+	// Check to see if we wrote anything.  If we didn't, we have lots of points in memory but none of them are "big".  So just flush them all to the tilestore.
+	if (_pendingPoints == previousPending)
+	{
+		OSG_NOTICE << "Flush found no big tiles, flushing all to disk" << std::endl;
+		flush(0);
+	}
+#endif
 }
 
 void Splitter::initReader()
