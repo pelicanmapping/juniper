@@ -91,13 +91,16 @@ namespace osgJuniper
 		unsigned int getTargetNumPoints() const;
 		void setTargetNumPoints(unsigned int targetNumPoints);
 
+		void writeNode(OctreeNode* node);
+
 	protected:
+
+		void refine();
 
 		pdal::Stage* createStageForFile(const std::string& filename);
 
 		void addPoint(const Point& point);
 
-		void writeNode(OctreeNode* node);
 
 		void flush();
 
@@ -130,6 +133,8 @@ namespace osgJuniper
 		osg::ref_ptr< osgEarth::SpatialReference > _destSRS;
 
 		osg::ref_ptr< OctreeNode > _filterNode;
+
+		std::set< OctreeId > _needsRefined;
 
 		bool _geocentric;
 	};

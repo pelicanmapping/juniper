@@ -181,10 +181,21 @@ void Splitter::addPoint(const Point& p)
 	osg::ref_ptr< OctreeNode > baseNode = getOrCreateNode(childId);
 
 	osg::ref_ptr< OctreeNode > node = getLeafNode(baseNode.get(), position);
+	if (!node.valid())
+	{
+		OSG_NOTICE << "Couldn't get node";
+		return;
+	}
 
 	// Get the cell count of the desired node
 	unsigned int pointCount = getCellCount(node->getID());
 
+	if (pointCount == _targetNumPoints)
+	{
+		_needsRefined.insert(node->getID());
+	}
+
+	/*
 	if (pointCount == _targetNumPoints)
 	{
 		OSG_NOTICE << "Splitting cell " << node->getID().level << " / " << node->getID().z << " / " << node->getID().x << " / " << node->getID().y << " with " << pointCount << " points" << std::endl;
@@ -219,6 +230,7 @@ void Splitter::addPoint(const Point& p)
 		}
 	}
 	else
+	*/
 	{
 		setCellCount(node->getID(), pointCount + 1);
 		node->getPoints().push_back(p);
@@ -339,7 +351,7 @@ void Splitter::split()
 		p.b = point.getFieldAs<int>(Dimension::Id::Blue);
 		if (point.hasDim(Dimension::Id::Classification))
 		{
-			p.classification = point.getFieldAs<char>(Dimension::Id::Classification);
+			p.classification = point.getFieldAs<unsigned char>(Dimension::Id::Classification);
 		}
 		if (point.hasDim(Dimension::Id::Intensity))
 		{
@@ -363,6 +375,142 @@ void Splitter::split()
 	callbackFilter.execute(fixed);
 
 	flush();
+
+	refine();
+}
+
+bool addPointToNode(OctreeNode* node, const Point& point, unsigned int target)
+{
+	osg::Vec3d position(point.x, point.y, point.z);
+	if (node->getBoundingBox().contains(position))
+	{
+		// There is room in this node and it's not split
+		if (!node->isSplit() && node->getPoints().size() < target)
+		{
+			node->getPoints().push_back(point);
+			return true;
+		}
+		// The node is split, just try adding to it's children.
+		else if (node->isSplit())
+		{
+			for (unsigned int i = 0; i < node->getChildren().size(); ++i)
+			{
+				if (addPointToNode(node->getChildren()[i], point, target))
+				{
+					return true;
+				}
+			}
+			OSG_NOTICE << "Warning couldn't add point to child" << std::endl;
+			return false;
+		}
+		else 
+		{
+			// Split the node
+			node->split();
+
+			// Go ahead and push back the point, it'll be removed when things are subdivided.
+			node->getPoints().push_back(point);
+
+			unsigned int numAdded = 0;
+			for (PointList::iterator itr = node->getPoints().begin(); itr != node->getPoints().end(); ++itr)
+			{
+				for (unsigned int i = 0; i < node->getChildren().size(); ++i)
+				{
+					if (addPointToNode(node->getChildren()[i], *itr, target))
+					{
+						numAdded++;
+						break;
+					}
+				}				
+			}
+
+			//OSG_NOTICE << "Added " << numAdded << " points of " << node->getPoints().size() << std::endl;
+
+			node->clearPoints();
+			return true;
+		}
+	}
+	return false;
+}
+
+class RefineOperator : public osg::Operation
+{
+public:
+	RefineOperator(const OctreeId& id, Splitter* splitter) :	
+		_id(id),		
+		_splitter(splitter)
+	{
+	}
+
+	void operator()(osg::Object* object)
+	{
+		PointList points;
+		// Read all the existing points into memory
+		_splitter->getTileStore()->get(_id, points);
+		//OSG_NOTICE << "Read " << points.size() << " from " << _id.level << "/" << _id.z << "/" << _id.x << "/" << _id.y << std::endl;
+
+		// Delete the tile from disk
+		_splitter->getTileStore()->remove(_id);
+
+		osg::ref_ptr< OctreeNode> node = _splitter->getOctreeNode()->createChild(_id);
+		node->split();
+
+		for (PointList::iterator itr = points.begin(); itr != points.end(); ++itr)
+		{
+			addPointToNode(node, *itr, _splitter->getTargetNumPoints());
+		}
+
+		_splitter->writeNode(node.get());
+	}
+
+	OctreeId _id;	
+	Splitter* _splitter;
+};
+
+void Splitter::refine()
+{	
+	osg::Timer_t startTime = osg::Timer::instance()->tick();
+	OSG_NOTICE << "Need to refine " << _needsRefined.size() << " of " << _cellCounts.size() << " cells" << std::endl;
+
+	osg::ref_ptr< osg::OperationQueue > queue = new osg::OperationQueue;
+	std::vector< osg::ref_ptr< osg::OperationsThread > > threads;
+	unsigned int numThreads = OpenThreads::GetNumberOfProcessors();
+	for (unsigned int i = 0; i < numThreads; i++)
+	{
+		osg::OperationsThread* thread = new osg::OperationsThread();
+		thread->setOperationQueue(queue.get());
+		thread->start();
+		threads.push_back(thread);
+	}
+
+	// Add all the operations
+	for (auto itr = _needsRefined.begin(); itr != _needsRefined.end(); ++itr)
+	{
+		queue->add(new RefineOperator(*itr, this));
+	}
+
+	unsigned int numRemaining = queue->getNumOperationsInQueue();
+	// Wait for all operations to be done.
+	while (!queue->empty())
+	{
+		OpenThreads::Thread::YieldCurrentThread();
+		unsigned int count = queue->getNumOperationsInQueue();
+		if (count != numRemaining)
+		{
+			numRemaining = count;
+			OSG_NOTICE << numRemaining << " cells left to refine" << std::endl;
+		}
+	}
+
+	for (unsigned int i = 0; i < numThreads; i++)
+	{
+		threads[i]->setDone(true);
+		threads[i]->join();
+	}	
+
+	osg::Timer_t endTime = osg::Timer::instance()->tick();
+
+	OSG_NOTICE << "Refine in " << osgEarth::prettyPrintTime(osg::Timer::instance()->delta_s(startTime, endTime)) << std::endl;
 }
 
 void Splitter::computeMetaData()
