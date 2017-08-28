@@ -105,7 +105,7 @@ namespace osgJuniper
 		void flush(unsigned int minPoints);
 
 		unsigned int _totalNumPoints;		
-		unsigned int _activePoints;
+		int _activePoints;
 		unsigned int _targetNumPoints;
 		osg::BoundingBoxd _bounds;     // Bounds for root octree cell
 		osg::BoundingBoxd _dataBounds; // Bounds for raw data
