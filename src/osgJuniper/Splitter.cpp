@@ -122,7 +122,7 @@ int Splitter::suggestSplitLevel()
 OctreeNode* getLeafNode(OctreeNode* node, const osg::Vec3d& point)
 {
 	// Only check this node if the node contains the point.
-	if (node->getBoundingBox().contains(point))
+	if (node->contains(point))
 	{
 		// If the node isn't split, then use this node.
 		if (!node->isSplit()) return node;
@@ -170,7 +170,7 @@ void Splitter::addPoint(const Point& p)
 {
 	osg::Vec3d position(p.x, p.y, p.z);
 	// Make sure the point fits in the bounding box.
-	if (!_node->getBoundingBox().contains(position))
+	if (!_node->contains(position))
 	{
 		OSG_NOTICE << "Skipping point " << p.x << ", " << p.y << ", " << p.z << " since it doesn't fit in bounding box" << std::endl;
 		return;
@@ -331,7 +331,7 @@ void Splitter::split()
 		double y = point.getFieldAs<double>(Dimension::Id::Y);
 		double z = point.getFieldAs<double>(Dimension::Id::Z);
 
-		if (_filterNode.valid() && !_filterNode->getBoundingBox().contains(osg::Vec3d(x, y, z)))
+		if (_filterNode.valid() && !_filterNode->contains(osg::Vec3d(x, y, z)))
 		{
 			complete++;
 			if (complete % 10000 == 0)
@@ -387,7 +387,7 @@ void Splitter::split()
 bool addPointToNode(OctreeNode* node, const Point& point, unsigned int target)
 {
 	osg::Vec3d position(point.x, point.y, point.z);
-	if (node->getBoundingBox().contains(position, 0.01))
+	if (node->contains(position))
 	{
 		// There is room in this node and it's not split
 		if (!node->isSplit() && node->getPoints().size() < target)
@@ -472,7 +472,7 @@ public:
 		for (PointList::iterator itr = points.begin(); itr != points.end(); ++itr)
 		{
 			osg::Vec3d pos(itr->x, itr->y, itr->z);
-			if (!node->getBoundingBox().contains(pos, 0.01))
+			if (!node->contains(pos))
 			{
 				OSG_NOTICE << "Point " << pos.x() << ", " << pos.y() << ", " << pos.z() << std::endl
 					<< "Bounds " << node->getBoundingBox().xMin() << ", " << node->getBoundingBox().yMin() << ", " << node->getBoundingBox().zMin() << " to " << std::endl
@@ -652,8 +652,7 @@ void Splitter::computeMetaData()
 	double height = _bounds.zMax() - _bounds.zMin();
 	double depth = _bounds.yMax() - _bounds.yMin();
 	double max = osg::maximum(osg::maximum(width, height), depth);
-	// Expand the half max slightly so that points on the edges don't get culled out due to precision errors.
-	double halfMax = 1.001 * (max / 2.0);
+	double halfMax = (max / 2.0);
 
 	osg::Vec3d center = _bounds.center();
 

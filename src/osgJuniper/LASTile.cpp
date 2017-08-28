@@ -649,7 +649,7 @@ std::shared_ptr< PointWriter >OctreeCellBuilder::getOrCreateWriter(const osg::Ve
     int child = -1;
     for (unsigned int i = 0; i < 8; i++)
     {
-        if (_children[i]->getBoundingBox().contains(location))
+        if (_children[i]->contains(location))
         {          
             child = i;
             break;                

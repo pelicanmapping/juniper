@@ -127,6 +127,11 @@ namespace osgJuniper
 		 */
 		void clearPoints();
 
+		/**
+		 * Check to see if a point is within a cell.  Uses an epsilon to avoid precision errors.
+		 */
+		bool contains(const osg::Vec3d& point);
+
     protected:       
 
         PointList _points;

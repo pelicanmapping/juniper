@@ -263,3 +263,8 @@ OctreeNode::setBoundingBox(const osg::BoundingBoxd& boundingBox)
 {
     _boundingBox = boundingBox;
 }   
+
+bool OctreeNode::contains(const osg::Vec3d& point)
+{
+	return _boundingBox.contains(point, 0.01);
+}
