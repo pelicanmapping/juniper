@@ -59,7 +59,7 @@ public:
 	TileIndex(OctreeNode* root, PointTileStore* tileStore):
 		_root(root),
 		_tileStore(tileStore),
-		_targetNumPoints(50000)
+		_targetNumPoints(500)
 	{
 	}
 
@@ -171,7 +171,7 @@ public:
 		{			
 			// If we are at the highest level and the children don't contain at least a minimum number of points
 			// then simplify take all of the points and promote them up instead of sampling.		
-			if (points.size() <= _targetNumPoints && highestLevel)
+			if (points.size() <= _targetNumPoints && highestLevel)			
 			{
 				//OSG_NOTICE << "Taking all " << points.size() << " points for " << id.level << "/" << id.z << "/" << id.x << "/" << id.y << std::endl;
 				// Write all of the points to this cell
