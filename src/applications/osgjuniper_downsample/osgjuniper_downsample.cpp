@@ -249,7 +249,7 @@ int main(int argc, char** argv)
 	arguments.read("--threads", numThreads);
 	OSG_NOTICE << "Num threads " << numThreads << std::endl;
 
-	unsigned int target = 50000;
+	unsigned int target = 500;
 	arguments.read("--target", target);
 
 	std::string infoFilename;
