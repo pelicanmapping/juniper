@@ -149,4 +149,23 @@ void RocksDBPointTileStore::remove(const OctreeId& id)
 	db->SyncWAL();
 }
 
+bool RocksDBPointTileStore::hasKey(const OctreeId& id)
+{
+	rocksdb::DB* db = (rocksdb::DB*)_db;
+	std::string key = getKey(id);
+
+	std::vector< std::string > keys;
+
+	bool hasKey = false;
+	rocksdb::Iterator* it = db->NewIterator(rocksdb::ReadOptions());
+	for (it->Seek(key);
+		it->Valid() && osgEarth::startsWith(it->key().ToString(), key);
+		it->Next()) {
+		hasKey = true;
+		break;
+	}
+	delete it;
+	return hasKey;
+}
+
 #endif

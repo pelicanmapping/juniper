@@ -41,6 +41,7 @@ std::string FilePointTileStore::getFilename(const OctreeId& id)
 {
 	std::stringstream buf;
 	buf << "tile_" << id.level << "_" << id.z << "_" << id.x << "_" << id.y << ".laz";
+	//return osgDB::convertFileNameToUnixStyle(osgDB::concatPaths(_path, buf.str()));
 	return osgDB::concatPaths(_path, buf.str());
 }
 
@@ -76,6 +77,12 @@ void FilePointTileStore::remove(const OctreeId& id)
 	{
 		unlink( filename.c_str() );
 	}
+}
+
+bool FilePointTileStore::hasKey(const OctreeId& id)
+{
+	std::string filename = getFilename(id);
+	return osgDB::fileExists(filename);
 }
 
 void FilePointTileStore::queryKeys(const KeyQuery& query, std::set< OctreeId >& keys)

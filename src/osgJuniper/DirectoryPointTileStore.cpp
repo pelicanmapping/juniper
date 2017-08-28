@@ -132,6 +132,12 @@ void DirectoryPointTileStore::remove(const OctreeId& id)
 	*/
 }
 
+bool DirectoryPointTileStore::hasKey(const OctreeId& id)
+{
+	std::string keyPath = getKeyPath(id);
+	return osgDB::fileExists(keyPath);
+}
+
 void DirectoryPointTileStore::queryKeys(const KeyQuery& query, std::set< OctreeId >& keys)
 {
 	keys.clear();

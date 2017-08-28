@@ -64,10 +64,7 @@ public:
 			for (unsigned int i = 0; i < 8; ++i)
 			{
 				osg::ref_ptr< OctreeNode > child = _octree->createChild(i);
-
-				// TODO:  Do an exact key match thing instead of reading all the points.
-				PointList pts;
-				if (_tileStore->get(child->getID(), pts))
+				if (_tileStore->hasKey(child->getID()))
 				{
 					group->addChild(new PagedOctreeNode(_tileStore.get(), child, getRangeFactor(), getAdditive()));
 				}
