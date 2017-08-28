@@ -48,7 +48,6 @@ using namespace pdal;
 Splitter::Splitter() :
 	_totalNumPoints(0),
 	_activePoints(0),
-	_pendingPoints(0),
 	_readerStage(0),
 	_geocentric(false),
 	_targetNumPoints(50000),
@@ -237,8 +236,7 @@ void Splitter::addPoint(const Point& p)
 		node->getPoints().push_back(p);
 
 		++_activePoints;
-		++_pendingPoints;
-		if (_pendingPoints >= 50000000)
+		if (_activePoints >= 50000000)
 		{
 			flush(1000);
 		}
@@ -250,12 +248,11 @@ void Splitter::writeNode(OctreeNode* node, unsigned int minPoints)
 	// Only write the node if it's non-empty
 	if (!node->getPoints().empty())
 	{
-		//_tileStore->set(node->getID(), node->getPoints(), true);
 		if (node->getPoints().size() >= minPoints)
 		{
-			_writeQueue->add(new WriteOperation(this, node->getID(), node->getPoints()));
-			_pendingPoints -= node->getPoints().size();
-			node->clearPoints();
+			_tileStore->set(node->getID(), node->getPoints(), true);
+			_activePoints -= node->getPoints().size();
+			node->clearPoints();			
 		}
 	}
 
@@ -317,12 +314,6 @@ Stage* Splitter::createStageForFile(const std::string& filename)
 
 void Splitter::split()
 {
-	// Initialize the write thread
-	_writeQueue = new osg::OperationQueue;
-	_writeThread = new osg::OperationsThread;
-	_writeThread->setOperationQueue(_writeQueue);
-	_writeThread->start();
-
 	// First compute the metadata.
 	computeMetaData();
 
@@ -388,24 +379,15 @@ void Splitter::split()
 	callbackFilter.execute(fixed);
 
 	// Flush any remaining nodes
-	flush(0);
+	flush(0);	
 
-	while (!_writeQueue->empty())
-	{
-		OpenThreads::Thread::YieldCurrentThread();
-	}
-
-	// Wait for the write thread to finished
-	_writeThread->setDone(true);
-	_writeThread->join();
-	
 	refine();
 }
 
 bool addPointToNode(OctreeNode* node, const Point& point, unsigned int target)
 {
 	osg::Vec3d position(point.x, point.y, point.z);
-	if (node->getBoundingBox().contains(position))
+	if (node->getBoundingBox().contains(position, 0.01))
 	{
 		// There is room in this node and it's not split
 		if (!node->isSplit() && node->getPoints().size() < target)
@@ -456,6 +438,15 @@ bool addPointToNode(OctreeNode* node, const Point& point, unsigned int target)
 	return false;
 }
 
+void countPoints(OctreeNode* node, int &count)
+{
+	count += node->getPoints().size();
+	for (unsigned int i = 0; i < node->getChildren().size(); i++)
+	{
+		countPoints(node->getChildren()[i], count);
+	}
+}
+
 class RefineOperator : public osg::Operation
 {
 public:
@@ -480,7 +471,26 @@ public:
 
 		for (PointList::iterator itr = points.begin(); itr != points.end(); ++itr)
 		{
-			addPointToNode(node, *itr, _splitter->getTargetNumPoints());
+			osg::Vec3d pos(itr->x, itr->y, itr->z);
+			if (!node->getBoundingBox().contains(pos, 0.01))
+			{
+				OSG_NOTICE << "Point " << pos.x() << ", " << pos.y() << ", " << pos.z() << std::endl
+					<< "Bounds " << node->getBoundingBox().xMin() << ", " << node->getBoundingBox().yMin() << ", " << node->getBoundingBox().zMin() << " to " << std::endl
+					<< "       " << node->getBoundingBox().xMax() << ", " << node->getBoundingBox().yMax() << ", " << node->getBoundingBox().zMax() << std::endl;
+				OSG_NOTICE << "Root bounding box doesn't contain point" << std::endl;
+			}
+
+			if (!addPointToNode(node, *itr, _splitter->getTargetNumPoints()))
+			{
+				OSG_NOTICE << "Failed to add point in refine" << std::endl;
+			}
+		}
+
+		int count = 0;
+		countPoints(node, count);
+		if (count != points.size())
+		{
+			OSG_NOTICE << "Points in node=" << count << " points read=" << points.size() << std::endl;
 		}
 
 		_splitter->writeNode(node.get(), 0);
@@ -510,6 +520,10 @@ void Splitter::refine()
 	for (auto itr = _needsRefined.begin(); itr != _needsRefined.end(); ++itr)
 	{
 		queue->add(new RefineOperator(*itr, this));
+		/*
+		osg::ref_ptr< RefineOperator > op = new RefineOperator(*itr, this);
+		op->operator()(0);
+		*/
 	}
 
 	unsigned int numRemaining = queue->getNumOperationsInQueue();
@@ -659,35 +673,20 @@ void Splitter::flush(unsigned int minPoints)
 {
 	OSG_NOTICE << "Writing" << std::endl;
 
-#if 0
-	for (OctreeToNodeMap::iterator itr = _nodes.begin(); itr != _nodes.end(); ++itr)
-	{
-		writeNode(itr->second.get());
-	}
-	_activePoints.exchange(0);
-#else
-	while (_activePoints > 100000000)
-	{
-		OpenThreads::Thread::YieldCurrentThread();
-		OSG_NOTICE << "Waiting..." << _activePoints << std::endl;
-	}
-
-	unsigned int previousPending = _pendingPoints;
+	unsigned int previousActive = _activePoints;
 
 	for (OctreeToNodeMap::iterator itr = _nodes.begin(); itr != _nodes.end(); ++itr)
 	{
 		writeNode(itr->second.get(), minPoints);
 	}
 
-	OSG_NOTICE << "Wrote " << (previousPending - _pendingPoints) << " of " << previousPending << " in memory points" << std::endl;
-
-	// Check to see if we wrote anything.  If we didn't, we have lots of points in memory but none of them are "big".  So just flush them all to the tilestore.
-	if (_pendingPoints == previousPending)
+	OSG_NOTICE << "Flush wrote " << previousActive - _activePoints << " of " << previousActive << " points " << std::endl;
+	
+	if (_activePoints == previousActive)
 	{
 		OSG_NOTICE << "Flush found no big tiles, flushing all to disk" << std::endl;
 		flush(0);
 	}
-#endif
 }
 
 void Splitter::initReader()
