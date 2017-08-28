@@ -128,7 +128,7 @@ public:
 
 		std::string file = osgDB::getNameLessExtension(location);
 
-		double radiusFactor = 5.0;		
+		double radiusFactor = 2.0;		
 
 		osg::ref_ptr< PointTileStore > tileStore = PointTileStore::create(info);
 		if (!tileStore.valid())
