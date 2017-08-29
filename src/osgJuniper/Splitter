@@ -107,6 +107,7 @@ namespace osgJuniper
 		unsigned int _totalNumPoints;		
 		int _activePoints;
 		unsigned int _targetNumPoints;
+        unsigned int _numSkipped;
 		osg::BoundingBoxd _bounds;     // Bounds for root octree cell
 		osg::BoundingBoxd _dataBounds; // Bounds for raw data
 		unsigned int _level;

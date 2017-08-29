@@ -51,7 +51,8 @@ Splitter::Splitter() :
 	_readerStage(0),
 	_geocentric(false),
 	_targetNumPoints(50000),
-	_level(6)
+	_level(6),
+    _numSkipped(0)
 {
 }
 
@@ -173,6 +174,7 @@ void Splitter::addPoint(const Point& p)
 	if (!_node->contains(position))
 	{
 		OSG_NOTICE << "Skipping point " << p.x << ", " << p.y << ", " << p.z << " since it doesn't fit in bounding box" << std::endl;
+        _numSkipped++;
 		return;
 	}
 	OctreeId childId = _node->getID(position, _level);
@@ -380,6 +382,8 @@ void Splitter::split()
 
 	// Flush any remaining nodes
 	flush(0);	
+
+    OSG_NOTICE << "Split discarded " << _numSkipped << " of " << _totalNumPoints << " points b/c they were outside of the reported bounds" << std::endl;
 
 	refine();
 }
