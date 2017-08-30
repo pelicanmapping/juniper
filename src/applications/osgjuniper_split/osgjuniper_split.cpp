@@ -21,10 +21,7 @@
 #include <osgEarth/SpatialReference>
 #include <osgJuniper/Splitter>
 
-#include <iostream>
-
 using namespace osgJuniper;
-using namespace pdal;
 
 int main(int argc, char** argv)
 {
