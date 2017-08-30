@@ -660,7 +660,7 @@ void Splitter::computeMetaData()
 
 	osg::Vec3d center = _bounds.center();
 
-	_bounds = osg::BoundingBox(center - osg::Vec3d(halfMax, halfMax, halfMax), center + osg::Vec3d(halfMax, halfMax, halfMax));
+	_bounds = osg::BoundingBoxd(center - osg::Vec3d(halfMax, halfMax, halfMax), center + osg::Vec3d(halfMax, halfMax, halfMax));
 
 	// Create the root OctreeNode
 	_node = new OctreeNode();
