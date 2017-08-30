@@ -203,5 +203,7 @@ int main(int argc, char** argv)
 
     osg::Timer_t endTime = osg::Timer::instance()->tick();
 
-    OSG_NOTICE << "Completed in " << osgEarth::prettyPrintTime(osg::Timer::instance()->delta_s(startTime, endTime)) << std::endl;
+    OSG_NOTICE << "Split completed in " << osgEarth::prettyPrintTime(osg::Timer::instance()->delta_s(startTime, endTime)) << std::endl;
+
+    OSG_NOTICE << "To generate lower levels run osgjuniper_downsample tileset.lastile" << std::endl;
 }
