@@ -25,6 +25,13 @@ osgjuniper_downsample uses the tileset.lastile file to get metadata information 
 
 ## Tile
 
+Tile is the original Juniper tiling algorithm and is similar to the split/downsample algorithm except that it works from the top down instead of the bottom up.  It can still run in parallel, but only starts becoming highly parallelized once many of the top level tiles are built.
+
+For each cell in the octree, starting at the top, osgjuniper_tile will read all of the points from the input files, and it will keep a portion of the them that fits it's "inner octree" level to produce a reasonable lower lod of what the overall point cloud looks like.  This is basically a box filter that is applied to the points.  Any points that aren't accepted in this cell are written to a temporary file on disk that corresponds to one of the 8 children of this cell.  Once the cell is complete, it's 8 children are built in the same manner.  Once the original input is split into it's children, then each child cell can be built in parallel.  
+
+This algorithm produces very regularly looking datasets, but it can be much slower for large datasets than the split/downsample algorithm due to the fact that it has to spend so much time reading data at each cell.  For example, lod 0 might have to read 1 billion points just to create a tile that contains 50K points, leaving lod 1 to have to read 999980000 points as input.  For this reason it is recommend to use the split/downsample algorithm.
+
+
 # Application Usage
 
 ### osgjuniper_split
