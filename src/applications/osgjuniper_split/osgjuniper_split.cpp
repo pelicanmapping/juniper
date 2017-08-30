@@ -25,10 +25,33 @@ using namespace osgJuniper;
 
 int main(int argc, char** argv)
 {
+    osg::ArgumentParser arguments(&argc, argv);
+    arguments.getApplicationUsage()->setApplicationName(arguments.getApplicationName());
+    arguments.getApplicationUsage()->setDescription(arguments.getApplicationName() + " splits point cloud datasets to a format suitable for streaming");
+    arguments.getApplicationUsage()->setCommandLineUsage(arguments.getApplicationName() + " [options] file.laz [file2.laz ...]");
+    arguments.getApplicationUsage()->addCommandLineOption("--directory", "Loads a directory of laz or las files");
+    arguments.getApplicationUsage()->addCommandLineOption("--level", "The initial split level.  Default is automatically computed from the source data");
+    arguments.getApplicationUsage()->addCommandLineOption("--filter level x y z", "The octree cell to filter the input data to.  Used in multiprocess builds.");
+    arguments.getApplicationUsage()->addCommandLineOption("--driver drivername", "The driver to use for output (filesystem, directory, rocksdb)", "filesystem" );
+    arguments.getApplicationUsage()->addCommandLineOption("--out", "The path to write tiles to", ".");
+    arguments.getApplicationUsage()->addCommandLineOption("--target",
+                                                          "The target number of points for a leaf node octree cell.  Tiles with more points than target will be further refined",
+                                                          "50000");
+    arguments.getApplicationUsage()->addCommandLineOption("--src", "The source srs");
+    arguments.getApplicationUsage()->addCommandLineOption("--dest", "The destination srs");
+    arguments.getApplicationUsage()->addCommandLineOption("--geocentric", "Generates a geocentric output");
+    arguments.getApplicationUsage()->addCommandLineOption("-h or --help", "Display command line parameters");
+
+
+    // if user request help write it out to cout.
+    if (arguments.read("-h") || arguments.read("--help"))
+    {
+        arguments.getApplicationUsage()->write(std::cout);
+        return 1;
+    }    
+
     osg::Timer_t startTime = osg::Timer::instance()->tick();
     std::vector< std::string > filenames;
-
-    osg::ArgumentParser arguments(&argc,argv);
 
     std::string directory;
     arguments.read("--directory", directory);
@@ -55,7 +78,7 @@ int main(int argc, char** argv)
 	int filterX = -1;
 	int filterY = -1;
 	int filterZ = -1;
-	arguments.read("--filter", filterLevel, filterZ, filterX, filterY);
+	arguments.read("--filter", filterLevel, filterX, filterY, filterZ);
 
 	std::string driver = "filesystem";
 	arguments.read("--driver", driver);
@@ -73,13 +96,11 @@ int main(int argc, char** argv)
 		path = "tiles.db";
 	}
 
-
 	unsigned int target = 50000;
 	arguments.read("--target", target);
 
 	std::string srcSRSString;
 	arguments.read("--src", srcSRSString);
-	OSG_NOTICE << "Read src " << srcSRSString << std::endl;
 
 	std::string destSRSString;
 	arguments.read("--dest", destSRSString);
@@ -95,6 +116,7 @@ int main(int argc, char** argv)
 		!destSRSString.empty() && srcSRSString.empty())
 	{
 		OSG_NOTICE << "Please provide both source and destination srs if you want to reproject" << std::endl;
+        arguments.getApplicationUsage()->write(std::cout);
 		return 1;
 	}
 
@@ -107,6 +129,7 @@ int main(int argc, char** argv)
 		if (!srcSRS.valid())
 		{
 			OSG_NOTICE << srcSRSString << " is not a valid SRS" << std::endl;
+            arguments.getApplicationUsage()->write(std::cout);
 			return 1;
 		}
 
@@ -114,6 +137,7 @@ int main(int argc, char** argv)
 		if (!destSRS.valid())
 		{
 			OSG_NOTICE << destSRSString << " is not a valid SRS" << std::endl;
+            arguments.getApplicationUsage()->write(std::cout);
 			return 1;
 		}
 	}
@@ -132,6 +156,7 @@ int main(int argc, char** argv)
     if (filenames.size() == 0)
     {
         OSG_NOTICE << "Please specify a filename" << std::endl;
+        arguments.getApplicationUsage()->write(std::cout);
         return 1;
     }
 
