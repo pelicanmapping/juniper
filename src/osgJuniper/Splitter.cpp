@@ -393,8 +393,9 @@ bool addPointToNode(OctreeNode* node, const Point& point, unsigned int target)
 	osg::Vec3d position(point.x, point.y, point.z);
 	if (node->contains(position))
 	{
+        unsigned int maxLevel = 13;
 		// There is room in this node and it's not split
-		if (!node->isSplit() && node->getPoints().size() < target)
+		if ((!node->isSplit() && node->getPoints().size() < target) || node->getID().level == maxLevel)
 		{
 			node->getPoints().push_back(point);
 			return true;
