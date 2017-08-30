@@ -22,25 +22,9 @@
 #include <osgJuniper/Splitter>
 
 #include <iostream>
-#include <thread>
 
 using namespace osgJuniper;
 using namespace pdal;
-
-void call_from_thread(Splitter* splitter)
-{
-	splitter->split();
-}
-
-void do_join(std::thread& t)
-{
-	t.join();
-}
-
-void join_all(std::vector<std::thread>& v)
-{
-	std::for_each(v.begin(), v.end(), do_join);
-}
 
 int main(int argc, char** argv)
 {
@@ -193,38 +177,7 @@ int main(int argc, char** argv)
 		return -1;
 	}
 	rootSplitter->setTileStore(tileStore.get());
-
-
-
-	bool threaded = false;
-	if (threaded)
-	{
-		std::vector< osg::ref_ptr< Splitter > > splitters;
-		std::vector<std::thread> threads;
-		osg::ref_ptr< OctreeNode > node = rootSplitter->getOctreeNode();
-		for (unsigned int i = 0; i < 8; i++)
-		{
-			osg::ref_ptr< OctreeNode > child = node->createChild(i);
-			Splitter* splitter = new Splitter;
-			splitter->getInputFiles().insert(splitter->getInputFiles().end(), rootSplitter->getInputFiles().begin(), rootSplitter->getInputFiles().end());
-			splitter->setFilterID(child->getID());
-			splitter->setLevel(level);
-			splitter->setTileStore(tileStore.get());
-			splitter->setDestSRS(destSRS.get());
-			splitter->setSourceSRS(srcSRS.get());
-			splitter->setGeocentric(geocentric);
-			splitter->setTargetNumPoints(target);
-			splitters.push_back(splitter);	
-			threads.push_back(std::thread(call_from_thread, splitters[i].get()));
-		}
-
-		join_all(threads);
-		OSG_NOTICE << "Threads finished " << std::endl;
-	}
-	else
-	{
-		rootSplitter->split();
-	}
+    rootSplitter->split();
 
     osg::Timer_t endTime = osg::Timer::instance()->tick();
 
