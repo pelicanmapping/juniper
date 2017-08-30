@@ -31,10 +31,30 @@ using namespace osgJuniper;
 
 int main(int argc, char** argv)
 {
+    osg::ArgumentParser arguments(&argc, argv);
+    arguments.getApplicationUsage()->setApplicationName(arguments.getApplicationName());
+    arguments.getApplicationUsage()->setDescription(arguments.getApplicationName() + " tiles a point cloud to a format suitable for streaming.");
+    arguments.getApplicationUsage()->setCommandLineUsage(arguments.getApplicationName() + " [options] file.laz [file2.laz ...]");
+    arguments.getApplicationUsage()->addCommandLineOption("--directory", "Loads a directory of laz or las files");
+    arguments.getApplicationUsage()->addCommandLineOption("--src", "The source srs");
+    arguments.getApplicationUsage()->addCommandLineOption("--dest", "The destination srs");
+    arguments.getApplicationUsage()->addCommandLineOption("--geocentric", "Generates a geocentric output");
+    arguments.getApplicationUsage()->addCommandLineOption("--target", "The target number of points in a cell");
+    arguments.getApplicationUsage()->addCommandLineOption("--innerLevel level", "The octree level to use for the internal box filter for each downsampled cell", "8");
+    arguments.getApplicationUsage()->addCommandLineOption("--maxLevel maxLevel", "The maximum level of subdivision for the tileset", "8");    
+    arguments.getApplicationUsage()->addCommandLineOption("--threads numThreads", "The number of threads to use", "All available cores");
+    arguments.getApplicationUsage()->addCommandLineOption("-h or --help", "Display command line parameters");
+
+
+    // if user request help write it out to cout.
+    if (arguments.read("-h") || arguments.read("--help"))
+    {
+        arguments.getApplicationUsage()->write(std::cout);
+        return 1;
+    }
+
     osg::Timer_t startTime = osg::Timer::instance()->tick();
     std::vector< std::string > filenames;
-
-    osg::ArgumentParser arguments(&argc,argv);
 
     std::string directory;
     arguments.read("--directory", directory);
@@ -69,8 +89,7 @@ int main(int argc, char** argv)
     arguments.read("--threads", numThreads);
 
     std::string srcSRSString;
-    arguments.read("--src", srcSRSString);
-    OSG_NOTICE << "Read src " << srcSRSString << std::endl;
+    arguments.read("--src", srcSRSString);    
 
     std::string destSRSString;
     arguments.read("--dest", destSRSString);
@@ -141,10 +160,7 @@ int main(int argc, char** argv)
     builder.setGeocentric(geocentric);
     builder.buildRoot(numThreads);
 
-
     osg::Timer_t endTime = osg::Timer::instance()->tick();
-
-
 
     OSG_NOTICE << "Completed " << builder.getProgress()->getTotal() << " in " << osgEarth::prettyPrintTime(osg::Timer::instance()->delta_s(startTime, endTime)) << std::endl;
 }
