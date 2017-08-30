@@ -196,7 +196,7 @@ int main(int argc, char** argv)
 	if (!tileStore.valid())
 	{
 		OSG_NOTICE << "Failed to create tilestore " << driver << std::endl;
-		return -1;
+		return 1;
 	}
 	rootSplitter->setTileStore(tileStore.get());
     rootSplitter->split();
