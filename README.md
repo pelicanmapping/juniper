@@ -24,9 +24,9 @@ Visualizing a tiled pointcloud
 osgviewer tileset.lastile
 ```
 
-
+Further reading
 * [Building Juniper from source](docs/building.md)
-* [Command line utilities](docs/utilities.md)
+* [Tiling algorithms and application usage](docs/utilities.md)
 
 
 
