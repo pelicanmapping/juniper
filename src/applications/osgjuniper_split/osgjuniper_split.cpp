@@ -17,9 +17,11 @@
 * TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
 */
 #include <osg/ArgumentParser>
+#include <osgJuniper/Version>
 #include <osgJuniper/Utils>
 #include <osgEarth/SpatialReference>
 #include <osgJuniper/Splitter>
+
 
 using namespace osgJuniper;
 
@@ -40,6 +42,7 @@ int main(int argc, char** argv)
     arguments.getApplicationUsage()->addCommandLineOption("--src", "The source srs");
     arguments.getApplicationUsage()->addCommandLineOption("--dest", "The destination srs");
     arguments.getApplicationUsage()->addCommandLineOption("--geocentric", "Generates a geocentric output");
+    arguments.getApplicationUsage()->addCommandLineOption("--version", "Displays the Juniper version");
     arguments.getApplicationUsage()->addCommandLineOption("-h or --help", "Display command line parameters");
 
 
@@ -47,8 +50,14 @@ int main(int argc, char** argv)
     if (arguments.read("-h") || arguments.read("--help"))
     {
         arguments.getApplicationUsage()->write(std::cout);
-        return 1;
+        return 0;
     }    
+
+    if (arguments.read("--version"))
+    {
+        std::cout << osgJuniperGetLibraryName() << " " << osgJuniperGetVersion() << std::endl;
+        return 0;
+    }
 
     osg::Timer_t startTime = osg::Timer::instance()->tick();
     std::vector< std::string > filenames;

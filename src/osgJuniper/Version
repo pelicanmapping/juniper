@@ -1,0 +1,72 @@
+/* -*-c++-*- */
+/* osgJuniper - Large Dataset Visualization Toolkit for OpenSceneGraph
+* Copyright 2010-2017 Pelican Mapping
+* Pelican Mapping CONFIDENTIAL
+* Copyright (c) 2010-2017 [Pelican Mapping], All Rights Reserved.
+*
+* NOTICE:  All information contained herein is, and remains the property of Pelican Mapping. The intellectual and technical concepts contained
+* herein are proprietary to Pelican Mapping and may be covered by U.S. and Foreign Patents, patents in process, and are protected by trade secret or copyright law.
+* Dissemination of this information or reproduction of this material is strictly forbidden unless prior written permission is obtained
+* from Pelican Mapping.  Access to the source code contained herein is hereby forbidden to anyone except current Pelican Mapping employees, managers or contractors who have executed
+* Confidentiality and Non-disclosure agreements explicitly covering such access.
+*
+* The copyright notice above does not evidence any actual or intended publication or disclosure  of  this source code, which includes
+* information that is confidential and/or proprietary, and is a trade secret, of Pelican Mapping.   ANY REPRODUCTION, MODIFICATION, DISTRIBUTION, PUBLIC  PERFORMANCE,
+* OR PUBLIC DISPLAY OF OR THROUGH USE  OF THIS  SOURCE CODE  WITHOUT  THE EXPRESS WRITTEN CONSENT OF PELICAN MAPPING IS STRICTLY PROHIBITED, AND IN VIOLATION OF APPLICABLE
+* LAWS AND INTERNATIONAL TREATIES.  THE RECEIPT OR POSSESSION OF  THIS SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY ANY RIGHTS
+* TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO MANUFACTURE, USE, OR SELL ANYTHING THAT IT  MAY DESCRIBE, IN WHOLE OR IN PART.
+*/
+#ifndef OSGJUNIPER_VERSION
+#define OSGJUNIPER_VERSION 1
+
+#include <osgJuniper/Common>
+
+extern "C" {
+
+#define OSGJUNIPER_MAJOR_VERSION    2
+#define OSGJUNIPER_MINOR_VERSION    0
+#define OSGJUNIPER_PATCH_VERSION    0
+#define OSGJUNIPER_SOVERSION        0
+#define OSGJUNIPER_RC_VERSION       0
+#define OSGJUNIPER_DEVEL_VERSION    0     // 0 = release; >0 = interim devel version
+
+/* Convenience macro that can be used to decide whether a feature is present or not i.e.
+ * #if OSGJUNIPER_MIN_VERSION_REQUIRED(1,4,0)
+ *    your code here
+ * #endif
+ */
+#define OSGJUNIPER_MIN_VERSION_REQUIRED(MAJOR, MINOR, PATCH) ((OSGJUNIPER_MAJOR_VERSION>MAJOR) || (OSGJUNIPER_MAJOR_VERSION==MAJOR && (OSGJUNIPER_MINOR_VERSION>MINOR || (OSGJUNIPER_MINOR_VERSION==MINOR && OSGJUNIPER_PATCH_VERSION>=PATCH))))
+#define OSGJUNIPER_VERSION_LESS_THAN(MAJOR, MINOR, PATCH) ((OSGJUNIPER_MAJOR_VERSION<MAJOR) || (OSGJUNIPER_MAJOR_VERSION==MAJOR && (OSGJUNIPER_MINOR_VERSION<MINOR || (OSGJUNIPER_MINOR_VERSION==MINOR && OSGJUNIPER_PATCH_VERSION<PATCH))))
+#define OSGJUNIPER_VERSION_LESS_OR_EQUAL(MAJOR, MINOR, PATCH) ((OSGJUNIPER_MAJOR_VERSION<MAJOR) || (OSGJUNIPER_MAJOR_VERSION==MAJOR && (OSGJUNIPER_MINOR_VERSION<MINOR || (OSGJUNIPER_MINOR_VERSION==MINOR && OSGJUNIPER_PATCH_VERSION<=PATCH))))
+#define OSGJUNIPER_VERSION_GREATER_THAN(MAJOR, MINOR, PATCH) ((OSGJUNIPER_MAJOR_VERSION>MAJOR) || (OSGJUNIPER_MAJOR_VERSION==MAJOR && (OSGJUNIPER_MINOR_VERSION>MINOR || (OSGJUNIPER_MINOR_VERSION==MINOR && OSGJUNIPER_PATCH_VERSION>PATCH))))
+#define OSGJUNIPER_VERSION_GREATER_OR_EQUAL(MAJOR, MINOR, PATCH) ((OSGJUNIPER_MAJOR_VERSION>MAJOR) || (OSGJUNIPER_MAJOR_VERSION==MAJOR && (OSGJUNIPER_MINOR_VERSION>MINOR || (OSGJUNIPER_MINOR_VERSION==MINOR && OSGJUNIPER_PATCH_VERSION>=PATCH))))
+
+/**
+  * osgJuniperGetVersion() returns the library version number.
+  * Numbering convention : OSGJUNIPER-1.0 will return 1.0 from osgJuniperGetVersion.
+  *
+  * This C function can be also used to check for the existence of the OSGJUNIPER
+  * library using autoconf and its m4 macro AC_CHECK_LIB.
+  *
+  * Here is the code to add to your configure.in:
+ \verbatim
+ #
+ # Check for the OSGJUNIPER (OSG) library
+ #
+ AC_CHECK_LIB(osg, osgJuniperGetVersion, ,
+    [AC_MSG_ERROR(OSGJUNIPER library not found)],)
+ \endverbatim
+*/
+extern OSGJUNIPER_EXPORT const char* osgJuniperGetVersion();
+
+/** The osgJuniperGetSOVersion() method returns the OSGJUNIPER shared object version number. */
+extern OSGJUNIPER_EXPORT const char* osgJuniperGetSOVersion();
+
+/** The osgJuniperGetLibraryName() method returns the library name in human-friendly form. */
+extern OSGJUNIPER_EXPORT const char* osgJuniperGetLibraryName();
+
+#define OSGJUNIPER_VERSION_RELEASE OSGJUNIPER_VERSION_PATCH
+#define OSGJUNIPER_VERSION_REVISION 0
+}
+
+#endif

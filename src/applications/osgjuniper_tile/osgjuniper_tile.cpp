@@ -26,6 +26,7 @@
 #include <iostream>
 #include <osgJuniper/Utils>
 #include <osgJuniper/LASTile>
+#include <osgJuniper/Version>
 
 using namespace osgJuniper;
 
@@ -43,6 +44,7 @@ int main(int argc, char** argv)
     arguments.getApplicationUsage()->addCommandLineOption("--innerLevel level", "The octree level to use for the internal box filter for each downsampled cell", "8");
     arguments.getApplicationUsage()->addCommandLineOption("--maxLevel maxLevel", "The maximum level of subdivision for the tileset", "8");    
     arguments.getApplicationUsage()->addCommandLineOption("--threads numThreads", "The number of threads to use", "All available cores");
+    arguments.getApplicationUsage()->addCommandLineOption("--version", "Displays the Juniper version");
     arguments.getApplicationUsage()->addCommandLineOption("-h or --help", "Display command line parameters");
 
 
@@ -51,6 +53,12 @@ int main(int argc, char** argv)
     {
         arguments.getApplicationUsage()->write(std::cout);
         return 1;
+    }
+
+    if (arguments.read("--version"))
+    {
+        std::cout << osgJuniperGetLibraryName() << " " << osgJuniperGetVersion() << std::endl;
+        return 0;
     }
 
     osg::Timer_t startTime = osg::Timer::instance()->tick();

@@ -40,6 +40,7 @@ SET(HEADERS
     StreamingNode
     TilesetInfo
     Velodyne
+    Version
 )
 
 SET(SOURCES
@@ -64,6 +65,7 @@ SET(SOURCES
     StreamingNode.cpp
     TilesetInfo.cpp
     Velodyne.cpp
+    Version.cpp
 )
 
 SET(TARGET_LIBRARIES_VARS
