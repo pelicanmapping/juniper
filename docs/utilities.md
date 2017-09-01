@@ -49,10 +49,13 @@ Options:
   --geocentric      Generates a geocentric output
   --level           The initial split level.  Default is automatically computed
                     from the source data
+  --maxLevel        The max level to to subdivide to.  Default is automatically
+                    computed from the source data
   --out             The path to write tiles to
   --src             The source srs
   --target          The target number of points for a leaf node octree cell.
                     Tiles with more points than target will be further refined
+  --version         Displays the Juniper version
   -h or --help      Display command line parameters
 ```
 
@@ -65,6 +68,8 @@ Options:
                     downsampled cell
   --threads numThreads
                     The number of threads to use for downsampling
+  --version         Displays the Juniper version
+  -h or --help      Display command line parameters
 ```
 
 ### osgjuniper_tile
@@ -84,4 +89,5 @@ Options:
   --threads numThreads
                     The number of threads to use
   -h or --help      Display command line parameters
+  --version         Displays the Juniper version
 ```

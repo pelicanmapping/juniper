@@ -58,6 +58,9 @@ namespace osgJuniper
 		unsigned int getLevel() const { return _level; }
 		void setLevel(unsigned int level) { _level = level; }
 
+        int getMaxLevel() const { return _maxLevel; }
+        void setMaxLevel(int level) { _maxLevel = level; }
+
 		void initReader();
 		void closeReader();
 
@@ -112,6 +115,8 @@ namespace osgJuniper
 		osg::BoundingBoxd _dataBounds; // Bounds for raw data
 		unsigned int _level;
 		std::vector<std::string> _inputFiles;
+
+        int _maxLevel;
 
 		typedef std::map < OctreeId, unsigned int > OctreeToCountMap;
 		OctreeToCountMap _cellCounts;

@@ -243,6 +243,7 @@ int main(int argc, char** argv)
     arguments.getApplicationUsage()->addCommandLineOption("--innerLevel level", "The octree level to use for the internal box filter for each downsampled cell", "6");
     arguments.getApplicationUsage()->addCommandLineOption("--threads numThreads", "The number of threads to use for downsampling", "All available cores");
     arguments.getApplicationUsage()->addCommandLineOption("--version", "Displays the Juniper version");
+    arguments.getApplicationUsage()->addCommandLineOption("-h or --help", "Display command line parameters");
 
     // if user request help write it out to cout.
     if (arguments.read("-h") || arguments.read("--help"))

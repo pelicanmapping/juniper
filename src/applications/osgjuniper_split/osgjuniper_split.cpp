@@ -33,6 +33,7 @@ int main(int argc, char** argv)
     arguments.getApplicationUsage()->setCommandLineUsage(arguments.getApplicationName() + " [options] file.laz [file2.laz ...]");
     arguments.getApplicationUsage()->addCommandLineOption("--directory", "Loads a directory of laz or las files");
     arguments.getApplicationUsage()->addCommandLineOption("--level", "The initial split level.  Default is automatically computed from the source data");
+    arguments.getApplicationUsage()->addCommandLineOption("--maxLevel", "The max level to to subdivide to.  Default is automatically computed from the source data");
     arguments.getApplicationUsage()->addCommandLineOption("--filter level x y z", "The octree cell to filter the input data to.  Used in multiprocess builds.");
     arguments.getApplicationUsage()->addCommandLineOption("--driver drivername", "The driver to use for output (filesystem, directory, rocksdb)", "filesystem" );
     arguments.getApplicationUsage()->addCommandLineOption("--out", "The path to write tiles to", ".");
@@ -82,6 +83,9 @@ int main(int argc, char** argv)
 
 	int level = -1;
     arguments.read("--level", level);    
+
+    int maxLevel = -1;
+    arguments.read("--maxLevel", maxLevel);
 
 	int filterLevel = -1;
 	int filterX = -1;
@@ -192,6 +196,7 @@ int main(int argc, char** argv)
 	OSG_NOTICE << "Splitting to level " << level << std::endl;
 
 	rootSplitter->setLevel(level);
+    rootSplitter->setMaxLevel(maxLevel);
 
 	// Write out the tileset info.
 	TilesetInfo info;

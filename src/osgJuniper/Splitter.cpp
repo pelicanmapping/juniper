@@ -52,7 +52,8 @@ Splitter::Splitter() :
 	_geocentric(false),
 	_targetNumPoints(50000),
 	_level(6),
-    _numSkipped(0)
+    _numSkipped(0),
+    _maxLevel(-1)
 {
 }
 
@@ -388,12 +389,11 @@ void Splitter::split()
 	refine();
 }
 
-bool addPointToNode(OctreeNode* node, const Point& point, unsigned int target)
+bool addPointToNode(OctreeNode* node, const Point& point, unsigned int target, unsigned int maxLevel)
 {
 	osg::Vec3d position(point.x, point.y, point.z);
 	if (node->contains(position))
 	{
-        unsigned int maxLevel = 13;
 		// There is room in this node and it's not split
 		if ((!node->isSplit() && node->getPoints().size() < target) || node->getID().level == maxLevel)
 		{
@@ -405,7 +405,7 @@ bool addPointToNode(OctreeNode* node, const Point& point, unsigned int target)
 		{
 			for (unsigned int i = 0; i < node->getChildren().size(); ++i)
 			{
-				if (addPointToNode(node->getChildren()[i], point, target))
+				if (addPointToNode(node->getChildren()[i], point, target, maxLevel))
 				{
 					return true;
 				}
@@ -426,7 +426,7 @@ bool addPointToNode(OctreeNode* node, const Point& point, unsigned int target)
 			{
 				for (unsigned int i = 0; i < node->getChildren().size(); ++i)
 				{
-					if (addPointToNode(node->getChildren()[i], *itr, target))
+					if (addPointToNode(node->getChildren()[i], *itr, target, maxLevel))
 					{
 						numAdded++;
 						break;
@@ -485,7 +485,7 @@ public:
 				OSG_NOTICE << "Root bounding box doesn't contain point" << std::endl;
 			}
 
-			if (!addPointToNode(node, *itr, _splitter->getTargetNumPoints()))
+			if (!addPointToNode(node, *itr, _splitter->getTargetNumPoints(), _splitter->getMaxLevel()))
 			{
 				OSG_NOTICE << "Failed to add point in refine" << std::endl;
 			}
@@ -507,6 +507,14 @@ public:
 
 void Splitter::refine()
 {	
+    // Autocompute max level if one is not defined.
+    if (_maxLevel < 0)
+    {
+        _maxLevel = _level * 2;
+    }
+
+    OSG_NOTICE << "Refining to max level " << _maxLevel << std::endl;
+
 	osg::Timer_t startTime = osg::Timer::instance()->tick();
 	OSG_NOTICE << "Need to refine " << _needsRefined.size() << " of " << _cellCounts.size() << " cells" << std::endl;
 
