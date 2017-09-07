@@ -166,7 +166,15 @@ int main(int argc, char** argv)
     builder.setSourceSRS(srcSRS.get());
     builder.setDestSRS(destSRS.get());
     builder.setGeocentric(geocentric);
-    builder.buildRoot(numThreads);
+    try
+    {
+      builder.buildRoot(numThreads);
+    }
+    catch (pdal::pdal_error& err)
+    {
+      OSG_FATAL << "osgjuniper_tile: " << err.what() << std::endl;
+      return 1;
+    }
 
     osg::Timer_t endTime = osg::Timer::instance()->tick();
 
