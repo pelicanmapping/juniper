@@ -213,7 +213,15 @@ int main(int argc, char** argv)
 		return 1;
 	}
 	rootSplitter->setTileStore(tileStore.get());
-    rootSplitter->split();
+    try
+    {
+      rootSplitter->split();
+    }
+    catch (pdal::pdal_error& err)
+    {
+      OSG_FATAL << "osgjuniper_split: " << err.what() << std::endl;
+      return 1;
+    }
 
     osg::Timer_t endTime = osg::Timer::instance()->tick();
 
