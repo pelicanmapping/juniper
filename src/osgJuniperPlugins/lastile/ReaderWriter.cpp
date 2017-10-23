@@ -58,7 +58,7 @@ public:
 			setupPaging();
 		}
 
-		virtual osg::Node* loadChildren()
+		virtual osg::Node* loadChild()
 		{
 			osg::Group* group = new osg::Group;
 			for (unsigned int i = 0; i < 8; ++i)
@@ -87,14 +87,14 @@ public:
 		}
 
 
-		virtual osg::BoundingSphere getKeyBound() const
+		virtual osg::BoundingSphere getChildBound() const
 		{
 			osg::BoundingSphere bs;
 			bs.expandBy(_octree->getBoundingBox());
 			return bs;
 		}
 
-		virtual bool hasChildren() const
+		virtual bool hasChild() const
 		{		
 			for (unsigned int i = 0; i < 8; ++i)
 			{
