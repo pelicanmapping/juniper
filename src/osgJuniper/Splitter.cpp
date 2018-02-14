@@ -337,7 +337,7 @@ void Splitter::split()
 		if (_filterNode.valid() && !_filterNode->contains(osg::Vec3d(x, y, z)))
 		{
 			complete++;
-			if (complete % 10000 == 0)
+			if (complete % 1000000 == 0)
 			{
 				OSG_NOTICE << "Completed " << complete << " of " << _totalNumPoints << std::endl;
 			}
@@ -368,7 +368,7 @@ void Splitter::split()
 		addPoint(p);
 
 		complete++;
-		if (complete % 10000 == 0)
+		if (complete % 1000000 == 0)
 		{
 			OSG_NOTICE << "Completed " << complete << " of " << _totalNumPoints << std::endl;
 		}
