@@ -18,8 +18,6 @@
 */
 #include <osgJuniper/PointReaderWriter>
 
-#include <pdal/pdal_macros.hpp>
-
 using namespace osgJuniper;
 
 PointReader::PointReader(const std::string& filename) :

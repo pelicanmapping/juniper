@@ -349,7 +349,7 @@ int main(int argc, char** argv)
 
     osg::ref_ptr< MapNode > mapNode = MapNode::findMapNode(loaded);
     mapNode->getTerrainEngine()->setNodeMask(MaskMapNode);
-    mapNode->getModelLayerGroup()->setNodeMask(MaskPointCloud);
+    mapNode->getLayerNodeGroup()->setNodeMask(MaskPointCloud);
 
     s_pointCloud = osgEarth::findTopMostNodeOfType<PointCloudDecorator>(loaded);
     if (!s_pointCloud)
