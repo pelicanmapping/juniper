@@ -94,17 +94,21 @@ void PDALUtils::writePointsToLaz(const PointList& points, const std::string& fil
 	bufferReader.addView(view);
 
 	Stage *writer = 0;
-	{PDAL_SCOPED_LOCK; writer = getStageFactory()->createStage("writers.las"); }
+  {
+    PDAL_SCOPED_LOCK;
+    writer = getStageFactory()->createStage("writers.las");
 
-	osgEarth::makeDirectoryForFile(filename);
+    osgEarth::makeDirectoryForFile(filename);
 
-	Options options;
-	options.add("filename", filename);
+    Options options;
+    options.add("filename", filename);
 
-	writer->setInput(bufferReader);
-	writer->setOptions(options);
-	{ PDAL_SCOPED_LOCK; writer->prepare(pointTable); }
-	writer->execute(pointTable);
+    writer->setInput(bufferReader);
+    writer->setOptions(options);
+    writer->prepare(pointTable);
+  }
+  
+  writer->execute(pointTable);
 
 	// Destroy the writer stage, we're done with it.
 	{PDAL_SCOPED_LOCK; getStageFactory()->destroyStage(writer); }
