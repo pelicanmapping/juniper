@@ -9,9 +9,11 @@ SET(TARGET_LIBRARIES_VARS
     )
 
 SET(TARGET_H
+    PointManager
 )
 
 SET(TARGET_SRC
+    PointManager.cpp
     ReaderWriter.cpp
 )
 SETUP_PLUGIN(lastile)

@@ -27,6 +27,7 @@
 #include <osgJuniper/Octree>
 #include <osgJuniper/PointTileStore>
 #include <osgEarth/PagedNode>
+#include "PointManager"
 
 using namespace osgJuniper;
 
@@ -48,9 +49,10 @@ public:
 	class PagedOctreeNode : public osgEarth::PagedNode
 	{
 	public:
-		PagedOctreeNode(PointTileStore* tileStore, OctreeNode* octree, float rangeFactor, bool additive) :
-			_tileStore(tileStore),
-			_octree(octree)
+        PagedOctreeNode(PointManager* pointManager, PointTileStore* tileStore, OctreeNode* octree, float rangeFactor, bool additive) :
+            _tileStore(tileStore),
+            _octree(octree),
+            _pointManager(pointManager)
 		{
 			setRangeFactor(rangeFactor);
 		    setAdditive(additive),
@@ -66,7 +68,7 @@ public:
 				osg::ref_ptr< OctreeNode > child = _octree->createChild(i);
 				if (_tileStore->hasKey(child->getID()))
 				{
-					group->addChild(new PagedOctreeNode(_tileStore.get(), child, getRangeFactor(), getAdditive()));
+					group->addChild(new PagedOctreeNode(_pointManager,_tileStore.get(), child, getRangeFactor(), getAdditive()));
 				}
 			}
 			return group;
@@ -74,18 +76,16 @@ public:
 
 		virtual void build()
 		{
-			PointList points;
-			_tileStore->get(_octree->getID(), points);
-			if (points.size() > 0)
+			//PointList points;
+            osg::ref_ptr< PointChunk > chunk = new PointChunk;
+            chunk->manager = _pointManager.get();
+			_tileStore->get(_octree->getID(), chunk->points);
+			if (chunk->points.size() > 0)
 			{
-				osg::Node* node = new PointCloud(points);
-				if (node)
-				{
-					_attachPoint->addChild(node);
-				}
+                _attachPoint->addChild(chunk);
+                _pointManager->addPoints(chunk);
 			}			
 		}
-
 
 		virtual osg::BoundingSphere getChildBound() const
 		{
@@ -110,6 +110,7 @@ public:
 
 		osg::ref_ptr< OctreeNode > _octree;
 		osg::ref_ptr< PointTileStore > _tileStore;
+        osg::ref_ptr< PointManager > _pointManager;
 	};
 
 
@@ -134,8 +135,19 @@ public:
 			return ReadResult::ERROR_IN_READING_FILE;
 		}
 
-		PointCloudDecorator* decorator = new PointCloudDecorator;
-		decorator->addChild(new PagedOctreeNode(tileStore.get(), root, radiusFactor, info.getAdditive()));
+		//PointCloudDecorator* decorator = new PointCloudDecorator;
+        /*
+        osg::Group* decorator = new osg::Group;
+        PointManager* manager = new PointManager;
+        decorator->addChild(manager);
+		decorator->addChild(new PagedOctreeNode(manager, tileStore.get(), root, radiusFactor, info.getAdditive()));
+        */
+        PointCloudDecorator* decorator = new PointCloudDecorator;
+        PointManager* manager = new PointManager;
+        manager->setAnchor(root->getBoundingBox().center());
+        decorator->addChild(manager);
+        manager->addChild(new PagedOctreeNode(manager, tileStore.get(), root, radiusFactor, info.getAdditive()));
+
 		return decorator;
 	}
 };

@@ -1,0 +1,68 @@
+#pragma once
+
+#include <osgJuniper/Point>
+#include <osg/Geometry>
+#include <osg/Geode>
+#include <osg/MatrixTransform>
+#include <osg/PrimitiveSetIndirect>
+#include <osg/BufferIndexBinding>
+
+
+namespace osgJuniper
+{
+
+    class PointManager;
+
+    class PointChunk : public osg::Node
+    {
+    public:
+        PointChunk();
+        osg::BoundingSphere computeBound() const;
+
+        void traverse(osg::NodeVisitor& nv);
+        PointList points;
+        unsigned int index;
+        osg::DrawArraysIndirectCommand cmd;
+
+        PointManager* manager;
+    };
+
+
+    typedef std::vector< osg::ref_ptr< PointChunk > > PointChunkList;
+
+    struct TraversedChunks : public osg::Referenced
+    {
+        PointChunkList chunks;
+    };
+
+
+    class PointManager : public osg::Group
+    {
+    public:
+        PointManager();
+
+        virtual void traverse(osg::NodeVisitor& nv);
+
+        //virtual osg::BoundingSphere computeBound() const;
+
+        void addPoints(PointChunk* chunk);
+        void removePoints(PointChunk* chunk);
+
+        const osg::Vec3d& getAnchor();
+        void setAnchor(const osg::Vec3d& anchor);
+
+    private:
+
+        void addPointsInternal(PointChunk* chunk);
+        osg::DefaultIndirectCommandDrawArrays* _commands;
+        osg::Vec3Array* _verts;
+        osg::Vec4Array* _colors;
+        osg::Vec4Array* _data;
+        PointChunkList _chunks;
+        PointChunkList _chunksToAdd;
+        OpenThreads::Mutex _mutex;
+        osg::Vec3d _anchor;
+        osg::MatrixTransform* _transform;
+        unsigned int _numPoints;
+    };
+}
