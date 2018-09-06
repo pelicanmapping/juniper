@@ -21,7 +21,6 @@
 #define OSGJUNIPER_POINT 1
 
 #include <osgJuniper/Common>
-#include <osg/ref_ptr>
 #include <osg/Object>
 #include <osg/Vec3>
 #include <osg/Vec4>
