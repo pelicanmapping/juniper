@@ -10,6 +10,20 @@
 
 namespace osgJuniper
 {
+    struct Block
+    {
+        Block(unsigned int _index, unsigned int _count, osg::Geometry* _geom):
+            index(_index),
+            count(_count),
+            geometry(_geom)
+        {
+        }
+
+        unsigned int index;
+        unsigned int count;
+        osg::Geometry* geometry;
+    };
+    typedef std::vector<Block> BlockList;
 
     class PointManager;
 
@@ -21,18 +35,28 @@ namespace osgJuniper
 
         void traverse(osg::NodeVisitor& nv);
         PointList points;
-        unsigned int index;
-        osg::DrawArraysIndirectCommand cmd;
-
+        std::vector<osg::DrawArraysIndirectCommand> commands;
         PointManager* manager;
+        BlockList blocks;
     };
-
 
     typedef std::vector< osg::ref_ptr< PointChunk > > PointChunkList;
 
     struct TraversedChunks : public osg::Referenced
     {
         PointChunkList chunks;
+    };
+
+    class PointGeometry : public osg::Geometry
+    {
+    public:
+        PointGeometry(unsigned int initialSize);
+
+        osg::DefaultIndirectCommandDrawArrays* _commands;
+        osg::Vec3Array* _verts;
+        osg::Vec4Array* _colors;
+        osg::Vec4Array* _data;
+        unsigned int _initialSize;
     };
 
 
@@ -43,26 +67,23 @@ namespace osgJuniper
 
         virtual void traverse(osg::NodeVisitor& nv);
 
-        //virtual osg::BoundingSphere computeBound() const;
-
         void addPoints(PointChunk* chunk);
-        void removePoints(PointChunk* chunk);
 
         const osg::Vec3d& getAnchor();
         void setAnchor(const osg::Vec3d& anchor);
 
     private:
 
+        void addPointGeometry();
         void addPointsInternal(PointChunk* chunk);
-        osg::DefaultIndirectCommandDrawArrays* _commands;
-        osg::Vec3Array* _verts;
-        osg::Vec4Array* _colors;
-        osg::Vec4Array* _data;
         PointChunkList _chunks;
         PointChunkList _chunksToAdd;
         OpenThreads::Mutex _mutex;
         osg::Vec3d _anchor;
         osg::MatrixTransform* _transform;
-        unsigned int _numPoints;
+
+        std::vector< osg::ref_ptr< PointGeometry > > _geometries;
+
+        BlockList _freeBlocks;
     };
 }
