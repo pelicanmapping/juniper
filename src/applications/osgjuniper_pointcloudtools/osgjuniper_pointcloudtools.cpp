@@ -331,7 +331,7 @@ void buildControls(osgViewer::Viewer& viewer, osg::Group* root)
     // Add a status label
     s_status = container->addControl(new LabelControl());
 
-    //root->addChild(canvas);
+    root->addChild(canvas);
 }
 
 int main(int argc, char** argv)
@@ -339,26 +339,29 @@ int main(int argc, char** argv)
     osg::ArgumentParser arguments(&argc,argv);
 
     osgViewer::Viewer viewer(arguments);
+  
+    osg::Group* root = new osg::Group;    
 
-    viewer.setCameraManipulator( new EarthManipulator());
-
-    osg::Group* root = new osg::Group;
-
-    osg::Node* loaded = osgEarth::Util::MapNodeHelper().load(arguments, &viewer);//osgDB::readNodeFiles(arguments);
+    osg::Node* loaded = osgDB::readNodeFiles(arguments);
     root->addChild(loaded);
 
     osg::ref_ptr< MapNode > mapNode = MapNode::findMapNode(loaded);
-    mapNode->getTerrainEngine()->setNodeMask(MaskMapNode);
-    mapNode->getLayerNodeGroup()->setNodeMask(MaskPointCloud);
+    if (mapNode.valid())
+    {
+        mapNode->getTerrainEngine()->setNodeMask(MaskMapNode);
+        mapNode->getLayerNodeGroup()->setNodeMask(MaskPointCloud);
+        viewer.setCameraManipulator( new EarthManipulator());
+    }
+
 
     s_pointCloud = osgEarth::findTopMostNodeOfType<PointCloudDecorator>(loaded);
     if (!s_pointCloud)
     {
         OSG_NOTICE << "Cannot find point cloud" << std::endl;
         return 1;
-    }
+    }    
 
-    // Set the color ramp to use for.
+    // Set the color ramp to use.
     osg::Texture2D* colorRamp = new osg::Texture2D(osgDB::readImageFile("d:/dev/juniper/data/iron_gradient.png"));
     colorRamp->setResizeNonPowerOfTwoHint(false);
     colorRamp->setWrap( osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE );
@@ -394,7 +397,7 @@ int main(int argc, char** argv)
         measure->addCallback(new P2PMeasureCallback());
         measure->setNodeMask(MaskPointCloud);
         viewer.addEventHandler(measure);
-    }
+    }    
 
 
     viewer.addEventHandler(new osgViewer::StatsHandler());
