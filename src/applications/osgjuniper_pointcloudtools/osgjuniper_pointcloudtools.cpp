@@ -361,13 +361,16 @@ int main(int argc, char** argv)
         return 1;
     }    
 
-    // Set the color ramp to use.
-    osg::Texture2D* colorRamp = new osg::Texture2D(osgDB::readImageFile("d:/dev/juniper/data/iron_gradient.png"));
-    colorRamp->setResizeNonPowerOfTwoHint(false);
-    colorRamp->setWrap( osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE );
-    colorRamp->setWrap( osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE );
-
-    s_pointCloud->setColorRamp(colorRamp);
+    std::string colorRampFile;
+    if (arguments.read("--colorramp", colorRampFile))
+    {
+        // Set the color ramp to use.
+        osg::Texture2D* colorRamp = new osg::Texture2D(osgDB::readImageFile(colorRampFile));
+        colorRamp->setResizeNonPowerOfTwoHint(false);
+        colorRamp->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+        colorRamp->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
+        s_pointCloud->setColorRamp(colorRamp);
+    }
 
     // any option left unread are converted into errors to write out later.
     arguments.reportRemainingOptionsAsUnrecognized();
