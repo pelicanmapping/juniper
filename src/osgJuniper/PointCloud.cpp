@@ -47,12 +47,13 @@ void PointCloud::setPoints(const PointList& points)
 	osg::Geometry* geometry = new osg::Geometry;
 	geometry->setUseVertexBufferObjects(true);
 	geometry->setUseDisplayList(false);
+    geometry->setDataVariance(osg::Object::DYNAMIC);
 
 	osg::Vec3Array* verts = new osg::Vec3Array();
 	verts->reserve(points.size());
 	geometry->setVertexArray(verts);
 	
-	osg::Vec4ubArray* colors = new osg::Vec4ubArray();
+	osg::Vec4Array* colors = new osg::Vec4Array();
 	colors->reserve(points.size());
 	geometry->setColorArray(colors);
 	geometry->setColorBinding(osg::Geometry::BIND_PER_VERTEX);
@@ -84,7 +85,7 @@ void PointCloud::setPoints(const PointList& points)
 		osg::Vec3 position = location - anchor;
 		verts->push_back(position);
 
-		osg::Vec4ub color = osg::Vec4ub(point.r / 256, point.g / 256, point.b / 256, 255);
+		osg::Vec4 color = osg::Vec4(point.r / 65536.0, point.g / 65536.0, point.b / 65536.0, 1.0);
 		colors->push_back(color);
 	}
 
@@ -103,8 +104,8 @@ void PointCloud::setPoints(const PointList& points)
 
 static const char *vertSource = { 
 
-    "#version 110\n"
-    "attribute vec4 data;\n"
+    "#version 330 compatibility\n"
+    "in vec4 data;\n"
     "uniform float maxReturn;\n"
     "uniform int colorMode;\n"
     "uniform float minIntensity;\n"
@@ -119,7 +120,8 @@ static const char *vertSource = {
     "uniform float maxHeight;\n"
     "uniform sampler2D colorRamp;\n"
     "uniform float hazeDistance;\n"
-    "varying float haze; \n"
+    "out float haze; \n"
+    "out vec4 clr;\n"
 
     "vec4 classificationToColor(in int classification)\n"
     "{\n"
@@ -159,31 +161,31 @@ static const char *vertSource = {
     "    {\n"    
     "        if (colorMode == 1)\n"
     "        {\n"
-    "            gl_FrontColor = intensityToColor(intensity, minIntensity, maxIntensity);\n"    
+    "            clr = intensityToColor(intensity, minIntensity, maxIntensity);\n"    
     "        }\n"
     "        else if (colorMode == 2)\n"
     "        {\n"
-    "            gl_FrontColor = classificationToColor(classification);\n"
+    "            clr = classificationToColor(classification);\n"
     "        }\n"
     "        else if (colorMode == 3)\n"
     "        {\n"
     "            if (height < minHeight) \n"
     "            {\n"
-    "                gl_FrontColor = vec4(0.0, 1.0, 0.0, 1.0);\n"
+    "                clr = vec4(0.0, 1.0, 0.0, 1.0);\n"
     "            }\n"
     "            else\n"
     "            {\n"
-    "                gl_FrontColor = vec4(1.0, 0.0, 0.0, 1.0);\n"
+    "                clr = vec4(1.0, 0.0, 0.0, 1.0);\n"
     "            }\n"
     "        }\n"
     "        else if (colorMode == 4)\n"
     "        {\n"
     "            float sample = (height - minHeight) / (maxHeight - minHeight);\n"
-    "            gl_FrontColor = texture2D(colorRamp, vec2(0.5, sample));\n"
+    "            clr = texture2D(colorRamp, vec2(0.5, sample));\n"
     "        }\n"
     "        else\n"
     "        {\n"
-    "            gl_FrontColor = vec4(gl_Color.rgb, 1.0);\n"
+    "            clr = vec4(gl_Color.rgb, 1.0);\n"
     "        }\n"    
     "        if (autoPointSize) {\n"
     "            float factor = 1.0 - smoothstep(0.0, maxPointDistance, distance);\n"
@@ -197,11 +199,25 @@ static const char *vertSource = {
 };
 
 static const char *fragSource = {    
-    "varying float haze; \n"
+    "#version 330 compatibility\n"
+    "in float haze; \n"
+    "in vec4 clr;\n"
     "void main(void)\n"
-    "{\n"        
-    //"    gl_FragColor = gl_Color;\n"
-    "    gl_FragColor = mix(gl_Color, vec4(0.5, 0.5, 0.5, 1.0), haze);\n"
+    "{\n"     
+    "    vec4 color = mix(clr, vec4(0.5, 0.5, 0.5, 1.0), haze);\n"
+
+    // Point smoothing.
+    "    vec2 c = 2.0*gl_PointCoord - 1.0;\n"
+    "    float r = dot(c, c);\n"
+    "    float d = 0.0;\n"
+    "#ifdef GL_OES_standard_derivatives\n"
+    "    d = fwidth(r);\n"
+    "#endif\n"    
+    "    color.a = 1.0 - smoothstep(1.0 - d, 1.0 + d, r);\n"
+    "    if (color.a < 0.1)\n"
+    "        discard; \n"    
+
+    "    gl_FragColor = color;\n"   
     "}\n"
 };
 
@@ -221,8 +237,6 @@ _maxPointDistance(5000.0),
 _autoPointSize(true),
 _hazeDistance(FLT_MAX)
 {    
-    getOrCreateStateSet()->setMode(GL_POINT_SMOOTH, osg::StateAttribute::ON);
-
     osg::Program* program =new osg::Program;
     program->addShader(new osg::Shader(osg::Shader::VERTEX, vertSource));
     program->addShader(new osg::Shader(osg::Shader::FRAGMENT, fragSource));

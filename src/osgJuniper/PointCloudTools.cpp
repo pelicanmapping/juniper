@@ -28,29 +28,29 @@ using namespace osgJuniper;
 
 /****************************************************************************/
 IdentifyPointHandler::IdentifyPointHandler():
-    _selectedColor(255, 0, 0, 255),
-    _hoverColor(255,255, 0, 255),
+    _selectedColor(1.0f, 0.0f, 0.0f, 1.0f),
+    _hoverColor(1.0f,1.0f, 0, 1.0f),
     _mask(0xffffffff),
     _selectionRadius(5.0f)
 {
 }
 
-const osg::Vec4ub& IdentifyPointHandler::getSelectedColor() const
+const osg::Vec4& IdentifyPointHandler::getSelectedColor() const
 {
     return _selectedColor;
 }
 
-void IdentifyPointHandler::setSelectedColor(const osg::Vec4ub& color)
+void IdentifyPointHandler::setSelectedColor(const osg::Vec4& color)
 {
     _selectedColor = color;
 }
 
-const osg::Vec4ub& IdentifyPointHandler::getHoverColor() const
+const osg::Vec4& IdentifyPointHandler::getHoverColor() const
 {
     return _hoverColor;
 }
 
-void IdentifyPointHandler::setHoverColor(const osg::Vec4ub& color)
+void IdentifyPointHandler::setHoverColor(const osg::Vec4& color)
 {
     _hoverColor = color;
 }
@@ -146,13 +146,17 @@ void IdentifyPointHandler::hover(float x, float y, osgViewer::View* viewer)
             }
         }        
         // We didn't pick a point cloud.
-        if (!decorator) return;
+        if (!decorator)
+        {
+            OSG_NOTICE << "No decorator" << std::endl;
+            return;
+        }
         osg::Geometry* geometry = hit.drawable->asGeometry();
 
         // Highlight the selected point
-        osg::Vec4ubArray* colors = static_cast<osg::Vec4ubArray*>(geometry->getColorArray());
+        osg::Vec4Array* colors = static_cast<osg::Vec4Array*>(geometry->getColorArray());
 
-        osg::Vec4ub prevColor = (*colors)[hit.primitiveIndex];
+        osg::Vec4 prevColor = (*colors)[hit.primitiveIndex];
         // Store the current values.
         _hoveredPoints.push_back(SelectionInfo(colors, prevColor, hit.primitiveIndex));
 
@@ -197,9 +201,9 @@ void IdentifyPointHandler::select(float x, float y, osgViewer::View* viewer)
         osg::Vec3 vert = (*verts)[hit.primitiveIndex];            
 
         // Highlight the selected point
-        osg::Vec4ubArray* colors = static_cast<osg::Vec4ubArray*>(geometry->getColorArray());
+        osg::Vec4Array* colors = static_cast<osg::Vec4Array*>(geometry->getColorArray());
 
-        osg::Vec4ub prevColor = (*colors)[hit.primitiveIndex];
+        osg::Vec4 prevColor = (*colors)[hit.primitiveIndex];
         // Store the current values.
         _selectedPoints.push_back(SelectionInfo(colors, prevColor, hit.primitiveIndex));
 
@@ -213,23 +217,21 @@ void IdentifyPointHandler::select(float x, float y, osgViewer::View* viewer)
         osg::Vec3d world = vert * localToWorld; 
 
         // Get the data from the vertex attributes.
-        osg::Vec3usArray* dataArray = static_cast<osg::Vec3usArray*>(geometry->getVertexAttribArray(osg::Drawable::ATTRIBUTE_6));
-        osg::Vec3us data = (*dataArray)[hit.primitiveIndex];
+        osg::Vec4Array* dataArray = static_cast<osg::Vec4Array*>(geometry->getVertexAttribArray(osg::Drawable::ATTRIBUTE_6));
+        osg::Vec4 data = (*dataArray)[hit.primitiveIndex];
 
         // Notify any callbacks of the point selection.
         Point point;
 		point.x = world.x();
 		point.y = world.y();
 		point.z = world.z();
-		/*
-		point.r = prevColor.r() * 255;
-		point.g = prevColor.g() * 255;
-		point.b = prevColor.b() * 255;
-		point.a = prevColor.a() * 255;
+		point.r = prevColor.r() * 65535.0f;
+		point.g = prevColor.g() * 65535.0f;
+		point.b = prevColor.b() * 65535.0f;
+		point.a = prevColor.a() * 65535.0f;
         point.classification = data.x();
         point.returnNumber = data.y();
         point.intensity = data.z();
-		*/
         for( Callbacks::iterator i = _callbacks.begin(); i != _callbacks.end(); ++i )
             i->get()->selected(point);        
     }
