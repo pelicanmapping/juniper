@@ -27,6 +27,10 @@
 #include <osgJuniper/Octree>
 #include <osgJuniper/PointTileStore>
 #include <osgEarth/PagedNode>
+#include <osg/ShapeDrawable>
+#include <osgText/Text>
+#include <osgEarth/ShaderGenerator>
+#include <osgEarth/Registry>
 
 using namespace osgJuniper;
 
@@ -44,6 +48,62 @@ public:
 	{
 		return "LAS Tiled Point Reader";
 	}
+
+    static osg::Node* makeBox(const osg::Vec3& size, const osg::Vec4& color)
+    {
+        osg::Geometry* geom = new osg::Geometry;
+        osg::Vec3Array* verts = new osg::Vec3Array;
+        geom->setVertexArray(verts);
+
+        osg::Vec4Array* colors = new osg::Vec4Array;
+        colors->push_back(color);
+        colors->push_back(color);
+        colors->push_back(color);
+        colors->push_back(color);
+        colors->push_back(color);
+        colors->push_back(color);
+        colors->push_back(color);
+        colors->push_back(color);
+        geom->setColorArray(colors, osg::Array::BIND_PER_VERTEX);
+
+        float x = size.x()/2.0f;
+        float y = size.y()/2.0f;
+        float z = size.z()/2.0f;
+
+        verts->push_back(osg::Vec3(-x, -y, -z)); //0
+        verts->push_back(osg::Vec3(x, -y, -z));  //1
+        verts->push_back(osg::Vec3(-x, -y, z));  //2
+        verts->push_back(osg::Vec3(x, -y, z));   //3
+        
+        verts->push_back(osg::Vec3(-x, y, -z));  //4
+        verts->push_back(osg::Vec3(x, y, -z));   //5
+        verts->push_back(osg::Vec3(-x, y, z));   //6
+        verts->push_back(osg::Vec3(x, y, z));    //7
+
+        osg::DrawElementsUByte* de = new osg::DrawElementsUByte(GL_LINES);
+        de->push_back(0); de->push_back(1);
+        de->push_back(1); de->push_back(3);
+        de->push_back(0); de->push_back(2);
+        de->push_back(2); de->push_back(3);
+
+        de->push_back(4); de->push_back(5);
+        de->push_back(6); de->push_back(7);
+        de->push_back(4); de->push_back(6);
+        de->push_back(5); de->push_back(7);
+
+        de->push_back(0); de->push_back(4);
+        de->push_back(1); de->push_back(5);
+        de->push_back(2); de->push_back(6);
+        de->push_back(3); de->push_back(7);
+
+        geom->addPrimitiveSet(de);
+
+        osgEarth::Registry::shaderGenerator().run(geom);
+
+        
+        return geom;
+
+    }
 
 	class PagedOctreeNode : public osgEarth::PagedNode
 	{
@@ -83,7 +143,31 @@ public:
 				{
 					_attachPoint->addChild(node);
 				}
-			}			
+
+                osg::BoundingBoxd bounds = _octree->getBoundingBox();
+
+                osgText::Text* text = new osgText::Text;
+                text->setAutoRotateToScreen(true);
+                text->setCharacterSize(12);
+                std::stringstream buf;
+                buf << _octree->getID().level << ": (" << _octree->getID().x << ", " << _octree->getID().y << ", " << _octree->getID().z << ")";
+                text->setText(buf.str());
+                text->setCharacterSizeMode(osgText::Text::SCREEN_COORDS);
+                osg::MatrixTransform* mt = new osg::MatrixTransform;
+                mt->setMatrix(osg::Matrixd::translate(bounds.center()));                
+                mt->addChild(text);
+                
+                /*
+                osg::Geode* geode = new osg::Geode;
+                osg::ShapeDrawable* sd = new osg::ShapeDrawable(new osg::Box(osg::Vec3f(0, 0, 0), bounds.radius(), bounds.radius(), bounds.radius()));
+                sd->setColor(osg::Vec4(1.0, 0.0, 0.0, 1.0));
+                geode->addDrawable(sd);
+                mt->addChild(geode);
+                */
+                osg::Vec4 color(_octree->getID().level, 0.0, 0.0, 1.0);
+                mt->addChild(makeBox(osg::Vec3(bounds.xMax() - bounds.xMin(), bounds.yMax() - bounds.yMin(), bounds.zMax() - bounds.zMin()), color));
+                _attachPoint->addChild(mt);
+			}
 		}
 
 
