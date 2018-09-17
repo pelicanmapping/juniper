@@ -36,6 +36,17 @@
 #include <osgJuniper/PointCloud>
 #include <osgJuniper/PointCloudTools>
 
+
+#include <osgGA/TrackballManipulator>
+#include <osgGA/FlightManipulator>
+#include <osgGA/DriveManipulator>
+#include <osgGA/KeySwitchMatrixManipulator>
+#include <osgGA/StateSetManipulator>
+#include <osgGA/AnimationPathManipulator>
+#include <osgGA/TerrainManipulator>
+#include <osgGA/SphericalManipulator>
+
+
 #include <iostream>
 
 using namespace osgJuniper;
@@ -351,6 +362,38 @@ int main(int argc, char** argv)
         mapNode->getTerrainEngine()->setNodeMask(MaskMapNode);
         mapNode->getLayerNodeGroup()->setNodeMask(MaskPointCloud);
         viewer.setCameraManipulator( new EarthManipulator());
+    }
+    else
+    {
+        osg::ref_ptr<osgGA::KeySwitchMatrixManipulator> keyswitchManipulator = new osgGA::KeySwitchMatrixManipulator;
+
+        keyswitchManipulator->addMatrixManipulator('1', "Trackball", new osgGA::TrackballManipulator());
+        keyswitchManipulator->addMatrixManipulator('2', "Flight", new osgGA::FlightManipulator());
+        keyswitchManipulator->addMatrixManipulator('3', "Drive", new osgGA::DriveManipulator());
+        keyswitchManipulator->addMatrixManipulator('4', "Terrain", new osgGA::TerrainManipulator());
+        keyswitchManipulator->addMatrixManipulator('5', "Orbit", new osgGA::OrbitManipulator());
+        keyswitchManipulator->addMatrixManipulator('6', "FirstPerson", new osgGA::FirstPersonManipulator());
+        keyswitchManipulator->addMatrixManipulator('7', "Spherical", new osgGA::SphericalManipulator());
+
+        std::string pathfile;
+        double animationSpeed = 1.0;
+        while (arguments.read("--speed", animationSpeed)) {}
+        char keyForAnimationPath = '8';
+        while (arguments.read("-p", pathfile))
+        {
+            osgGA::AnimationPathManipulator* apm = new osgGA::AnimationPathManipulator(pathfile);
+            if (apm || !apm->valid())
+            {
+                apm->setTimeScale(animationSpeed);
+
+                unsigned int num = keyswitchManipulator->getNumMatrixManipulators();
+                keyswitchManipulator->addMatrixManipulator(keyForAnimationPath, "Path", apm);
+                keyswitchManipulator->selectMatrixManipulator(num);
+                ++keyForAnimationPath;
+            }
+        }
+
+        viewer.setCameraManipulator(keyswitchManipulator.get());
     }
 
 
