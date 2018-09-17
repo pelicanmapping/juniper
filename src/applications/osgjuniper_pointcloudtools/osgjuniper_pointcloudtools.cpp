@@ -378,24 +378,20 @@ int main(int argc, char** argv)
     buildControls(viewer, root);
 
     bool measure = arguments.read("--measure");
+    bool identify = arguments.read("--identify");
 
-    if (measure)
-    {
-        OSG_NOTICE << "measuring" << std::endl;
-    }
-    else
+    if (identify)
     {
         OSG_NOTICE << "identifying" << std::endl;
-    }
-    if (!measure)
-    {
         IdentifyPointHandler* identify = new IdentifyPointHandler();
         identify->addCallback( new IdentifyCallback(s_status));
         identify->setNodeMask(MaskPointCloud);
         viewer.addEventHandler(identify);
     }
-    else
+
+    if (measure)
     {
+        OSG_NOTICE << "measuring" << std::endl;
         P2PMeasureHandler* measure = new P2PMeasureHandler(root);
         measure->addCallback(new P2PMeasureCallback());
         measure->setNodeMask(MaskPointCloud);
