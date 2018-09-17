@@ -156,17 +156,13 @@ public:
                 osg::MatrixTransform* mt = new osg::MatrixTransform;
                 mt->setMatrix(osg::Matrixd::translate(bounds.center()));                
                 mt->addChild(text);
-                
+
+                // Debug box
                 /*
-                osg::Geode* geode = new osg::Geode;
-                osg::ShapeDrawable* sd = new osg::ShapeDrawable(new osg::Box(osg::Vec3f(0, 0, 0), bounds.radius(), bounds.radius(), bounds.radius()));
-                sd->setColor(osg::Vec4(1.0, 0.0, 0.0, 1.0));
-                geode->addDrawable(sd);
-                mt->addChild(geode);
-                */
                 osg::Vec4 color(_octree->getID().level, 0.0, 0.0, 1.0);
                 mt->addChild(makeBox(osg::Vec3(bounds.xMax() - bounds.xMin(), bounds.yMax() - bounds.yMin(), bounds.zMax() - bounds.zMin()), color));
                 _attachPoint->addChild(mt);
+                */
 			}
 		}
 

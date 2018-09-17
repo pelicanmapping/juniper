@@ -205,18 +205,6 @@ static const char *fragSource = {
     "void main(void)\n"
     "{\n"     
     "    vec4 color = mix(clr, vec4(0.5, 0.5, 0.5, 1.0), haze);\n"
-
-    // Point smoothing.
-    "    vec2 c = 2.0*gl_PointCoord - 1.0;\n"
-    "    float r = dot(c, c);\n"
-    "    float d = 0.0;\n"
-    "#ifdef GL_OES_standard_derivatives\n"
-    "    d = fwidth(r);\n"
-    "#endif\n"    
-    "    color.a = 1.0 - smoothstep(1.0 - d, 1.0 + d, r);\n"
-    "    if (color.a < 0.1)\n"
-    "        discard; \n"    
-
     "    gl_FragColor = color;\n"   
     "}\n"
 };
@@ -242,6 +230,7 @@ _hazeDistance(FLT_MAX)
     program->addShader(new osg::Shader(osg::Shader::FRAGMENT, fragSource));
     program->addBindAttribLocation("data", osg::Drawable::ATTRIBUTE_6);
     getOrCreateStateSet()->setAttributeAndModes(program, osg::StateAttribute::ON);
+    getOrCreateStateSet()->setMode(GL_POINT_SMOOTH, osg::StateAttribute::ON);
 
     getOrCreateStateSet()->getOrCreateUniform("maxReturn", osg::Uniform::FLOAT)->set((float)_maxReturn);
     getOrCreateStateSet()->getOrCreateUniform("minIntensity", osg::Uniform::FLOAT)->set((float)(_minIntensity));
