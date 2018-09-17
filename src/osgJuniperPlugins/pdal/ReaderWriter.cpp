@@ -118,10 +118,15 @@ public:
 				point.intensity = pdalPoint.getFieldAs<int>(Dimension::Id::Intensity);
 				point.returnNumber = pdalPoint.getFieldAs<int>(Dimension::Id::ReturnNumber);
 				point.classification = pdalPoint.getFieldAs<int>(Dimension::Id::Classification);
+                point.normalX = pdalPoint.getFieldAs<float>(Dimension::Id::NormalX);
+                point.normalY = pdalPoint.getFieldAs<float>(Dimension::Id::NormalY);
+                point.normalZ = pdalPoint.getFieldAs<float>(Dimension::Id::NormalZ);
 				points.push_back(point);
 			}
 
-			return new PointCloud(points);
+            PointCloudDecorator* decorator = new PointCloudDecorator;
+            decorator->addChild(new PointCloud(points));            
+            return decorator;
 		}
 		return ReadResult::ERROR_IN_READING_FILE;
     }

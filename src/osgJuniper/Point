@@ -55,6 +55,10 @@ namespace osgJuniper
 		unsigned char classification;
 		unsigned char returnNumber;       
 
+		float normalX;
+		float normalY;
+		float normalZ;
+
 		static void write(std::ostream &out, const std::vector< Point >& points);
 		static void read(std::istream &in, std::vector< Point >& points);
     };

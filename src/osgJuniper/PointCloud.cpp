@@ -25,6 +25,40 @@
 
 using namespace osgJuniper;
 
+
+osg::Node* makeNormals(osg::Geometry* in)
+{
+    osg::Vec3Array* inVerts = static_cast<osg::Vec3Array*>(in->getVertexArray());
+    osg::Vec3Array* inNormals = static_cast<osg::Vec3Array*>(in->getNormalArray());
+    OSG_NOTICE << inVerts->size() << ", " << inNormals->size() << std::endl;
+
+    osg::Geometry* geom = new osg::Geometry;
+
+    osg::Vec3Array* verts = new osg::Vec3Array;
+    geom->setVertexArray(verts);
+    verts->reserve(inVerts->size());
+    osg::Vec4Array* colors = new osg::Vec4Array;    
+    geom->setColorArray(colors, osg::Array::BIND_PER_VERTEX);
+    
+    for (unsigned int i = 0; i < inVerts->size(); i++)
+    {
+        osg::Vec3 a = (*inVerts)[i];
+        osg::Vec3 normal = (*inNormals)[i];
+        normal.normalize();
+
+        osg::Vec3 b = a + normal * 0.05;
+        verts->push_back(a);
+        verts->push_back(b);
+        colors->push_back(osg::Vec4(1.0, 0.0, 0.0, 1.0));
+        colors->push_back(osg::Vec4(0.0, 1.0, 0.0, 1.0));
+    }
+
+    geom->addPrimitiveSet(new osg::DrawArrays(GL_LINES, 0, verts->size()));
+
+    geom->getOrCreateStateSet()->setAttributeAndModes(new osg::Program(), osg::StateAttribute::OFF);
+    return geom;
+}
+
 PointCloud::PointCloud()
 {
 }
@@ -52,6 +86,10 @@ void PointCloud::setPoints(const PointList& points)
 	osg::Vec3Array* verts = new osg::Vec3Array();
 	verts->reserve(points.size());
 	geometry->setVertexArray(verts);
+
+    osg::Vec3Array* normals = new osg::Vec3Array;
+    normals->reserve(points.size());
+    geometry->setNormalArray(normals, osg::Array::BIND_PER_VERTEX);
 	
 	osg::Vec4Array* colors = new osg::Vec4Array();
 	colors->reserve(points.size());
@@ -87,6 +125,8 @@ void PointCloud::setPoints(const PointList& points)
 
 		osg::Vec4 color = osg::Vec4(point.r / 65536.0, point.g / 65536.0, point.b / 65536.0, 1.0);
 		colors->push_back(color);
+
+        normals->push_back(osg::Vec3(point.normalX, point.normalY, point.normalZ));
 	}
 
 	// Add a final geometry if necessary
@@ -94,15 +134,16 @@ void PointCloud::setPoints(const PointList& points)
 	{
 		geode->addDrawable(geometry);
 		geometry->addPrimitiveSet(new osg::DrawArrays(GL_POINTS, 0, verts->size()));
-		geometry = 0;
 	}
+
+    //addChild(makeNormals(geometry));
 
 	setMatrix(osg::Matrixd::translate(anchor));
 	addChild(geode);	
 }
 
 
-static const char *vertSource = { 
+static const char *vertSource = {
 
     "#version 330 compatibility\n"
     "in vec4 data;\n"
@@ -126,7 +167,7 @@ static const char *vertSource = {
     "vec4 classificationToColor(in int classification)\n"
     "{\n"
     // Ground
-    "    if (classification == 2) return vec4(1,0,0,1);\n"    
+    "    if (classification == 2) return vec4(1,0,0,1);\n"
     // Veg
     "    if (classification == 3 || classification == 4 || classification == 5) return vec4(0,1,0,1);\n"
     // Building
@@ -143,13 +184,14 @@ static const char *vertSource = {
     "}\n"
 
     "void main(void)\n"
-    "{\n"    
+    "{\n"
     "    int classification = int(data.x);\n"
     "    float returnNumber = data.y;\n"
     "    float intensity = data.z;\n"
     "    float height = data.w;\n"
-    "    vec4 vertexView = gl_ModelViewMatrix * gl_Vertex;\n"    
+    "    vec4 vertexView = gl_ModelViewMatrix * gl_Vertex;\n"
     "    gl_Position = gl_ProjectionMatrix * vertexView ;\n"
+    "    vec3 normal = gl_NormalMatrix * gl_Normal;\n"
     "    float distance = -vertexView.z;\n"
     "    haze = clamp( distance/hazeDistance, 0.0, 0.75 ); \n"
     // Hide the vert if it's been filtered out.
@@ -158,10 +200,10 @@ static const char *vertSource = {
     "        gl_Position = vec4(10000, 10000, 0, 1);\n"
     "    }\n"
     "    else \n"
-    "    {\n"    
+    "    {\n"
     "        if (colorMode == 1)\n"
     "        {\n"
-    "            clr = intensityToColor(intensity, minIntensity, maxIntensity);\n"    
+    "            clr = intensityToColor(intensity, minIntensity, maxIntensity);\n"
     "        }\n"
     "        else if (colorMode == 2)\n"
     "        {\n"
@@ -186,14 +228,20 @@ static const char *vertSource = {
     "        else\n"
     "        {\n"
     "            clr = vec4(gl_Color.rgb, 1.0);\n"
-    "        }\n"    
+    "        }\n"
+    /*
     "        if (autoPointSize) {\n"
     "            float factor = 1.0 - smoothstep(0.0, maxPointDistance, distance);\n"
     "            gl_PointSize = pointSize * mix(minPointSize, maxPointSize, factor);\n"
     "        }\n"
     "        else {\n"
-    "            gl_PointSize = pointSize;\n"    
-    "        }\n"
+    */
+    "            gl_PointSize = pointSize;\n"
+    //"        }\n"
+    "if (autoPointSize) {\n"
+    "    if (dot(normal, -vertexView.xyz) <= 0) gl_Position = vec4(10000, 10000, 0, 1); \n"
+    "}\n"
+    //   if (dot(normal, -vertexView.xyz) <= 0) clr = vec4(1.0, 0.0, 0.0, 1.0); \n"
     "    }\n"
     "}\n"
 };
@@ -206,6 +254,7 @@ static const char *fragSource = {
     "{\n"     
     "    vec4 color = mix(clr, vec4(0.5, 0.5, 0.5, 1.0), haze);\n"
 
+    /*
     // Point smoothing.
     "    vec2 c = 2.0*gl_PointCoord - 1.0;\n"
     "    float r = dot(c, c);\n"
@@ -216,6 +265,7 @@ static const char *fragSource = {
     "    color.a = 1.0 - smoothstep(1.0 - d, 1.0 + d, r);\n"
     "    if (color.a < 0.1)\n"
     "        discard; \n"    
+    */
 
     "    gl_FragColor = color;\n"   
     "}\n"
@@ -242,6 +292,7 @@ _hazeDistance(FLT_MAX)
     program->addShader(new osg::Shader(osg::Shader::FRAGMENT, fragSource));
     program->addBindAttribLocation("data", osg::Drawable::ATTRIBUTE_6);
     getOrCreateStateSet()->setAttributeAndModes(program, osg::StateAttribute::ON);
+    getOrCreateStateSet()->setMode(GL_POINT_SMOOTH, osg::StateAttribute::ON);
 
     getOrCreateStateSet()->getOrCreateUniform("maxReturn", osg::Uniform::FLOAT)->set((float)_maxReturn);
     getOrCreateStateSet()->getOrCreateUniform("minIntensity", osg::Uniform::FLOAT)->set((float)(_minIntensity));

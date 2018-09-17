@@ -31,6 +31,9 @@ Point::Point() :
 	g(0.0),
 	b(0.0),
 	a(0.0),
+    normalX(0.0f),
+    normalY(0.0f),
+    normalZ(0.0f),
 	classification(0),
 	intensity(0),
 	returnNumber(0)
@@ -39,6 +42,7 @@ Point::Point() :
 
 void Point::write(std::ostream &out, const std::vector< Point >& points)
 {
+    // TODO:  Do we need this?
 	float minX = FLT_MAX;
 	float minY = FLT_MAX;
 	float minZ = FLT_MAX;
