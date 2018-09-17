@@ -22,6 +22,7 @@
 #include <osg/Program>
 #include <osg/Geometry>
 #include <osg/Geode>
+#include <sstream>
 
 using namespace osgJuniper;
 
@@ -105,23 +106,36 @@ void PointCloud::setPoints(const PointList& points)
 static const char *vertSource = { 
 
     "#version 330 compatibility\n"
+    "\n"
+    "#pragma import_defines(JUNIPER_AUTOPOINTSIZE, JUNIPER_COLORMODE)\n"
+    "\n"
+    
+    "#define COLORMODE_RGB 0 \n"
+    "#define COLORMODE_INTENSITY 1 \n"
+    "#define COLORMODE_CLASSIFICATION 2 \n"
+    "#define COLORMODE_HEIGHT 3 \n"
+    "#define COLORMODE_RAMP 4 \n"    
+
     "in vec4 data;\n"
     "uniform float maxReturn;\n"
-    "uniform int colorMode;\n"
     "uniform float minIntensity;\n"
     "uniform float maxIntensity;\n"
-    "uniform bool classificationFilter[32];\n"
+    //"uniform bool classificationFilter[32];\n"
     "uniform float minPointSize;\n"
     "uniform float maxPointSize;\n"
     "uniform float maxPointDistance;\n"
     "uniform float pointSize;\n"
-    "uniform bool autoPointSize;\n"
+
     "uniform float minHeight;\n"
     "uniform float maxHeight;\n"
     "uniform sampler2D colorRamp;\n"
     "uniform float hazeDistance;\n"
     "out float haze; \n"
     "out vec4 clr;\n"
+
+    "#ifndef JUNIPER_COLORMODE\n"
+    "    #define JUNIPER_COLORMODE COLORMODE_RGB\n"
+    "#endif\n"
 
     "vec4 classificationToColor(in int classification)\n"
     "{\n"
@@ -144,57 +158,52 @@ static const char *vertSource = {
 
     "void main(void)\n"
     "{\n"    
+
     "    int classification = int(data.x);\n"
     "    float returnNumber = data.y;\n"
     "    float intensity = data.z;\n"
     "    float height = data.w;\n"
+
     "    vec4 vertexView = gl_ModelViewMatrix * gl_Vertex;\n"    
     "    gl_Position = gl_ProjectionMatrix * vertexView ;\n"
     "    float distance = -vertexView.z;\n"
     "    haze = clamp( distance/hazeDistance, 0.0, 0.75 ); \n"
-    // Hide the vert if it's been filtered out.
-    "    if (returnNumber > maxReturn || !classificationFilter[classification])\n"
-    "    {\n"
-    "        gl_Position = vec4(10000, 10000, 0, 1);\n"
-    "    }\n"
-    "    else \n"
-    "    {\n"    
-    "        if (colorMode == 1)\n"
+
+    "    #if JUNIPER_COLORMODE == COLORMODE_RGB\n"
+    "      clr = vec4(gl_Color.rgb, 1.0); \n"
+    "    #endif\n"
+
+    "    #if JUNIPER_COLORMODE == COLORMODE_INTENSITY \n"
+    "        clr = intensityToColor(intensity, minIntensity, maxIntensity);\n"    
+    "    #endif\n"
+
+    "    #if JUNIPER_COLORMODE == COLORMODE_CLASSIFICATION \n"
+    "        clr = classificationToColor(classification);\n"
+    "    #endif\n"
+
+    "    #if JUNIPER_COLORMODE == COLORMODE_HEIGHT\n"
+    "        if (height < minHeight) \n"
     "        {\n"
-    "            clr = intensityToColor(intensity, minIntensity, maxIntensity);\n"    
-    "        }\n"
-    "        else if (colorMode == 2)\n"
-    "        {\n"
-    "            clr = classificationToColor(classification);\n"
-    "        }\n"
-    "        else if (colorMode == 3)\n"
-    "        {\n"
-    "            if (height < minHeight) \n"
-    "            {\n"
-    "                clr = vec4(0.0, 1.0, 0.0, 1.0);\n"
-    "            }\n"
-    "            else\n"
-    "            {\n"
-    "                clr = vec4(1.0, 0.0, 0.0, 1.0);\n"
-    "            }\n"
-    "        }\n"
-    "        else if (colorMode == 4)\n"
-    "        {\n"
-    "            float sample = (height - minHeight) / (maxHeight - minHeight);\n"
-    "            clr = texture2D(colorRamp, vec2(0.5, sample));\n"
+    "            clr = vec4(0.0, 1.0, 0.0, 1.0);\n"
     "        }\n"
     "        else\n"
     "        {\n"
-    "            clr = vec4(gl_Color.rgb, 1.0);\n"
-    "        }\n"    
-    "        if (autoPointSize) {\n"
-    "            float factor = 1.0 - smoothstep(0.0, maxPointDistance, distance);\n"
-    "            gl_PointSize = pointSize * mix(minPointSize, maxPointSize, factor);\n"
+    "            clr = vec4(1.0, 0.0, 0.0, 1.0);\n"
     "        }\n"
-    "        else {\n"
-    "            gl_PointSize = pointSize;\n"    
-    "        }\n"
-    "    }\n"
+    "    #endif\n"
+
+    "   #if JUNIPER_COLORMODE == COLORMODE_RAMP\n"
+    "        float sample = (height - minHeight) / (maxHeight - minHeight);\n"
+    "        clr = texture2D(colorRamp, vec2(0.5, sample));\n"    
+    "   #endif\n"
+
+    "#ifdef JUNIPER_AUTOPOINTSIZE\n"
+    "        float factor = 1.0 - smoothstep(0.0, maxPointDistance, distance);\n"
+    "        gl_PointSize = pointSize * mix(minPointSize, maxPointSize, factor);\n"
+    "#else\n"
+    "        gl_PointSize = pointSize;\n"    
+    "#endif\n"
+
     "}\n"
 };
 
@@ -225,11 +234,6 @@ _maxPointDistance(5000.0),
 _autoPointSize(true),
 _hazeDistance(FLT_MAX)
 {    
-    osg::Program* program =new osg::Program;
-    program->addShader(new osg::Shader(osg::Shader::VERTEX, vertSource));
-    program->addShader(new osg::Shader(osg::Shader::FRAGMENT, fragSource));
-    program->addBindAttribLocation("data", osg::Drawable::ATTRIBUTE_6);
-    getOrCreateStateSet()->setAttributeAndModes(program, osg::StateAttribute::ON);
     getOrCreateStateSet()->setMode(GL_POINT_SMOOTH, osg::StateAttribute::ON);
 
     getOrCreateStateSet()->getOrCreateUniform("maxReturn", osg::Uniform::FLOAT)->set((float)_maxReturn);
@@ -239,23 +243,35 @@ _hazeDistance(FLT_MAX)
     getOrCreateStateSet()->getOrCreateUniform("maxPointSize", osg::Uniform::FLOAT)->set(_maxPointSize);
     getOrCreateStateSet()->getOrCreateUniform("maxPointDistance", osg::Uniform::FLOAT)->set(_maxPointDistance);
     getOrCreateStateSet()->getOrCreateUniform("pointSize", osg::Uniform::FLOAT)->set(_pointSize);
-    getOrCreateStateSet()->getOrCreateUniform("autoPointSize", osg::Uniform::BOOL)->set(_autoPointSize);
     getOrCreateStateSet()->getOrCreateUniform("minHeight", osg::Uniform::FLOAT)->set(_minHeight);
     getOrCreateStateSet()->getOrCreateUniform("maxHeight", osg::Uniform::FLOAT)->set(_maxHeight);
-    getOrCreateStateSet()->getOrCreateUniform("colorMode", osg::Uniform::INT)->set((int)_colorMode);
     getOrCreateStateSet()->getOrCreateUniform("colorRamp", osg::Uniform::SAMPLER_2D)->set(0);
     getOrCreateStateSet()->getOrCreateUniform("hazeDistance", osg::Uniform::FLOAT)->set(_hazeDistance);
+
+    getOrCreateStateSet()->setDefine("JUNIPER_AUTOPOINTSIZE", _autoPointSize ? osg::StateAttribute::ON : osg::StateAttribute::OFF);
+    std::stringstream buf;
+    buf << (int)_colorMode;
+    getOrCreateStateSet()->setDefine("JUNIPER_COLORMODE", buf.str(), osg::StateAttribute::ON);    
 
     getOrCreateStateSet()->setMode(GL_BLEND, osg::StateAttribute::ON);
 
     // To enable setting the point size in the vertex program.
     getOrCreateStateSet()->setMode(GL_VERTEX_PROGRAM_POINT_SIZE, true);
 
+    /*
     _classificationFilter = getOrCreateStateSet()->getOrCreateUniform("classificationFilter", osg::Uniform::BOOL, 32);
     for (unsigned int i = 0; i < 32; i++)
     {
         _classificationFilter->setElement(i, true);
-    }   
+    } 
+    */
+
+    osg::Program* program = new osg::Program;
+    program->addShader(new osg::Shader(osg::Shader::VERTEX, vertSource));
+    program->addShader(new osg::Shader(osg::Shader::FRAGMENT, fragSource));
+    program->addBindAttribLocation("data", osg::Drawable::ATTRIBUTE_6);
+    getOrCreateStateSet()->setAttributeAndModes(program, osg::StateAttribute::ON);
+
 }
 
 float PointCloudDecorator::getPointSize() const
@@ -291,9 +307,9 @@ void PointCloudDecorator::setMaxHeight(float maxHeight)
     getOrCreateStateSet()->getOrCreateUniform("maxHeight", osg::Uniform::FLOAT)->set(_maxHeight);
 }
 
-
 bool PointCloudDecorator::getClassificationVisible(unsigned int classification) const
 {
+    return true;
       bool result;
       _classificationFilter->getElement(classification, result);
       return result;
@@ -301,6 +317,7 @@ bool PointCloudDecorator::getClassificationVisible(unsigned int classification) 
 
 void PointCloudDecorator::setClassificationVisible(unsigned int classification, bool enabled)
 {
+    return;
     _classificationFilter->setElement(classification, enabled);
 }
 
@@ -346,7 +363,9 @@ PointCloudDecorator::ColorMode PointCloudDecorator::getColorMode() const
 void PointCloudDecorator::setColorMode(PointCloudDecorator::ColorMode colorMode)
 {
     _colorMode = colorMode;
-    getOrCreateStateSet()->getOrCreateUniform("colorMode", osg::Uniform::INT)->set((int)_colorMode);
+    std::stringstream buf;
+    buf << (int)_colorMode;
+    getOrCreateStateSet()->setDefine("JUNIPER_COLORMODE", buf.str(), osg::StateAttribute::ON);
 }
 
 float PointCloudDecorator::getMinPointSize() const
@@ -391,7 +410,7 @@ bool PointCloudDecorator::getAutoPointSize() const
 void PointCloudDecorator::setAutoPointSize(bool autoPointSize)
 {
     _autoPointSize = autoPointSize;
-    getOrCreateStateSet()->getOrCreateUniform("autoPointSize", osg::Uniform::BOOL)->set(_autoPointSize);
+    getOrCreateStateSet()->setDefine("JUNIPER_AUTOPOINTSIZE", _autoPointSize ? osg::StateAttribute::ON : osg::StateAttribute::OFF);
 }
 
 
