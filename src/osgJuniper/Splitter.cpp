@@ -508,12 +508,13 @@ public:
 void Splitter::refine()
 {	
     // Autocompute max level if one is not defined.
+    /*
     if (_maxLevel < 0)
     {
         _maxLevel = _level * 2;
     }
-
     OSG_NOTICE << "Refining to max level " << _maxLevel << std::endl;
+    */
 
 	osg::Timer_t startTime = osg::Timer::instance()->tick();
 	OSG_NOTICE << "Need to refine " << _needsRefined.size() << " of " << _cellCounts.size() << " cells" << std::endl;
